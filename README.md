@@ -1,4 +1,4 @@
-# Traffic Monitor
+# tx-monitor
 
 A real-time network traffic visualizer.
 
@@ -10,7 +10,7 @@ A real-time network traffic visualizer.
 ## Quick Start
 Use your preferred Node package management solution to execute the cli.
 ```bash
-sudo bunx tx-mon
+sudo bunx tx-monitor
 ```
 
 ### Development

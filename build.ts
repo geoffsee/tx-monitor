@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 
 const DIST = "./dist";
 const PUBLIC = "./public";
+const SKIP_COPY = /\.(log)$/i;
 
 async function copyDir(src: string, dest: string) {
   await mkdir(dest, { recursive: true });
@@ -13,6 +14,10 @@ async function copyDir(src: string, dest: string) {
     cwd: src,
     absolute: false,
   })) {
+    if (SKIP_COPY.test(entry)) {
+      continue;
+    }
+
     const from = join(src, entry);
     const to = join(dest, entry);
     const file = Bun.file(from);
@@ -36,7 +41,6 @@ const result = await Bun.build({
   target: "browser",
   format: "esm",
   splitting: true,
-  sourcemap: "external",
   minify: true,
   naming: {
     entry: "[dir]/[name]-[hash].[ext]",
