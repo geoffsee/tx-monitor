@@ -4,9 +4,10 @@ import { join, extname } from "node:path";
 import { parseArgs } from "node:util";
 import { TcpdumpParser, type ParsedPacket } from "./tcpdumpParser";
 
+const PACKAGE_ROOT = join(import.meta.dirname, "..");
 const DEFAULT_TCPDUMP = ["sudo", "tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv"];
 const WS_PATH = "/ws";
-const DIST = "./dist";
+const DIST = join(PACKAGE_ROOT, "dist");
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 const FILE_REPLAY_SPEED = Number.parseFloat(process.env.FILE_REPLAY_SPEED ?? "40");
 

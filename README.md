@@ -8,9 +8,9 @@ A real-time network traffic visualizer.
 - `tcpdump` (required for live capture only)
 
 ## Quick Start
-
+Use your preferred Node package management solution to execute the cli.
 ```bash
-bun install
+sudo bunx tx-mon
 ```
 
 ### Development

@@ -1,14 +1,42 @@
 {
   "name": "tx-mon",
-  "module": "src/index.tsx",
+  "version": "1.0.1",
+  "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
+  "license": "MIT",
   "type": "module",
+  "bin": {
+    "tx-mon": "bin/tx-mon.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoffsee/tx-mon.git"
+  },
+  "keywords": [
+    "tcpdump",
+    "network",
+    "traffic",
+    "monitor",
+    "visualizer",
+    "websocket"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "scripts": {
     "build": "bun run build.ts",
     "dev": "vite",
     "monitor": "bun run src/server.ts",
     "monitor:file": "bun run src/server.ts --file tcpdump.log",
     "start": "bun run src/server.ts",
-    "start:file": "bun run src/server.ts --file tcpdump.log"
+    "start:file": "bun run src/server.ts --file tcpdump.log",
+    "prepublishOnly": "bun run build",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",
