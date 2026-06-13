@@ -1,0 +1,25 @@
+{
+  "name": "tx-mon",
+  "module": "src/index.tsx",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "dev": "vite",
+    "monitor": "bun run src/server.ts",
+    "monitor:file": "bun run src/server.ts --file tcpdump.log",
+    "start": "bun run src/server.ts",
+    "start:file": "bun run src/server.ts --file tcpdump.log"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.10.2",
+    "mobx": "^6.15.0",
+    "mobx-state-tree": "^7.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  }
+}

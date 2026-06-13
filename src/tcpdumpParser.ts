@@ -1,0 +1,184 @@
+export type PacketProto = "TCP" | "UDP" | "ICMP" | "OTHER";
+
+export type ParsedPacket = {
+    id: string;
+    timestamp: string;
+    proto: PacketProto;
+    srcHost: string;
+    srcPort: number | null;
+    dstHost: string;
+    dstPort: number | null;
+    length: number;
+    info: string;
+};
+
+type PendingHeader = {
+    timestamp: string;
+    proto: PacketProto;
+    length: number;
+};
+
+let packetCounter = 0;
+
+function nextPacketId(): string {
+    packetCounter += 1;
+    return `pkt-${packetCounter}`;
+}
+
+function extractProto(line: string): PacketProto {
+    const match = line.match(/(?:proto|next-header)\s+(TCP|UDP|ICMP)\s*\(/i);
+    if (!match?.[1]) {
+        return "OTHER";
+    }
+    return match[1].toUpperCase() as PacketProto;
+}
+
+function extractLength(line: string): number {
+    const match = line.match(/length[:\s]+(\d+)/i);
+    return match?.[1] ? Number.parseInt(match[1], 10) : 0;
+}
+
+function parseEndpoint(endpoint: string): { host: string; port: number | null } {
+    const lastDot = endpoint.lastIndexOf(".");
+    if (lastDot === -1) {
+        return { host: endpoint, port: null };
+    }
+
+    const host = endpoint.slice(0, lastDot);
+    const port = Number.parseInt(endpoint.slice(lastDot + 1), 10);
+    return {
+        host,
+        port: Number.isFinite(port) ? port : null,
+    };
+}
+
+function extractFlow(line: string): {
+    srcHost: string;
+    srcPort: number | null;
+    dstHost: string;
+    dstPort: number | null;
+    info: string;
+} | null {
+    const match = line.match(
+        /([0-9a-fA-F:.]+)\.(\d+)\s+>\s+([0-9a-fA-F:.]+)\.(\d+):\s*(.*)$/,
+    );
+    if (!match) {
+        return null;
+    }
+
+    return {
+        srcHost: match[1]!,
+        srcPort: Number.parseInt(match[2]!, 10),
+        dstHost: match[3]!,
+        dstPort: Number.parseInt(match[4]!, 10),
+        info: match[5]?.trim() ?? "",
+    };
+}
+
+function isHeaderLine(line: string): boolean {
+    return /^\d{2}:\d{2}:\d{2}\.\d+\s+IP6?\s+\(/.test(line);
+}
+
+export class TcpdumpParser {
+    private pendingHeader: PendingHeader | null = null;
+
+    parseLine(line: string): ParsedPacket | null {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        if (isHeaderLine(trimmed)) {
+            const timestampMatch = trimmed.match(/^(\d{2}:\d{2}:\d{2}\.\d+)/);
+            const timestamp = timestampMatch?.[1] ?? "00:00:00.000000";
+            const proto = extractProto(trimmed);
+            const length = extractLength(trimmed);
+            const inlineFlow = extractFlow(trimmed);
+
+            if (inlineFlow) {
+                return {
+                    id: nextPacketId(),
+                    timestamp,
+                    proto,
+                    srcHost: inlineFlow.srcHost,
+                    srcPort: inlineFlow.srcPort,
+                    dstHost: inlineFlow.dstHost,
+                    dstPort: inlineFlow.dstPort,
+                    length,
+                    info: inlineFlow.info,
+                };
+            }
+
+            this.pendingHeader = { timestamp, proto, length };
+            return null;
+        }
+
+        if (this.pendingHeader) {
+            const flow = extractFlow(trimmed);
+            if (!flow) {
+                return null;
+            }
+
+            const packet: ParsedPacket = {
+                id: nextPacketId(),
+                timestamp: this.pendingHeader.timestamp,
+                proto: this.pendingHeader.proto,
+                srcHost: flow.srcHost,
+                srcPort: flow.srcPort,
+                dstHost: flow.dstHost,
+                dstPort: flow.dstPort,
+                length: this.pendingHeader.length,
+                info: flow.info,
+            };
+            this.pendingHeader = null;
+            return packet;
+        }
+
+        return null;
+    }
+}
+
+export function hostCategory(address: string): "local" | "private" | "public" {
+    if (
+        address === "127.0.0.1" ||
+        address === "::1" ||
+        address.startsWith("127.")
+    ) {
+        return "local";
+    }
+
+    if (
+        address.startsWith("10.") ||
+        address.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
+        address.startsWith("fe80:") ||
+        address.startsWith("fd")
+    ) {
+        return "private";
+    }
+
+    return "public";
+}
+
+export function shortHost(address: string): string {
+    if (address.length <= 18) {
+        return address;
+    }
+    return `${address.slice(0, 8)}…${address.slice(-6)}`;
+}
+
+export function formatService(port: number | null, proto: PacketProto): string {
+    if (port === null) {
+        return proto;
+    }
+    if (port === 443) {
+        return "HTTPS";
+    }
+    if (port === 80) {
+        return "HTTP";
+    }
+    if (port === 53) {
+        return "DNS";
+    }
+    return `${proto}/${port}`;
+}
