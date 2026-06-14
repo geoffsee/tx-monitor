@@ -22,6 +22,23 @@ export type Selection =
     | { kind: "flow"; id: string }
     | { kind: "packet"; id: string };
 
+export type CaptureSessionSummary = {
+    id: string;
+    mode: string;
+    label: string;
+    startedAt: number;
+    endedAt: number | null;
+    totalPackets: number;
+    totalBytes: number;
+};
+
+export type TrafficViewMode = "live" | "history";
+
+export type SessionLoadProgress = {
+    loaded: number;
+    total: number;
+};
+
 export type TrafficSnapshot = {
     nodes: Node<HostNodeData>[];
     edges: Edge<FlowEdgeData>[];

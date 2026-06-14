@@ -1,7 +1,13 @@
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
-import type { Selection, TrafficSnapshot } from "../types";
+import type {
+    Selection,
+    SessionLoadProgress,
+    TrafficSnapshot,
+    TrafficViewMode,
+} from "../types";
 import { DetailPanel } from "./DetailPanel";
+import { SessionHistory } from "./SessionHistory";
 import {
     denseFeedRowStyle,
     denseListRowStyle,
@@ -21,6 +27,12 @@ type SidebarProps = {
     graph: TrafficSnapshot;
     selection: Selection | null;
     isCompact: boolean;
+    viewMode: TrafficViewMode;
+    activeSessionId: string | null;
+    sessionLoadProgress: SessionLoadProgress | null;
+    sessionsVersion: number;
+    onLoadSession: (sessionId: string) => void;
+    onReturnToLive: () => void;
     onSelectFlow: (id: string) => void;
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
@@ -31,11 +43,24 @@ export function Sidebar({
     graph,
     selection,
     isCompact,
+    viewMode,
+    activeSessionId,
+    sessionLoadProgress,
+    sessionsVersion,
+    onLoadSession,
+    onReturnToLive,
     onSelectFlow,
     onSelectPacket,
     onNavigateToFlow,
     onClearSelection,
 }: SidebarProps) {
+    const feedLabel =
+        viewMode === "history"
+            ? "History"
+            : graph.connected
+              ? "Live"
+              : "Offline";
+
     return (
         <aside
             style={{
@@ -63,9 +88,7 @@ export function Sidebar({
             >
                 <div style={summaryCardStyle}>
                     <div style={summaryLabelStyle}>Feed</div>
-                    <div style={summaryValueStyle}>
-                        {graph.connected ? "Live" : "Offline"}
-                    </div>
+                    <div style={summaryValueStyle}>{feedLabel}</div>
                 </div>
                 <div style={summaryCardStyle}>
                     <div style={summaryLabelStyle}>Volume</div>
@@ -81,6 +104,14 @@ export function Sidebar({
                     onSelectFlow={onNavigateToFlow}
                 />
             ) : null}
+            <SessionHistory
+                viewMode={viewMode}
+                activeSessionId={activeSessionId}
+                sessionLoadProgress={sessionLoadProgress}
+                sessionsVersion={sessionsVersion}
+                onLoadSession={onLoadSession}
+                onReturnToLive={onReturnToLive}
+            />
             <section style={{ flexShrink: 0, minWidth: 0 }}>
                 <div style={panelTitleStyle}>Capture Source</div>
                 <div style={{ ...denseFeedRowStyle, marginTop: 8 }}>

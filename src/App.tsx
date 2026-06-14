@@ -6,7 +6,15 @@ import { useSelection } from "./hooks/useSelection";
 import { useTrafficFeed } from "./hooks/useTrafficFeed";
 
 export default function App() {
-    const graph = useTrafficFeed();
+    const {
+        graph,
+        viewMode,
+        activeSessionId,
+        sessionLoadProgress,
+        sessionsVersion,
+        loadSession,
+        returnToLive,
+    } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
         useSelection();
@@ -75,6 +83,12 @@ export default function App() {
                     graph={graph}
                     selection={selection}
                     isCompact={isCompact}
+                    viewMode={viewMode}
+                    activeSessionId={activeSessionId}
+                    sessionLoadProgress={sessionLoadProgress}
+                    sessionsVersion={sessionsVersion}
+                    onLoadSession={loadSession}
+                    onReturnToLive={returnToLive}
                     onSelectFlow={handleSidebarSelectFlow}
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}

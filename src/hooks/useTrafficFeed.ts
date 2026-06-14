@@ -1,36 +1,168 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    fetchSession,
+    fetchSessionPackets,
+    SESSION_PAGE_SIZE,
+} from "../lib/api";
 import { createGraph } from "../lib/graph";
 import type { ParsedPacket } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
-import type { TrafficSnapshot } from "../types";
+import type {
+    SessionLoadProgress,
+    TrafficSnapshot,
+    TrafficViewMode,
+} from "../types";
 import { resolveWsUrl } from "../ws";
 
 const FLUSH_INTERVAL_MS = 80;
 const MAX_INGEST_PER_FLUSH = 1000;
 const CATCHUP_GRAPH_INTERVAL_MS = 120;
+const HISTORY_INGEST_CHUNK = 2000;
 
-export function useTrafficFeed() {
+export type TrafficFeedState = {
+    graph: TrafficSnapshot;
+    viewMode: TrafficViewMode;
+    activeSessionId: string | null;
+    sessionLoadProgress: SessionLoadProgress | null;
+    sessionsVersion: number;
+    loadSession: (sessionId: string) => Promise<void>;
+    returnToLive: () => void;
+    refreshSessions: () => void;
+};
+
+export function useTrafficFeed(): TrafficFeedState {
     const [graph, setGraph] = useState<TrafficSnapshot>(() => createGraph());
+    const [viewMode, setViewMode] = useState<TrafficViewMode>("live");
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const [sessionLoadProgress, setSessionLoadProgress] =
+        useState<SessionLoadProgress | null>(null);
+    const [sessionsVersion, setSessionsVersion] = useState(0);
     const graphRafRef = useRef<number | null>(null);
     const graphTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasDisplayedPacketsRef = useRef(false);
+    const livePausedRef = useRef(false);
+    const loadAbortRef = useRef(0);
+
+    const publishGraph = useCallback(() => {
+        if (graphRafRef.current !== null) {
+            cancelAnimationFrame(graphRafRef.current);
+        }
+        if (graphTimerRef.current !== null) {
+            clearTimeout(graphTimerRef.current);
+            graphTimerRef.current = null;
+        }
+        graphRafRef.current = requestAnimationFrame(() => {
+            graphRafRef.current = null;
+            setGraph(createGraph());
+        });
+    }, []);
+
+    const refreshSessions = useCallback(() => {
+        setSessionsVersion((version) => version + 1);
+    }, []);
+
+    const returnToLive = useCallback(() => {
+        loadAbortRef.current += 1;
+        livePausedRef.current = false;
+        setSessionLoadProgress(null);
+        setActiveSessionId(null);
+        setViewMode("live");
+        trafficNetwork.reset();
+        publishGraph();
+        refreshSessions();
+    }, [publishGraph, refreshSessions]);
+
+    const loadSession = useCallback(
+        async (sessionId: string) => {
+            const loadId = loadAbortRef.current + 1;
+            loadAbortRef.current = loadId;
+            livePausedRef.current = true;
+            setActiveSessionId(sessionId);
+            setViewMode("history");
+            setSessionLoadProgress({ loaded: 0, total: 0 });
+            trafficNetwork.reset();
+            publishGraph();
+
+            try {
+                const session = await fetchSession(sessionId);
+                if (loadAbortRef.current !== loadId) {
+                    return;
+                }
+
+                trafficNetwork.setSource("history", session.label);
+                trafficNetwork.remember(
+                    `Loading ${session.totalPackets.toLocaleString()} packets`,
+                );
+                setSessionLoadProgress({
+                    loaded: 0,
+                    total: session.totalPackets,
+                });
+                publishGraph();
+
+                let offset = 0;
+                while (offset < session.totalPackets) {
+                    if (loadAbortRef.current !== loadId) {
+                        return;
+                    }
+
+                    const batch = await fetchSessionPackets(
+                        sessionId,
+                        offset,
+                        SESSION_PAGE_SIZE,
+                    );
+                    if (batch.length === 0) {
+                        break;
+                    }
+
+                    for (
+                        let index = 0;
+                        index < batch.length;
+                        index += HISTORY_INGEST_CHUNK
+                    ) {
+                        if (loadAbortRef.current !== loadId) {
+                            return;
+                        }
+                        trafficNetwork.ingestHistoricalBatch(
+                            batch.slice(index, index + HISTORY_INGEST_CHUNK),
+                        );
+                    }
+
+                    offset += batch.length;
+                    setSessionLoadProgress({
+                        loaded: offset,
+                        total: session.totalPackets,
+                    });
+                    publishGraph();
+                }
+
+                if (loadAbortRef.current !== loadId) {
+                    return;
+                }
+
+                trafficNetwork.remember(
+                    `Loaded session · ${session.totalPackets.toLocaleString()} packets`,
+                );
+                setSessionLoadProgress(null);
+                publishGraph();
+                refreshSessions();
+            } catch (error) {
+                if (loadAbortRef.current !== loadId) {
+                    return;
+                }
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load session";
+                trafficNetwork.remember(message);
+                setSessionLoadProgress(null);
+                publishGraph();
+            }
+        },
+        [publishGraph, refreshSessions],
+    );
 
     useEffect(() => {
         hasDisplayedPacketsRef.current = false;
-
-        const publishGraph = () => {
-            if (graphRafRef.current !== null) {
-                cancelAnimationFrame(graphRafRef.current);
-            }
-            if (graphTimerRef.current !== null) {
-                clearTimeout(graphTimerRef.current);
-                graphTimerRef.current = null;
-            }
-            graphRafRef.current = requestAnimationFrame(() => {
-                graphRafRef.current = null;
-                setGraph(createGraph());
-            });
-        };
 
         const scheduleGraphUpdate = (
             backlogSize: number,
@@ -59,7 +191,8 @@ export function useTrafficFeed() {
 
         const flushPackets = () => {
             flushTimer = null;
-            if (pendingPackets.length === 0) {
+            if (pendingPackets.length === 0 || livePausedRef.current) {
+                pendingPackets.length = 0;
                 return;
             }
 
@@ -77,7 +210,7 @@ export function useTrafficFeed() {
         };
 
         const scheduleFlush = () => {
-            if (flushTimer) {
+            if (flushTimer || livePausedRef.current) {
                 return;
             }
             const delay =
@@ -88,7 +221,7 @@ export function useTrafficFeed() {
         };
 
         const queuePackets = (packets: ParsedPacket[]) => {
-            if (packets.length === 0) {
+            if (packets.length === 0 || livePausedRef.current) {
                 return;
             }
             pendingPackets.push(...packets);
@@ -96,20 +229,28 @@ export function useTrafficFeed() {
         };
 
         socket.addEventListener("open", () => {
-            trafficNetwork.setConnection(true);
-            publishGraph();
+            if (!livePausedRef.current) {
+                trafficNetwork.setConnection(true);
+                publishGraph();
+            }
         });
 
         socket.addEventListener("close", () => {
             if (flushTimer) {
                 clearTimeout(flushTimer);
             }
-            flushPackets();
-            trafficNetwork.setConnection(false);
-            publishGraph();
+            if (!livePausedRef.current) {
+                flushPackets();
+                trafficNetwork.setConnection(false);
+                publishGraph();
+            }
         });
 
         socket.addEventListener("message", (event) => {
+            if (livePausedRef.current) {
+                return;
+            }
+
             const payload = JSON.parse(String(event.data)) as
                 | { type: "packet"; packet: ParsedPacket }
                 | { type: "packets"; packets: ParsedPacket[] }
@@ -143,6 +284,7 @@ export function useTrafficFeed() {
                 flushPackets();
                 trafficNetwork.remember("File replay complete");
                 publishGraph();
+                refreshSessions();
             }
         });
 
@@ -158,7 +300,16 @@ export function useTrafficFeed() {
             }
             socket.close();
         };
-    }, []);
+    }, [publishGraph, refreshSessions]);
 
-    return graph;
+    return {
+        graph,
+        viewMode,
+        activeSessionId,
+        sessionLoadProgress,
+        sessionsVersion,
+        loadSession,
+        returnToLive,
+        refreshSessions,
+    };
 }

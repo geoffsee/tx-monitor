@@ -41,4 +41,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.webp
 !README-screenshot.png
 tcpdump.log
-/bin/
+*.db
+*.db-shm
+*.db-wal
+/drizzle/meta/0000_snapshot.json
+/drizzle/meta/_journal.json
+/bin/tx-monitor.js

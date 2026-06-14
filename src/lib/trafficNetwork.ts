@@ -97,7 +97,11 @@ const TrafficNetworkModel = types
         const flowKey = (packet: ParsedPacket) =>
             `${packet.srcHost}->${packet.dstHost}:${packet.proto}:${packet.dstPort ?? "any"}`;
 
-        const ingestPacket = (packet: ParsedPacket, quiet = false) => {
+        const ingestPacket = (
+            packet: ParsedPacket,
+            quiet = false,
+            seenAt = Date.now(),
+        ) => {
             const src = ensureHost(packet.srcHost, quiet);
             const dst = ensureHost(packet.dstHost, quiet);
             src.packetCount += 1;
@@ -110,7 +114,7 @@ const TrafficNetworkModel = types
             if (existingFlow) {
                 existingFlow.packetCount += 1;
                 existingFlow.bytesTotal += packet.length;
-                existingFlow.lastSeen = Date.now();
+                existingFlow.lastSeen = seenAt;
             } else {
                 self.flows.set(
                     key,
@@ -122,7 +126,7 @@ const TrafficNetworkModel = types
                         dstPort: packet.dstPort,
                         packetCount: 1,
                         bytesTotal: packet.length,
-                        lastSeen: Date.now(),
+                        lastSeen: seenAt,
                     }),
                 );
             }
@@ -137,7 +141,7 @@ const TrafficNetworkModel = types
                 dstPort: packet.dstPort,
                 length: packet.length,
                 info: packet.info,
-                receivedAt: Date.now(),
+                receivedAt: seenAt,
             };
             self.packets.unshift(snapshot);
             if (self.packets.length > 80) {
@@ -151,6 +155,17 @@ const TrafficNetworkModel = types
         const ingestBatch = (packets: ParsedPacket[], quiet = false) => {
             for (const packet of packets) {
                 ingestPacket(packet, quiet);
+            }
+        };
+
+        type HistoricalPacket = ParsedPacket & { receivedAt: number };
+
+        const ingestHistoricalBatch = (
+            packets: HistoricalPacket[],
+            quiet = true,
+        ) => {
+            for (const packet of packets) {
+                ingestPacket(packet, quiet, packet.receivedAt);
             }
         };
 
@@ -181,6 +196,7 @@ const TrafficNetworkModel = types
         return {
             ingestPacket,
             ingestBatch,
+            ingestHistoricalBatch,
             setConnection,
             setSource,
             reset,

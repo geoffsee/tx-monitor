@@ -3,9 +3,12 @@ import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
+import { openDatabase } from "./db/client";
+import { TrafficStore } from "./db/store";
 import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
+const DEFAULT_DB = "tx-mon.db";
 const DEFAULT_TCPDUMP = [
     "sudo",
     "tcpdump",
@@ -43,6 +46,8 @@ const { values } = parseArgs({
         file: { type: "string" },
         port: { type: "string" },
         serve: { type: "boolean", default: false },
+        db: { type: "string" },
+        "no-db": { type: "boolean", default: false },
     },
     strict: true,
     allowPositionals: false,
@@ -51,6 +56,16 @@ const { values } = parseArgs({
 const filePath = values.file;
 const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
 const serveStatic = values.serve || existsSync(join(DIST, "index.html"));
+const dbPath = values["no-db"]
+    ? null
+    : (values.db ?? process.env.TXMON_DB ?? DEFAULT_DB);
+const store = dbPath
+    ? new TrafficStore(
+          openDatabase(
+              dbPath.startsWith("/") ? dbPath : join(process.cwd(), dbPath),
+          ),
+      )
+    : null;
 const clients = new Set<WsClient>();
 let captureStarted = false;
 const PACKET_BATCH_INTERVAL_MS = 50;
@@ -69,6 +84,7 @@ function flushPacketBatch() {
     if (pendingPackets.length === 0) {
         return;
     }
+    store?.savePackets(pendingPackets);
     broadcast({ type: "packets", packets: pendingPackets });
     pendingPackets = [];
     packetBatchTimer = null;
@@ -155,6 +171,7 @@ async function replayFileOnce(path: string) {
 async function replayFile(path: string) {
     try {
         while (clients.size > 0) {
+            ensureCaptureSession("file", `file ${path}`);
             emitStatus("file", `file ${path}`);
             await replayFileOnce(path);
             flushPacketBatch();
@@ -162,6 +179,7 @@ async function replayFile(path: string) {
             await Bun.sleep(750);
         }
     } finally {
+        endCaptureSession();
         captureStarted = false;
     }
 }
@@ -186,6 +204,7 @@ function timestampToMs(timestamp: string): number | null {
 }
 
 async function streamLiveTcpdump() {
+    ensureCaptureSession("live", DEFAULT_TCPDUMP.join(" "));
     emitStatus("live", DEFAULT_TCPDUMP.join(" "));
     const parser = new TcpdumpParser();
     const proc = Bun.spawn({
@@ -217,12 +236,24 @@ async function streamLiveTcpdump() {
     }
 
     const exitCode = await proc.exited;
+    endCaptureSession();
     if (exitCode !== 0) {
         broadcast({
             type: "error",
             message: `tcpdump exited with code ${exitCode}`,
         });
     }
+}
+
+function ensureCaptureSession(mode: string, label: string) {
+    if (!store || store.getActiveSessionId()) {
+        return;
+    }
+    store.startSession(mode, label);
+}
+
+function endCaptureSession() {
+    store?.endSession();
 }
 
 function startCapture() {
@@ -242,8 +273,100 @@ function startCapture() {
             broadcast({ type: "error", message });
         })
         .finally(() => {
+            endCaptureSession();
             captureStarted = false;
         });
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+    });
+}
+
+function handleApiRequest(url: URL): Response | null {
+    if (!url.pathname.startsWith("/api/")) {
+        return null;
+    }
+
+    if (!store) {
+        return jsonResponse({ error: "Persistence is disabled" }, 503);
+    }
+
+    if (url.pathname === "/api/sessions") {
+        const limit = Number.parseInt(
+            url.searchParams.get("limit") ?? "20",
+            10,
+        );
+        return jsonResponse(store.listSessions(limit));
+    }
+
+    const sessionMatch = url.pathname.match(
+        /^\/api\/sessions\/([^/]+)(\/packets)?$/,
+    );
+    if (sessionMatch) {
+        const sessionId = decodeURIComponent(sessionMatch[1] ?? "");
+        const session = store.getSession(sessionId);
+        if (!session) {
+            return jsonResponse({ error: "Session not found" }, 404);
+        }
+
+        if (sessionMatch[2] === "/packets") {
+            const offset = Number.parseInt(
+                url.searchParams.get("offset") ?? "0",
+                10,
+            );
+            const limit = Number.parseInt(
+                url.searchParams.get("limit") ?? "5000",
+                10,
+            );
+            const rows = store.listSessionPackets(sessionId, offset, limit);
+            return jsonResponse(
+                rows.map((row) => ({
+                    id: row.id,
+                    timestamp: row.timestamp,
+                    proto: row.proto,
+                    srcHost: row.srcHost,
+                    srcPort: row.srcPort,
+                    dstHost: row.dstHost,
+                    dstPort: row.dstPort,
+                    length: row.length,
+                    info: row.info,
+                    receivedAt: row.receivedAt,
+                    sessionId: row.sessionId,
+                })),
+            );
+        }
+
+        return jsonResponse(session);
+    }
+
+    if (url.pathname === "/api/packets") {
+        const limit = Number.parseInt(
+            url.searchParams.get("limit") ?? "80",
+            10,
+        );
+        const sessionId = url.searchParams.get("session") ?? undefined;
+        const rows = store.listRecentPackets(limit, sessionId);
+        return jsonResponse(
+            rows.map((row) => ({
+                id: row.id,
+                timestamp: row.timestamp,
+                proto: row.proto,
+                srcHost: row.srcHost,
+                srcPort: row.srcPort,
+                dstHost: row.dstHost,
+                dstPort: row.dstPort,
+                length: row.length,
+                info: row.info,
+                receivedAt: row.receivedAt,
+                sessionId: row.sessionId,
+            })),
+        );
+    }
+
+    return jsonResponse({ error: "Not found" }, 404);
 }
 
 async function serveStaticFile(pathname: string): Promise<Response> {
@@ -270,6 +393,11 @@ Bun.serve({
     port: listenPort,
     async fetch(request, server) {
         const url = new URL(request.url);
+        const apiResponse = handleApiRequest(url);
+        if (apiResponse) {
+            return apiResponse;
+        }
+
         if (url.pathname === WS_PATH) {
             const upgraded = server.upgrade(request);
             if (!upgraded) {
@@ -307,6 +435,9 @@ Bun.serve({
 console.log(
     `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
 );
+if (store && dbPath) {
+    console.log(`Persisting traffic to ${dbPath}`);
+}
 if (filePath) {
     console.log(`Replay capture file on connect: ${filePath}`);
 } else {
