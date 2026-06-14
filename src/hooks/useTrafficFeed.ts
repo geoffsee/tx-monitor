@@ -6,21 +6,51 @@ import type { TrafficSnapshot } from "../types";
 import { resolveWsUrl } from "../ws";
 
 const FLUSH_INTERVAL_MS = 80;
-const MAX_INGEST_PER_FLUSH = 250;
+const MAX_INGEST_PER_FLUSH = 1000;
+const CATCHUP_GRAPH_INTERVAL_MS = 120;
 
 export function useTrafficFeed() {
     const [graph, setGraph] = useState<TrafficSnapshot>(() => createGraph());
     const graphRafRef = useRef<number | null>(null);
+    const graphTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasDisplayedPacketsRef = useRef(false);
 
     useEffect(() => {
-        const scheduleGraphUpdate = () => {
+        hasDisplayedPacketsRef.current = false;
+
+        const publishGraph = () => {
             if (graphRafRef.current !== null) {
-                return;
+                cancelAnimationFrame(graphRafRef.current);
+            }
+            if (graphTimerRef.current !== null) {
+                clearTimeout(graphTimerRef.current);
+                graphTimerRef.current = null;
             }
             graphRafRef.current = requestAnimationFrame(() => {
                 graphRafRef.current = null;
                 setGraph(createGraph());
             });
+        };
+
+        const scheduleGraphUpdate = (
+            backlogSize: number,
+            isFirstBatch = false,
+        ) => {
+            if (isFirstBatch || backlogSize === 0) {
+                publishGraph();
+                return;
+            }
+            if (backlogSize > MAX_INGEST_PER_FLUSH) {
+                if (graphTimerRef.current !== null) {
+                    return;
+                }
+                graphTimerRef.current = setTimeout(() => {
+                    graphTimerRef.current = null;
+                    publishGraph();
+                }, CATCHUP_GRAPH_INTERVAL_MS);
+                return;
+            }
+            publishGraph();
         };
 
         const socket = new WebSocket(resolveWsUrl());
@@ -34,11 +64,15 @@ export function useTrafficFeed() {
             }
 
             const batch = pendingPackets.splice(0, MAX_INGEST_PER_FLUSH);
+            const isFirstBatch = !hasDisplayedPacketsRef.current;
             trafficNetwork.ingestBatch(batch, true);
-            scheduleGraphUpdate();
+            hasDisplayedPacketsRef.current = true;
+            scheduleGraphUpdate(pendingPackets.length, isFirstBatch);
 
             if (pendingPackets.length > 0) {
                 flushTimer = setTimeout(flushPackets, 0);
+            } else {
+                publishGraph();
             }
         };
 
@@ -46,7 +80,11 @@ export function useTrafficFeed() {
             if (flushTimer) {
                 return;
             }
-            flushTimer = setTimeout(flushPackets, FLUSH_INTERVAL_MS);
+            const delay =
+                hasDisplayedPacketsRef.current || pendingPackets.length === 0
+                    ? FLUSH_INTERVAL_MS
+                    : 0;
+            flushTimer = setTimeout(flushPackets, delay);
         };
 
         const queuePackets = (packets: ParsedPacket[]) => {
@@ -59,7 +97,7 @@ export function useTrafficFeed() {
 
         socket.addEventListener("open", () => {
             trafficNetwork.setConnection(true);
-            scheduleGraphUpdate();
+            publishGraph();
         });
 
         socket.addEventListener("close", () => {
@@ -68,7 +106,7 @@ export function useTrafficFeed() {
             }
             flushPackets();
             trafficNetwork.setConnection(false);
-            scheduleGraphUpdate();
+            publishGraph();
         });
 
         socket.addEventListener("message", (event) => {
@@ -91,20 +129,20 @@ export function useTrafficFeed() {
 
             if (payload.type === "status") {
                 trafficNetwork.setSource(payload.mode, payload.label);
-                scheduleGraphUpdate();
+                publishGraph();
                 return;
             }
 
             if (payload.type === "error") {
                 trafficNetwork.remember(payload.message);
-                scheduleGraphUpdate();
+                publishGraph();
                 return;
             }
 
             if (payload.type === "complete") {
                 flushPackets();
                 trafficNetwork.remember("File replay complete");
-                scheduleGraphUpdate();
+                publishGraph();
             }
         });
 
@@ -114,6 +152,9 @@ export function useTrafficFeed() {
             }
             if (graphRafRef.current !== null) {
                 cancelAnimationFrame(graphRafRef.current);
+            }
+            if (graphTimerRef.current !== null) {
+                clearTimeout(graphTimerRef.current);
             }
             socket.close();
         };

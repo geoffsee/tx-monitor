@@ -20,7 +20,10 @@ const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 const FILE_REPLAY_SPEED = Number.parseFloat(
-    process.env.FILE_REPLAY_SPEED ?? "40",
+    process.env.FILE_REPLAY_SPEED ?? "0",
+);
+const FILE_REPLAY_SLEEP_CAP_MS = Number.parseFloat(
+    process.env.FILE_REPLAY_SLEEP_CAP_MS ?? "120",
 );
 
 type WsClient = ServerWebSocket<undefined>;
@@ -72,6 +75,7 @@ function flushPacketBatch() {
 }
 
 function emitPacket(packet: ParsedPacket) {
+    const isFirstPacket = pendingPackets.length === 0;
     pendingPackets.push(packet);
     if (pendingPackets.length >= PACKET_BATCH_MAX) {
         if (packetBatchTimer) {
@@ -83,7 +87,10 @@ function emitPacket(packet: ParsedPacket) {
     if (packetBatchTimer) {
         return;
     }
-    packetBatchTimer = setTimeout(flushPacketBatch, PACKET_BATCH_INTERVAL_MS);
+    packetBatchTimer = setTimeout(
+        () => flushPacketBatch(),
+        isFirstPacket ? 0 : PACKET_BATCH_INTERVAL_MS,
+    );
 }
 
 function emitStatus(mode: string, label: string) {
@@ -102,6 +109,7 @@ async function replayFileOnce(path: string) {
     const decoder = new TextDecoder();
     let buffer = "";
     let previousTimestamp: number | null = null;
+    const replayRealtime = FILE_REPLAY_SPEED > 0;
 
     while (true) {
         const { value, done } = await reader.read();
@@ -119,16 +127,24 @@ async function replayFileOnce(path: string) {
                 continue;
             }
 
-            const currentTimestamp = timestampToMs(packet.timestamp);
-            if (previousTimestamp !== null && currentTimestamp !== null) {
-                const delta = Math.max(0, currentTimestamp - previousTimestamp);
-                const delay = Math.min(delta / FILE_REPLAY_SPEED, 120);
-                if (delay > 0) {
-                    await Bun.sleep(delay);
+            if (replayRealtime) {
+                const currentTimestamp = timestampToMs(packet.timestamp);
+                if (previousTimestamp !== null && currentTimestamp !== null) {
+                    const delta = Math.max(
+                        0,
+                        currentTimestamp - previousTimestamp,
+                    );
+                    const delay = Math.min(
+                        delta / FILE_REPLAY_SPEED,
+                        FILE_REPLAY_SLEEP_CAP_MS,
+                    );
+                    if (delay > 0) {
+                        await Bun.sleep(delay);
+                    }
                 }
-            }
-            if (currentTimestamp !== null) {
-                previousTimestamp = currentTimestamp;
+                if (currentTimestamp !== null) {
+                    previousTimestamp = currentTimestamp;
+                }
             }
 
             emitPacket(packet);
@@ -137,12 +153,16 @@ async function replayFileOnce(path: string) {
 }
 
 async function replayFile(path: string) {
-    while (clients.size > 0) {
-        emitStatus("file", `file ${path}`);
-        await replayFileOnce(path);
-        flushPacketBatch();
-        broadcast({ type: "complete" });
-        await Bun.sleep(750);
+    try {
+        while (clients.size > 0) {
+            emitStatus("file", `file ${path}`);
+            await replayFileOnce(path);
+            flushPacketBatch();
+            broadcast({ type: "complete" });
+            await Bun.sleep(750);
+        }
+    } finally {
+        captureStarted = false;
     }
 }
 
@@ -212,13 +232,18 @@ function startCapture() {
     captureStarted = true;
 
     const task = filePath ? replayFile(filePath) : streamLiveTcpdump();
-    void task.catch((error: unknown) => {
-        const message =
-            error instanceof Error ? error.message : "Unknown capture error";
-        console.error(message);
-        broadcast({ type: "error", message });
-        captureStarted = false;
-    });
+    void task
+        .catch((error: unknown) => {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unknown capture error";
+            console.error(message);
+            broadcast({ type: "error", message });
+        })
+        .finally(() => {
+            captureStarted = false;
+        });
 }
 
 async function serveStaticFile(pathname: string): Promise<Response> {

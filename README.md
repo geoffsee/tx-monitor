@@ -74,7 +74,8 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve]
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3001` | Server listen port |
-| `FILE_REPLAY_SPEED` | `40` | Replay speed multiplier for file mode |
+| `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
+| `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
 
 ## Testing
 
