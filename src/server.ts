@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
-import type { ServerWebSocket } from "bun";
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
+import type { ServerWebSocket } from "bun";
 import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
@@ -50,6 +50,10 @@ const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
 const serveStatic = values.serve || existsSync(join(DIST, "index.html"));
 const clients = new Set<WsClient>();
 let captureStarted = false;
+const PACKET_BATCH_INTERVAL_MS = 50;
+const PACKET_BATCH_MAX = 100;
+let pendingPackets: ParsedPacket[] = [];
+let packetBatchTimer: ReturnType<typeof setTimeout> | null = null;
 
 function broadcast(message: Record<string, unknown>) {
     const payload = JSON.stringify(message);
@@ -58,8 +62,28 @@ function broadcast(message: Record<string, unknown>) {
     }
 }
 
+function flushPacketBatch() {
+    if (pendingPackets.length === 0) {
+        return;
+    }
+    broadcast({ type: "packets", packets: pendingPackets });
+    pendingPackets = [];
+    packetBatchTimer = null;
+}
+
 function emitPacket(packet: ParsedPacket) {
-    broadcast({ type: "packet", packet });
+    pendingPackets.push(packet);
+    if (pendingPackets.length >= PACKET_BATCH_MAX) {
+        if (packetBatchTimer) {
+            clearTimeout(packetBatchTimer);
+        }
+        flushPacketBatch();
+        return;
+    }
+    if (packetBatchTimer) {
+        return;
+    }
+    packetBatchTimer = setTimeout(flushPacketBatch, PACKET_BATCH_INTERVAL_MS);
 }
 
 function emitStatus(mode: string, label: string) {
@@ -116,6 +140,7 @@ async function replayFile(path: string) {
     while (clients.size > 0) {
         emitStatus("file", `file ${path}`);
         await replayFileOnce(path);
+        flushPacketBatch();
         broadcast({ type: "complete" });
         await Bun.sleep(750);
     }

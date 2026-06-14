@@ -74,7 +74,7 @@ const TrafficNetworkModel = types
             }
         };
 
-        const ensureHost = (address: string) => {
+        const ensureHost = (address: string, quiet = false) => {
             const existing = self.hosts.get(address);
             if (existing) {
                 return existing;
@@ -88,16 +88,18 @@ const TrafficNetworkModel = types
                 category,
             });
             self.hosts.set(address, host);
-            remember(`Discovered host ${shortHost(address)} (${category})`);
+            if (!quiet) {
+                remember(`Discovered host ${shortHost(address)} (${category})`);
+            }
             return host;
         };
 
         const flowKey = (packet: ParsedPacket) =>
             `${packet.srcHost}->${packet.dstHost}:${packet.proto}:${packet.dstPort ?? "any"}`;
 
-        const ingestPacket = (packet: ParsedPacket) => {
-            const src = ensureHost(packet.srcHost);
-            const dst = ensureHost(packet.dstHost);
+        const ingestPacket = (packet: ParsedPacket, quiet = false) => {
+            const src = ensureHost(packet.srcHost, quiet);
+            const dst = ensureHost(packet.dstHost, quiet);
             src.packetCount += 1;
             src.bytesTotal += packet.length;
             dst.packetCount += 1;
@@ -146,9 +148,9 @@ const TrafficNetworkModel = types
             self.totalBytes += packet.length;
         };
 
-        const ingestBatch = (packets: ParsedPacket[]) => {
+        const ingestBatch = (packets: ParsedPacket[], quiet = false) => {
             for (const packet of packets) {
-                ingestPacket(packet);
+                ingestPacket(packet, quiet);
             }
         };
 

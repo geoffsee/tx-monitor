@@ -182,7 +182,7 @@ export function Sidebar({
                             overflow: "auto",
                         }}
                     >
-                        {graph.packets.slice(0, 10).map((packet) => (
+                        {graph.packets.map((packet) => (
                             <li key={packet.id}>
                                 <button
                                     type="button"
