@@ -38,20 +38,6 @@ function extractLength(line: string): number {
     return match?.[1] ? Number.parseInt(match[1], 10) : 0;
 }
 
-function parseEndpoint(endpoint: string): { host: string; port: number | null } {
-    const lastDot = endpoint.lastIndexOf(".");
-    if (lastDot === -1) {
-        return { host: endpoint, port: null };
-    }
-
-    const host = endpoint.slice(0, lastDot);
-    const port = Number.parseInt(endpoint.slice(lastDot + 1), 10);
-    return {
-        host,
-        port: Number.isFinite(port) ? port : null,
-    };
-}
-
 function extractFlow(line: string): {
     srcHost: string;
     srcPort: number | null;
@@ -66,12 +52,17 @@ function extractFlow(line: string): {
         return null;
     }
 
+    const [, srcHost, srcPortStr, dstHost, dstPortStr, info = ""] = match;
+    if (!srcHost || !srcPortStr || !dstHost || !dstPortStr) {
+        return null;
+    }
+
     return {
-        srcHost: match[1]!,
-        srcPort: Number.parseInt(match[2]!, 10),
-        dstHost: match[3]!,
-        dstPort: Number.parseInt(match[4]!, 10),
-        info: match[5]?.trim() ?? "",
+        srcHost,
+        srcPort: Number.parseInt(srcPortStr, 10),
+        dstHost,
+        dstPort: Number.parseInt(dstPortStr, 10),
+        info: info.trim(),
     };
 }
 

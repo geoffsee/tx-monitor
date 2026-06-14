@@ -1,11 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { HOST_NODE_SIZE, layoutHosts } from "./layout";
-import type { TrafficHost } from "./trafficNetwork";
+import type { TrafficHost } from "./lib/trafficNetwork";
 
-function makeHost(
-    id: string,
-    category: TrafficHost["category"],
-): TrafficHost {
+function makeHost(id: string, category: TrafficHost["category"]): TrafficHost {
     return {
         id,
         address: id,
@@ -16,16 +13,24 @@ function makeHost(
     };
 }
 
-function minDistance(
-    positions: Map<string, { x: number; y: number }>,
-): number {
+function minDistance(positions: Map<string, { x: number; y: number }>): number {
     const points = [...positions.values()];
     let min = Number.POSITIVE_INFINITY;
 
     for (let left = 0; left < points.length; left += 1) {
+        const leftPoint = points[left];
+        if (!leftPoint) {
+            continue;
+        }
+
         for (let right = left + 1; right < points.length; right += 1) {
-            const dx = points[left]!.x - points[right]!.x;
-            const dy = points[left]!.y - points[right]!.y;
+            const rightPoint = points[right];
+            if (!rightPoint) {
+                continue;
+            }
+
+            const dx = leftPoint.x - rightPoint.x;
+            const dy = leftPoint.y - rightPoint.y;
             min = Math.min(min, Math.hypot(dx, dy));
         }
     }
@@ -41,7 +46,9 @@ describe("layoutHosts", () => {
         const positions = layoutHosts(hosts);
 
         expect(positions.size).toBe(18);
-        expect(minDistance(positions)).toBeGreaterThan(HOST_NODE_SIZE.width * 0.55);
+        expect(minDistance(positions)).toBeGreaterThan(
+            HOST_NODE_SIZE.width * 0.55,
+        );
     });
 
     test("uses stable positions regardless of input order", () => {

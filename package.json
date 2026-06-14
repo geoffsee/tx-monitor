@@ -1,53 +1,60 @@
 {
-  "name": "tx-monitor",
-  "version": "1.0.3",
-  "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
-  "license": "MIT",
-  "type": "module",
-  "bin": {
-    "tx-monitor": "bin/tx-monitor.js"
-  },
-  "files": [
-    "bin",
-    "dist",
-    "src",
-    "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/geoffsee/tx-monitor.git"
-  },
-  "keywords": [
-    "tcpdump",
-    "network",
-    "traffic",
-    "monitor",
-    "visualizer",
-    "websocket"
-  ],
-  "engines": {
-    "bun": ">=1.0.0"
-  },
-  "scripts": {
-    "build": "bun run build.ts",
-    "dev": "vite",
-    "monitor": "bun run src/server.ts",
-    "monitor:file": "bun run src/server.ts --file tcpdump.log",
-    "start": "bun run src/server.ts",
-    "start:file": "bun run src/server.ts --file tcpdump.log",
-    "prepublishOnly": "bun run build",
-    "test": "bun test"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@vitejs/plugin-react": "^6.0.1",
-    "vite": "^8.0.10"
-  },
-  "dependencies": {
-    "@xyflow/react": "^12.10.2",
-    "mobx": "^6.15.0",
-    "mobx-state-tree": "^7.2.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
-  }
+    "name": "tx-monitor",
+    "version": "1.0.3",
+    "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
+    "license": "MIT",
+    "type": "module",
+    "bin": {
+        "tx-monitor": "bin/tx-monitor.js"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "src",
+        "README.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/geoffsee/tx-monitor.git"
+    },
+    "keywords": [
+        "tcpdump",
+        "network",
+        "traffic",
+        "monitor",
+        "visualizer",
+        "websocket"
+    ],
+    "engines": {
+        "bun": ">=1.0.0"
+    },
+    "scripts": {
+        "build": "bun run build.ts",
+        "dev": "vite",
+        "monitor": "bun run src/server.ts",
+        "monitor:file": "bun run src/server.ts --file tcpdump.log",
+        "start": "bun run src/server.ts",
+        "start:file": "bun run src/server.ts --file tcpdump.log",
+        "prepublishOnly": "bun run build",
+        "test": "bun test",
+        "typecheck": "tsc --noEmit",
+        "lint": "biome check .",
+        "lint:fix": "biome check --write .",
+        "format": "biome format --write ."
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.5.0",
+        "@types/bun": "latest",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.0.1",
+        "vite": "^8.0.10"
+    },
+    "dependencies": {
+        "@xyflow/react": "^12.10.2",
+        "mobx": "^6.15.0",
+        "mobx-state-tree": "^7.2.0",
+        "react": "^19.2.5",
+        "react-dom": "^19.2.5"
+    }
 }

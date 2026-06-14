@@ -1,4 +1,5 @@
-import type { TrafficHost } from "./trafficNetwork";
+import type { TrafficHost } from "./lib/trafficNetwork";
+import type { HostCategory } from "./types";
 
 export const HOST_NODE_SIZE = {
     width: 168,
@@ -33,7 +34,11 @@ function placeOnRing(
     const count = sorted.length;
 
     for (let index = 0; index < count; index += 1) {
-        const host = sorted[index]!;
+        const host = sorted[index];
+        if (!host) {
+            continue;
+        }
+
         const angle = angleOffset + (index / count) * Math.PI * 2;
         positions.set(host.id, {
             x: center.x + Math.cos(angle) * radius,
@@ -54,7 +59,10 @@ export function layoutHosts(
     };
 
     if (grouped.local.length === 1) {
-        positions.set(grouped.local[0]!.id, { ...center });
+        const [localHost] = grouped.local;
+        if (localHost) {
+            positions.set(localHost.id, { ...center });
+        }
     } else if (grouped.local.length > 1) {
         placeOnRing(
             grouped.local,
@@ -66,8 +74,15 @@ export function layoutHosts(
 
     let nextRadius = ringRadiusForCount(grouped.private.length, 220);
     if (grouped.private.length > 0) {
-        placeOnRing(grouped.private, nextRadius, center, positions, -Math.PI / 2);
-        nextRadius += ringRadiusForCount(grouped.private.length, 220) + RING_GAP;
+        placeOnRing(
+            grouped.private,
+            nextRadius,
+            center,
+            positions,
+            -Math.PI / 2,
+        );
+        nextRadius +=
+            ringRadiusForCount(grouped.private.length, 220) + RING_GAP;
     }
 
     if (grouped.public.length > 0) {
@@ -75,7 +90,13 @@ export function layoutHosts(
             nextRadius,
             ringRadiusForCount(grouped.public.length, 360),
         );
-        placeOnRing(grouped.public, publicRadius, center, positions, Math.PI / 6);
+        placeOnRing(
+            grouped.public,
+            publicRadius,
+            center,
+            positions,
+            Math.PI / 6,
+        );
     }
 
     for (const host of hosts) {
@@ -100,7 +121,7 @@ export function formatBytes(value: number): string {
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function categoryLabel(category: TrafficHost["category"]): string {
+export function categoryLabel(category: HostCategory): string {
     switch (category) {
         case "local":
             return "LOCAL";
@@ -108,10 +129,12 @@ export function categoryLabel(category: TrafficHost["category"]): string {
             return "PRIVATE";
         case "public":
             return "PUBLIC";
+        default:
+            return category satisfies never;
     }
 }
 
-export function categoryColor(category: TrafficHost["category"]): string {
+export function categoryColor(category: HostCategory): string {
     switch (category) {
         case "local":
             return "#7ce3b7";
@@ -119,6 +142,8 @@ export function categoryColor(category: TrafficHost["category"]): string {
             return "#66aec4";
         case "public":
             return "#efc26d";
+        default:
+            return category satisfies never;
     }
 }
 

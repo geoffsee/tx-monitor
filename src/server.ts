@@ -1,15 +1,27 @@
 #!/usr/bin/env bun
+import type { ServerWebSocket } from "bun";
 import { existsSync } from "node:fs";
-import { join, extname } from "node:path";
+import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
-import { TcpdumpParser, type ParsedPacket } from "./tcpdumpParser";
+import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
-const DEFAULT_TCPDUMP = ["sudo", "tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv"];
+const DEFAULT_TCPDUMP = [
+    "sudo",
+    "tcpdump",
+    "-i",
+    "any",
+    "-Q",
+    "out",
+    "-nn",
+    "-vv",
+];
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
-const FILE_REPLAY_SPEED = Number.parseFloat(process.env.FILE_REPLAY_SPEED ?? "40");
+const FILE_REPLAY_SPEED = Number.parseFloat(
+    process.env.FILE_REPLAY_SPEED ?? "40",
+);
 
 type WsClient = ServerWebSocket<undefined>;
 
@@ -115,10 +127,15 @@ function timestampToMs(timestamp: string): number | null {
         return null;
     }
 
-    const hours = Number.parseInt(match[1]!, 10);
-    const minutes = Number.parseInt(match[2]!, 10);
-    const seconds = Number.parseInt(match[3]!, 10);
-    const fraction = match[4]!.padEnd(6, "0").slice(0, 6);
+    const [, hoursStr, minutesStr, secondsStr, fractionStr] = match;
+    if (!hoursStr || !minutesStr || !secondsStr || !fractionStr) {
+        return null;
+    }
+
+    const hours = Number.parseInt(hoursStr, 10);
+    const minutes = Number.parseInt(minutesStr, 10);
+    const seconds = Number.parseInt(secondsStr, 10);
+    const fraction = fractionStr.padEnd(6, "0").slice(0, 6);
     const micros = Number.parseInt(fraction, 10);
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + micros / 1000;
 }
@@ -206,7 +223,9 @@ Bun.serve({
         if (url.pathname === WS_PATH) {
             const upgraded = server.upgrade(request);
             if (!upgraded) {
-                return new Response("WebSocket upgrade failed", { status: 400 });
+                return new Response("WebSocket upgrade failed", {
+                    status: 400,
+                });
             }
             return undefined;
         }
@@ -235,7 +254,9 @@ Bun.serve({
     },
 });
 
-console.log(`Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`);
+console.log(
+    `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
+);
 if (filePath) {
     console.log(`Replay capture file on connect: ${filePath}`);
 } else {

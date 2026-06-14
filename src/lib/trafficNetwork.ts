@@ -1,10 +1,6 @@
-import { types } from "mobx-state-tree";
 import type { SnapshotIn } from "mobx-state-tree";
-import {
-    hostCategory,
-    shortHost,
-    type ParsedPacket,
-} from "./tcpdumpParser";
+import { types } from "mobx-state-tree";
+import { hostCategory, type ParsedPacket, shortHost } from "./tcpdumpParser";
 
 const HostModel = types.model("Host", {
     id: types.identifier,
@@ -48,7 +44,10 @@ const TrafficNetworkModel = types
         totalPackets: types.optional(types.number, 0),
         totalBytes: types.optional(types.number, 0),
         sourceMode: types.optional(types.string, "live"),
-        sourceLabel: types.optional(types.string, "sudo tcpdump -i any -Q out -nn -vv"),
+        sourceLabel: types.optional(
+            types.string,
+            "sudo tcpdump -i any -Q out -nn -vv",
+        ),
         connected: types.optional(types.boolean, false),
     })
     .views((self) => ({
@@ -155,7 +154,11 @@ const TrafficNetworkModel = types
 
         const setConnection = (connected: boolean) => {
             self.connected = connected;
-            remember(connected ? "Connected to traffic feed" : "Traffic feed disconnected");
+            remember(
+                connected
+                    ? "Connected to traffic feed"
+                    : "Traffic feed disconnected",
+            );
         };
 
         const setSource = (mode: string, label: string) => {
