@@ -1,6 +1,6 @@
 {
     "name": "tx-monitor",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
     "license": "MIT",
     "type": "module",
@@ -60,6 +60,7 @@
         "drizzle-orm": "^0.45.2",
         "mobx": "^6.15.0",
         "mobx-state-tree": "^7.2.0",
+        "openai": "^6.42.0",
         "react": "^19.2.5",
         "react-dom": "^19.2.5"
     }

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { CopilotSidebar } from "./components/CopilotSidebar";
 import { Sidebar } from "./components/Sidebar";
 import { TrafficGraph } from "./components/TrafficGraph";
 import { useCompactLayout } from "./hooks/useCompactLayout";
@@ -63,7 +64,7 @@ export default function App() {
                     display: "grid",
                     gridTemplateColumns: isCompact
                         ? "minmax(0, 1fr)"
-                        : "minmax(0, 1fr) minmax(0, 340px)",
+                        : "minmax(0, 300px) minmax(0, 1fr) minmax(0, 340px)",
                     gap: 14,
                     minHeight: isCompact ? "auto" : "calc(100vh - 32px)",
                     maxHeight: isCompact ? undefined : "calc(100vh - 32px)",
@@ -71,6 +72,11 @@ export default function App() {
                     overflow: "hidden",
                 }}
             >
+                <CopilotSidebar
+                    graph={graph}
+                    selection={selection}
+                    isCompact={isCompact}
+                />
                 <TrafficGraph
                     graph={graph}
                     selection={selection}

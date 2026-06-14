@@ -9,6 +9,7 @@
         "drizzle-orm": "^0.45.2",
         "mobx": "^6.15.0",
         "mobx-state-tree": "^7.2.0",
+        "openai": "^6.42.0",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
       },
@@ -239,6 +240,8 @@
     "mobx-state-tree": ["mobx-state-tree@7.2.0", "", { "dependencies": { "ts-essentials": "^9.4.1" }, "peerDependencies": { "mobx": "^6.3.0" } }, "sha512-o46IsMI/lHITYCmkbQgNOCDT8M9Hd2WAgOlHt42hCg+XUZP21obF5ui5Vv9epIsQV8Wpp/GWNHu1YFhTx6iq0g=="],
 
     "nanoid": ["nanoid@3.3.11", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w=="],
+
+    "openai": ["openai@6.42.0", "", { "peerDependencies": { "ws": "^8.18.0", "zod": "^3.25 || ^4.0" }, "optionalPeers": ["ws", "zod"] }, "sha512-1WFEt/uXMXOLhYRNkgJWo08Y2YNvNwpVU72K7ibrWgWpNOXd4VojXLbe6SQ4bLiUQ3Y8jz4IiyVkylJCL1DtZg=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const COMPACT_BREAKPOINT = 1220;
+const COMPACT_BREAKPOINT = 1480;
 
 export function useCompactLayout() {
     const [isCompact, setIsCompact] = useState(

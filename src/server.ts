@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
+import { loadClientSecrets } from "./lib/secrets";
 import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
@@ -19,16 +20,7 @@ function resolveTcpdumpCommand(): string[] {
             : ["sudo", ...parts];
     }
 
-    const args = [
-        "tcpdump",
-        "-i",
-        "any",
-        "-Q",
-        "out",
-        "-nn",
-        "-vv",
-        "-l",
-    ];
+    const args = ["tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv", "-l"];
     return process.getuid?.() === 0 ? args : ["sudo", ...args];
 }
 
@@ -219,9 +211,7 @@ function timestampToMs(timestamp: string): number | null {
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + micros / 1000;
 }
 
-async function monitorTcpdumpStderr(
-    proc: ReturnType<typeof Bun.spawn>,
-) {
+async function monitorTcpdumpStderr(proc: ReturnType<typeof Bun.spawn>) {
     if (!proc.stderr || typeof proc.stderr === "number") {
         return;
     }
@@ -328,16 +318,26 @@ function startCapture() {
         });
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(
+    body: unknown,
+    status = 200,
+    headers: Record<string, string> = {},
+): Response {
     return new Response(JSON.stringify(body), {
         status,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...headers },
     });
 }
 
 function handleApiRequest(url: URL): Response | null {
     if (!url.pathname.startsWith("/api/")) {
         return null;
+    }
+
+    if (url.pathname === "/api/secrets") {
+        return jsonResponse(loadClientSecrets(), 200, {
+            "cache-control": "no-store",
+        });
     }
 
     if (!store) {

@@ -1,4 +1,5 @@
 import type { CaptureSessionSummary } from "../types";
+import type { ClientSecrets } from "./secrets";
 import type { PacketProto } from "./tcpdumpParser";
 
 export type StoredPacketRow = {
@@ -31,6 +32,16 @@ export async function fetchSessions(
         throw new Error(`Failed to load sessions (${response.status})`);
     }
     return response.json() as Promise<CaptureSessionSummary[]>;
+}
+
+export async function fetchSecrets(): Promise<ClientSecrets> {
+    const response = await fetch(resolveApiUrl("/api/secrets"), {
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to load server config (${response.status})`);
+    }
+    return response.json() as Promise<ClientSecrets>;
 }
 
 export async function fetchSession(

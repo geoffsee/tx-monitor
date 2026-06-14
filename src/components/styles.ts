@@ -335,3 +335,78 @@ export const detailLinkRowStyle: React.CSSProperties = {
     color: "inherit",
     font: "inherit",
 };
+
+export const copilotMessagesStyle: React.CSSProperties = {
+    flex: 1,
+    minHeight: 0,
+    overflow: "auto",
+    display: "grid",
+    gap: 10,
+    alignContent: "start",
+    paddingRight: 2,
+};
+
+export const copilotBubbleAssistantStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    borderRadius: "10px 10px 10px 4px",
+    border: "1px solid #223849",
+    background: "#0d1821",
+    color: "#d9e6ec",
+    fontSize: 13,
+    lineHeight: 1.5,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+};
+
+export const copilotBubbleUserStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    borderRadius: "10px 10px 4px 10px",
+    border: "1px solid #1f4d40",
+    background: "rgba(41, 161, 116, 0.14)",
+    color: "#d9e6ec",
+    fontSize: 13,
+    lineHeight: 1.5,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    justifySelf: "end",
+    maxWidth: "92%",
+};
+
+export const copilotSuggestionStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid #1a2d3a",
+    background: "#0f1921",
+    color: "#9eb4c0",
+    fontSize: 11,
+    lineHeight: 1.2,
+    cursor: "pointer",
+    font: "inherit",
+};
+
+export const copilotInputStyle: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #1a2d3a",
+    background: "#0f1921",
+    color: "#d9e6ec",
+    fontSize: 13,
+    font: "inherit",
+    outline: "none",
+};
+
+export const copilotSendButtonStyle: React.CSSProperties = {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid #1f4d40",
+    background: "rgba(41, 161, 116, 0.18)",
+    color: "#7ce3b7",
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+    font: "inherit",
+};
