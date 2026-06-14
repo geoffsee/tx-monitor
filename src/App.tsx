@@ -44,6 +44,11 @@ type FlowEdgeData = {
     active: boolean;
 };
 
+type Selection =
+    | { kind: "host"; id: string }
+    | { kind: "flow"; id: string }
+    | { kind: "packet"; id: string };
+
 type TrafficSnapshot = {
     nodes: Node<HostNodeData>[];
     edges: Edge<FlowEdgeData>[];
@@ -85,6 +90,7 @@ function FlowEdge({
     targetPosition,
     markerEnd,
     data,
+    selected,
 }: EdgeProps<Edge<FlowEdgeData>>) {
     const [path, labelX, labelY] = getSmoothStepPath({
         sourceX,
@@ -103,8 +109,9 @@ function FlowEdge({
                 markerEnd={markerEnd}
                 style={{
                     stroke: data?.stroke,
-                    strokeWidth: data?.active ? 3.5 : 2,
-                    opacity: data?.active ? 1 : 0.45,
+                    strokeWidth: selected ? 5 : data?.active ? 3.5 : 2,
+                    opacity: selected ? 1 : data?.active ? 1 : 0.45,
+                    cursor: "pointer",
                 }}
             />
             {data?.label ? (
@@ -132,7 +139,7 @@ function FlowEdge({
     );
 }
 
-function HostNode({ data }: NodeProps<Node<HostNodeData>>) {
+function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
     const accent = categoryColor(data.category);
 
     return (
@@ -141,11 +148,14 @@ function HostNode({ data }: NodeProps<Node<HostNodeData>>) {
                 width: HOST_NODE_SIZE.width,
                 padding: 10,
                 borderRadius: 10,
-                border: `1px solid ${accent}33`,
+                border: `1px solid ${selected ? accent : `${accent}33`}`,
                 background: "linear-gradient(180deg, #0d1821 0%, #0a131a 100%)",
                 color: "#d9e6ec",
-                boxShadow: "0 10px 24px rgba(0, 0, 0, 0.28)",
+                boxShadow: selected
+                    ? `0 0 0 2px ${accent}55, 0 10px 24px rgba(0, 0, 0, 0.28)`
+                    : "0 10px 24px rgba(0, 0, 0, 0.28)",
                 fontFamily: '"IBM Plex Sans", "Avenir Next", sans-serif',
+                cursor: "pointer",
             }}
         >
             <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -325,11 +335,247 @@ function resolveWsUrl(): string {
     return `${protocol}//${window.location.host}/ws`;
 }
 
+function DetailPanel({
+    selection,
+    onClear,
+    onSelectFlow,
+}: {
+    selection: Selection;
+    onClear: () => void;
+    onSelectFlow: (flowId: string) => void;
+}) {
+    if (selection.kind === "host") {
+        const host = trafficNetwork.hosts.get(selection.id);
+        if (!host) {
+            return null;
+        }
+
+        const accent = categoryColor(host.category);
+        const allFlows = trafficNetwork.flowList.filter(
+            (flow) => flow.srcHost === host.id || flow.dstHost === host.id,
+        );
+        const flows = allFlows.slice(0, 8);
+        const packets = trafficNetwork.packets
+            .filter((packet) => packet.srcHost === host.id || packet.dstHost === host.id)
+            .slice(0, 6);
+
+        return (
+            <section style={detailPanelStyle}>
+                <div style={detailHeaderStyle}>
+                    <div style={detailEyebrowStyle}>Host Details</div>
+                    <button type="button" onClick={onClear} style={detailCloseButtonStyle}>
+                        Close
+                    </button>
+                </div>
+                <div style={{ ...detailBadgeStyle, color: accent, borderColor: `${accent}44`, background: `${accent}1f` }}>
+                    {categoryLabel(host.category)}
+                </div>
+                <div style={detailTitleStyle}>{host.label}</div>
+                <div style={detailSubtleStyle}>{host.address}</div>
+                <div style={detailMetricGridStyle}>
+                    <div style={detailMetricStyle}>
+                        <div style={detailMetricLabelStyle}>Packets</div>
+                        <div style={detailMetricValueStyle}>{host.packetCount}</div>
+                    </div>
+                    <div style={detailMetricStyle}>
+                        <div style={detailMetricLabelStyle}>Volume</div>
+                        <div style={detailMetricValueStyle}>{formatBytes(host.bytesTotal)}</div>
+                    </div>
+                    <div style={detailMetricStyle}>
+                        <div style={detailMetricLabelStyle}>Flows</div>
+                        <div style={detailMetricValueStyle}>{allFlows.length}</div>
+                    </div>
+                </div>
+                {flows.length > 0 ? (
+                    <>
+                        <div style={detailSectionTitleStyle}>Connections</div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            {flows.map((flow) => (
+                                <button
+                                    key={flow.id}
+                                    type="button"
+                                    onClick={() => onSelectFlow(flow.id)}
+                                    style={detailLinkRowStyle}
+                                >
+                                    <span style={{ fontWeight: 600, fontSize: 12 }}>
+                                        {flow.srcHost === host.id ? "→" : "←"}{" "}
+                                        {flow.srcHost === host.id ? flow.dstHost : flow.srcHost}
+                                    </span>
+                                    <span style={detailSubtleStyle}>
+                                        {flow.proto}
+                                        {flow.dstPort ? `:${flow.dstPort}` : ""} ·{" "}
+                                        {flow.packetCount} pkts
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
+                {packets.length > 0 ? (
+                    <>
+                        <div style={detailSectionTitleStyle}>Recent Packets</div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            {packets.map((packet) => (
+                                <div key={packet.id} style={detailRowStyle}>
+                                    <div style={{ fontSize: 12, fontWeight: 600 }}>
+                                        {packet.timestamp} · {packet.proto}
+                                    </div>
+                                    <div style={detailSubtleStyle}>
+                                        {packet.srcHost} → {packet.dstHost} · {packet.length} B
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
+            </section>
+        );
+    }
+
+    if (selection.kind === "flow") {
+        const flow = trafficNetwork.flows.get(selection.id);
+        if (!flow) {
+            return null;
+        }
+
+        const stroke = protoColor(flow.proto);
+        const active = trafficNetwork.activeFlows.some((entry) => entry.id === flow.id);
+        const packets = trafficNetwork.packets
+            .filter(
+                (packet) =>
+                    packet.srcHost === flow.srcHost &&
+                    packet.dstHost === flow.dstHost &&
+                    packet.proto === flow.proto &&
+                    packet.dstPort === flow.dstPort,
+            )
+            .slice(0, 8);
+
+        return (
+            <section style={detailPanelStyle}>
+                <div style={detailHeaderStyle}>
+                    <div style={detailEyebrowStyle}>Flow Details</div>
+                    <button type="button" onClick={onClear} style={detailCloseButtonStyle}>
+                        Close
+                    </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ ...detailBadgeStyle, color: stroke, borderColor: `${stroke}44`, background: `${stroke}1f` }}>
+                        {flow.proto}
+                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                    </div>
+                    <div style={statusBadgeStyle(active)}>{active ? "active" : "idle"}</div>
+                </div>
+                <div style={detailTitleStyle}>
+                    {flow.srcHost} → {flow.dstHost}
+                </div>
+                <div style={detailMetricGridStyle}>
+                    <div style={detailMetricStyle}>
+                        <div style={detailMetricLabelStyle}>Packets</div>
+                        <div style={detailMetricValueStyle}>{flow.packetCount}</div>
+                    </div>
+                    <div style={detailMetricStyle}>
+                        <div style={detailMetricLabelStyle}>Volume</div>
+                        <div style={detailMetricValueStyle}>{formatBytes(flow.bytesTotal)}</div>
+                    </div>
+                </div>
+                {packets.length > 0 ? (
+                    <>
+                        <div style={detailSectionTitleStyle}>Recent Packets</div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            {packets.map((packet) => (
+                                <div key={packet.id} style={detailRowStyle}>
+                                    <div style={{ fontSize: 12, fontWeight: 600 }}>
+                                        {packet.timestamp} · {packet.length} B
+                                    </div>
+                                    <div style={detailSubtleStyle}>
+                                        {packet.srcPort ?? "?"} → {packet.dstPort ?? "?"} ·{" "}
+                                        {packet.info || "No payload summary"}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
+            </section>
+        );
+    }
+
+    const packet = trafficNetwork.packets.find((entry) => entry.id === selection.id);
+    if (!packet) {
+        return null;
+    }
+
+    const stroke = protoColor(packet.proto);
+
+    return (
+        <section style={detailPanelStyle}>
+            <div style={detailHeaderStyle}>
+                <div style={detailEyebrowStyle}>Packet Details</div>
+                <button type="button" onClick={onClear} style={detailCloseButtonStyle}>
+                    Close
+                </button>
+            </div>
+            <div style={{ ...detailBadgeStyle, color: stroke, borderColor: `${stroke}44`, background: `${stroke}1f` }}>
+                {packet.proto}
+            </div>
+            <div style={detailTitleStyle}>{packet.timestamp}</div>
+            <div style={detailMetricGridStyle}>
+                <div style={detailMetricStyle}>
+                    <div style={detailMetricLabelStyle}>Length</div>
+                    <div style={detailMetricValueStyle}>{packet.length} B</div>
+                </div>
+                <div style={detailMetricStyle}>
+                    <div style={detailMetricLabelStyle}>Source Port</div>
+                    <div style={detailMetricValueStyle}>{packet.srcPort ?? "—"}</div>
+                </div>
+                <div style={detailMetricStyle}>
+                    <div style={detailMetricLabelStyle}>Dest Port</div>
+                    <div style={detailMetricValueStyle}>{packet.dstPort ?? "—"}</div>
+                </div>
+            </div>
+            <div style={detailSectionTitleStyle}>Endpoints</div>
+            <div style={detailRowStyle}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>Source</div>
+                <div style={detailSubtleStyle}>{packet.srcHost}</div>
+            </div>
+            <div style={detailRowStyle}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>Destination</div>
+                <div style={detailSubtleStyle}>{packet.dstHost}</div>
+            </div>
+            <div style={detailSectionTitleStyle}>Summary</div>
+            <div style={{ ...detailRowStyle, whiteSpace: "normal", lineHeight: 1.45 }}>
+                {packet.info || "No payload summary available"}
+            </div>
+        </section>
+    );
+}
+
+function isRowSelected(selection: Selection | null, kind: Selection["kind"], id: string): boolean {
+    return selection?.kind === kind && selection.id === id;
+}
+
 export default function App() {
     const [graph, setGraph] = useState<TrafficSnapshot>(() => createGraph());
+    const [selection, setSelection] = useState<Selection | null>(null);
     const [isCompact, setIsCompact] = useState(() => window.innerWidth < 1220);
     const flowRef = useRef<ReactFlowInstance | null>(null);
     const lastFitBucket = useRef(-1);
+
+    const selectItem = useCallback((next: Selection) => {
+        setSelection((current) =>
+            current?.kind === next.kind && current.id === next.id ? null : next,
+        );
+    }, []);
+
+    const displayNodes = graph.nodes.map((node) => ({
+        ...node,
+        selected: isRowSelected(selection, "host", node.id),
+    }));
+
+    const displayEdges = graph.edges.map((edge) => ({
+        ...edge,
+        selected: isRowSelected(selection, "flow", edge.id),
+    }));
 
     const fitGraphView = useCallback((hostCount: number) => {
         if (!flowRef.current || hostCount === 0) {
@@ -431,6 +677,16 @@ export default function App() {
         };
     }, [fitGraphView]);
 
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setSelection(null);
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, []);
+
     return (
         <main
             style={{
@@ -439,14 +695,21 @@ export default function App() {
                 background: "linear-gradient(180deg, #081118 0%, #0a141c 100%)",
                 color: "#d9e6ec",
                 fontFamily: '"IBM Plex Sans", "Avenir Next", sans-serif',
+                boxSizing: "border-box",
+                width: "100%",
+                maxWidth: "100vw",
+                overflow: "hidden",
             }}
         >
             <section
                 style={{
                     display: "grid",
-                    gridTemplateColumns: isCompact ? "1fr" : "minmax(0, 1fr) 340px",
+                    gridTemplateColumns: isCompact ? "minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 340px)",
                     gap: 14,
                     minHeight: isCompact ? "auto" : "calc(100vh - 32px)",
+                    maxHeight: isCompact ? undefined : "calc(100vh - 32px)",
+                    width: "100%",
+                    overflow: "hidden",
                 }}
             >
                 <article
@@ -457,13 +720,14 @@ export default function App() {
                         border: "1px solid #1a2d3a",
                         background: "linear-gradient(180deg, #0a141c 0%, #091118 100%)",
                         minHeight: isCompact ? 780 : undefined,
+                        minWidth: 0,
                     }}
                 >
                     <div style={scanlineStyle} />
                     <div style={{ position: "absolute", inset: 0 }}>
                         <ReactFlow
-                            nodes={graph.nodes}
-                            edges={graph.edges}
+                            nodes={displayNodes}
+                            edges={displayEdges}
                             nodeTypes={nodeTypes}
                             edgeTypes={edgeTypes}
                             nodeOrigin={[0.5, 0.5]}
@@ -471,9 +735,16 @@ export default function App() {
                                 flowRef.current = instance;
                                 fitGraphView(graph.nodes.length);
                             }}
+                            onNodeClick={(_event, node) => {
+                                selectItem({ kind: "host", id: node.id });
+                            }}
+                            onEdgeClick={(_event, edge) => {
+                                selectItem({ kind: "flow", id: edge.id });
+                            }}
+                            onPaneClick={() => setSelection(null)}
                             nodesDraggable={false}
                             nodesConnectable={false}
-                            elementsSelectable={false}
+                            elementsSelectable
                             zoomOnScroll
                             panOnScroll
                             minZoom={0.2}
@@ -590,11 +861,16 @@ export default function App() {
                 <aside
                     style={{
                         ...sidePanelStyle,
-                        display: "grid",
-                        gridTemplateRows: "auto auto auto 1fr",
+                        display: "flex",
+                        flexDirection: "column",
                         gap: 12,
-                        minHeight: isCompact ? "auto" : "calc(100vh - 32px)",
+                        minWidth: 0,
+                        width: "100%",
+                        maxWidth: "100%",
+                        height: isCompact ? "auto" : "calc(100vh - 32px)",
+                        maxHeight: isCompact ? undefined : "calc(100vh - 32px)",
                         overflow: "hidden",
+                        boxSizing: "border-box",
                     }}
                 >
                     <section
@@ -602,6 +878,8 @@ export default function App() {
                             display: "grid",
                             gridTemplateColumns: "1fr 1fr",
                             gap: 8,
+                            flexShrink: 0,
+                            minWidth: 0,
                         }}
                     >
                         <div style={summaryCardStyle}>
@@ -617,20 +895,56 @@ export default function App() {
                             </div>
                         </div>
                     </section>
-                    <section>
+                    {selection ? (
+                        <DetailPanel
+                            selection={selection}
+                            onClear={() => setSelection(null)}
+                            onSelectFlow={(flowId) => setSelection({ kind: "flow", id: flowId })}
+                        />
+                    ) : null}
+                    <section style={{ flexShrink: 0, minWidth: 0 }}>
                         <div style={panelTitleStyle}>Capture Source</div>
                         <div style={{ ...denseFeedRowStyle, marginTop: 8 }}>
                             {graph.sourceLabel}
                         </div>
                     </section>
-                    <section>
+                    <div
+                        style={{
+                            flex: 1,
+                            minHeight: 0,
+                            minWidth: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                            overflow: "hidden",
+                        }}
+                    >
+                    <section style={{ flexShrink: 0, minWidth: 0, maxHeight: selection ? 180 : 240, overflow: "auto" }}>
                         <div style={panelTitleStyle}>Active Flows</div>
                         <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
                             {graph.flows.length === 0 ? (
                                 <div style={denseFeedRowStyle}>No flows yet</div>
                             ) : (
                                 graph.flows.map((flow) => (
-                                    <div key={flow.id} style={denseStatusRowStyle}>
+                                    <div
+                                        key={flow.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => selectItem({ kind: "flow", id: flow.id })}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                selectItem({ kind: "flow", id: flow.id });
+                                            }
+                                        }}
+                                        style={{
+                                            ...denseStatusRowStyle,
+                                            cursor: "pointer",
+                                            ...(isRowSelected(selection, "flow", flow.id)
+                                                ? selectedRowStyle
+                                                : {}),
+                                        }}
+                                    >
                                         <div style={{ minWidth: 0 }}>
                                             <div
                                                 style={{
@@ -658,11 +972,29 @@ export default function App() {
                             )}
                         </div>
                     </section>
-                    <section style={{ minHeight: 0, overflow: "hidden" }}>
+                    <section style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                         <div style={panelTitleStyle}>Packet Feed</div>
-                        <ul style={{ ...listStyle, gap: 6, marginTop: 8 }}>
+                        <ul style={{ ...listStyle, gap: 6, marginTop: 8, flex: 1, minHeight: 0, overflow: "auto" }}>
                             {graph.packets.slice(0, 10).map((packet) => (
-                                <li key={packet.id} style={denseListRowStyle}>
+                                <li
+                                    key={packet.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => selectItem({ kind: "packet", id: packet.id })}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            selectItem({ kind: "packet", id: packet.id });
+                                        }
+                                    }}
+                                    style={{
+                                        ...denseListRowStyle,
+                                        cursor: "pointer",
+                                        ...(isRowSelected(selection, "packet", packet.id)
+                                            ? selectedRowStyle
+                                            : {}),
+                                    }}
+                                >
                                     <strong style={{ display: "block", fontSize: 13 }}>
                                         {packet.timestamp} {packet.proto}
                                     </strong>
@@ -677,6 +1009,7 @@ export default function App() {
                             ))}
                         </ul>
                     </section>
+                    </div>
                 </aside>
             </section>
         </main>
@@ -796,6 +1129,7 @@ const sidePanelStyle: React.CSSProperties = {
     padding: 12,
     border: "1px solid #1a2d3a",
     background: "#0b141b",
+    boxSizing: "border-box",
 };
 
 const summaryCardStyle: React.CSSProperties = {
@@ -856,6 +1190,7 @@ const denseStatusRowStyle: React.CSSProperties = {
     borderRadius: 8,
     border: "1px solid #1a2d3a",
     background: "#0f1921",
+    minWidth: 0,
 };
 
 const denseSubtleStyle: React.CSSProperties = {
@@ -882,4 +1217,137 @@ const denseFeedRowStyle: React.CSSProperties = {
     color: "#d9e6ec",
     lineHeight: 1.35,
     fontSize: 12,
+    wordBreak: "break-all",
+    overflowWrap: "anywhere",
+};
+
+const selectedRowStyle: React.CSSProperties = {
+    borderColor: "#66aec4",
+    background: "#132028",
+    boxShadow: "inset 0 0 0 1px #66aec433",
+};
+
+const detailPanelStyle: React.CSSProperties = {
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #223849",
+    background: "#0d1821",
+    display: "grid",
+    gap: 10,
+    minWidth: 0,
+    maxHeight: 240,
+    overflow: "auto",
+    flexShrink: 0,
+};
+
+const detailHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+};
+
+const detailEyebrowStyle: React.CSSProperties = {
+    fontSize: 11,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "#66aec4",
+    fontWeight: 700,
+};
+
+const detailCloseButtonStyle: React.CSSProperties = {
+    padding: "4px 8px",
+    borderRadius: 6,
+    border: "1px solid #33414a",
+    background: "#101d26",
+    color: "#9aa8b2",
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: "pointer",
+};
+
+const detailBadgeStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignSelf: "start",
+    padding: "4px 8px",
+    borderRadius: 999,
+    border: "1px solid",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+};
+
+const detailTitleStyle: React.CSSProperties = {
+    fontSize: 15,
+    fontWeight: 700,
+    lineHeight: 1.3,
+    wordBreak: "break-all",
+    overflowWrap: "anywhere",
+};
+
+const detailSubtleStyle: React.CSSProperties = {
+    fontSize: 11,
+    color: "#7f99a7",
+    wordBreak: "break-all",
+    overflowWrap: "anywhere",
+};
+
+const detailMetricGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 6,
+};
+
+const detailMetricStyle: React.CSSProperties = {
+    padding: 8,
+    borderRadius: 8,
+    background: "#101d26",
+    border: "1px solid #1a2c38",
+    minWidth: 0,
+    overflow: "hidden",
+};
+
+const detailMetricLabelStyle: React.CSSProperties = {
+    fontSize: 9,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "#7b9aaa",
+};
+
+const detailMetricValueStyle: React.CSSProperties = {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: 700,
+};
+
+const detailSectionTitleStyle: React.CSSProperties = {
+    marginTop: 4,
+    fontSize: 10,
+    letterSpacing: "0.1em",
+    textTransform: "uppercase",
+    color: "#7b9aaa",
+    fontWeight: 700,
+};
+
+const detailRowStyle: React.CSSProperties = {
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: "1px solid #1a2d3a",
+    background: "#0f1921",
+    minWidth: 0,
+    overflow: "hidden",
+};
+
+const detailLinkRowStyle: React.CSSProperties = {
+    display: "grid",
+    gap: 2,
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: "1px solid #1a2d3a",
+    background: "#0f1921",
+    textAlign: "left",
+    cursor: "pointer",
+    color: "inherit",
+    font: "inherit",
 };
