@@ -1,6 +1,6 @@
 {
     "name": "tx-monitor",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
     "license": "MIT",
     "type": "module",

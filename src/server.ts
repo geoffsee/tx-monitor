@@ -9,16 +9,31 @@ import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
 const DEFAULT_DB = "tx-mon.db";
-const DEFAULT_TCPDUMP = [
-    "sudo",
-    "tcpdump",
-    "-i",
-    "any",
-    "-Q",
-    "out",
-    "-nn",
-    "-vv",
-];
+
+function resolveTcpdumpCommand(): string[] {
+    const envArgs = process.env.TXMON_TCPDUMP_ARGS?.trim();
+    if (envArgs) {
+        const parts = envArgs.split(/\s+/);
+        return parts[0] === "sudo" || process.getuid?.() === 0
+            ? parts
+            : ["sudo", ...parts];
+    }
+
+    const args = [
+        "tcpdump",
+        "-i",
+        "any",
+        "-Q",
+        "out",
+        "-nn",
+        "-vv",
+        "-l",
+    ];
+    return process.getuid?.() === 0 ? args : ["sudo", ...args];
+}
+
+const TCPDUMP_COMMAND = resolveTcpdumpCommand();
+const TCPDUMP_LABEL = TCPDUMP_COMMAND.join(" ");
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
@@ -84,10 +99,11 @@ function flushPacketBatch() {
     if (pendingPackets.length === 0) {
         return;
     }
-    store?.savePackets(pendingPackets);
-    broadcast({ type: "packets", packets: pendingPackets });
+    const batch = pendingPackets;
     pendingPackets = [];
     packetBatchTimer = null;
+    broadcast({ type: "packets", packets: batch });
+    store?.savePackets(batch);
 }
 
 function emitPacket(packet: ParsedPacket) {
@@ -203,15 +219,48 @@ function timestampToMs(timestamp: string): number | null {
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + micros / 1000;
 }
 
+async function monitorTcpdumpStderr(
+    proc: ReturnType<typeof Bun.spawn>,
+) {
+    if (!proc.stderr || typeof proc.stderr === "number") {
+        return;
+    }
+
+    const reader = proc.stderr.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("tcpdump: listening on")) {
+                continue;
+            }
+            console.error(trimmed);
+            broadcast({ type: "error", message: trimmed });
+        }
+    }
+}
+
 async function streamLiveTcpdump() {
-    ensureCaptureSession("live", DEFAULT_TCPDUMP.join(" "));
-    emitStatus("live", DEFAULT_TCPDUMP.join(" "));
+    ensureCaptureSession("live", TCPDUMP_LABEL);
+    emitStatus("live", TCPDUMP_LABEL);
     const parser = new TcpdumpParser();
     const proc = Bun.spawn({
-        cmd: DEFAULT_TCPDUMP,
+        cmd: TCPDUMP_COMMAND,
         stdout: "pipe",
-        stderr: "inherit",
+        stderr: "pipe",
     });
+    const stderrTask = monitorTcpdumpStderr(proc);
 
     const reader = proc.stdout.getReader();
     const decoder = new TextDecoder();
@@ -235,6 +284,7 @@ async function streamLiveTcpdump() {
         }
     }
 
+    await stderrTask;
     const exitCode = await proc.exited;
     endCaptureSession();
     if (exitCode !== 0) {
@@ -421,7 +471,7 @@ Bun.serve({
             clients.add(ws);
             emitStatus(
                 filePath ? "file" : "live",
-                filePath ? `file ${filePath}` : DEFAULT_TCPDUMP.join(" "),
+                filePath ? `file ${filePath}` : TCPDUMP_LABEL,
             );
             startCapture();
         },
@@ -441,5 +491,6 @@ if (store && dbPath) {
 if (filePath) {
     console.log(`Replay capture file on connect: ${filePath}`);
 } else {
-    console.log(`Live capture on connect: ${DEFAULT_TCPDUMP.join(" ")}`);
+    console.log(`Live capture: ${TCPDUMP_LABEL}`);
+    startCapture();
 }
