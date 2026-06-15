@@ -5,6 +5,7 @@ import {
     useRef,
     useState,
 } from "react";
+import type React from "react";
 import { fetchSecrets } from "../lib/api";
 import {
     askCopilot,
@@ -15,12 +16,14 @@ import {
 } from "../lib/copilot";
 import type { Selection, TrafficSnapshot } from "../types";
 import {
+    anomalyBadgeStyle,
     copilotBubbleAssistantStyle,
     copilotBubbleUserStyle,
     copilotInputStyle,
     copilotMessagesStyle,
     copilotSendButtonStyle,
     copilotSuggestionStyle,
+    denseAnomalyRowStyle,
     panelTitleStyle,
     sidePanelStyle,
 } from "./styles";
@@ -31,11 +34,14 @@ type CopilotSidebarProps = {
     isCompact: boolean;
 };
 
+type Tab = "copilot" | "anomalies";
+
 export function CopilotSidebar({
     graph,
     selection,
     isCompact,
 }: CopilotSidebarProps) {
+    const [activeTab, setActiveTab] = useState<Tab>("copilot");
     const [messages, setMessages] = useState<CopilotMessage[]>([
         COPILOT_WELCOME,
     ]);
@@ -139,6 +145,21 @@ export function CopilotSidebar({
         [draft, submitPrompt],
     );
 
+    const tabButtonStyle = (isActive: boolean): React.CSSProperties => ({
+        flex: 1,
+        padding: "8px 4px",
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        background: isActive ? "#132028" : "transparent",
+        color: isActive ? "#66aec4" : "#7f99a7",
+        border: "none",
+        borderBottom: isActive ? "2px solid #66aec4" : "2px solid transparent",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+    });
+
     return (
         <aside
             style={{
@@ -153,176 +174,296 @@ export function CopilotSidebar({
                 maxHeight: isCompact ? 320 : "calc(100vh - 32px)",
                 overflow: "hidden",
                 boxSizing: "border-box",
+                padding: 0,
             }}
         >
-            <header style={{ flexShrink: 0 }}>
-                <div style={panelTitleStyle}>Copilot</div>
-                <p
-                    style={{
-                        margin: "6px 0 0",
-                        fontSize: 12,
-                        lineHeight: 1.45,
-                        color: "#7f99a7",
-                    }}
-                >
-                    Ask about flows, hosts, and patterns in the current capture.
-                </p>
-            </header>
-
-            <label
+            <nav
                 style={{
-                    display: "grid",
-                    gap: 6,
-                    flexShrink: 0,
+                    display: "flex",
+                    borderBottom: "1px solid #1a2d3a",
+                    background: "#0b141b",
                 }}
             >
-                <span
-                    style={{
-                        fontSize: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: "#7b9aaa",
-                    }}
+                <button
+                    type="button"
+                    style={tabButtonStyle(activeTab === "copilot")}
+                    onClick={() => setActiveTab("copilot")}
                 >
-                    OpenAI config
-                </span>
-                <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    placeholder={
-                        isLoadingConfig
-                            ? "Loading OPENAI_API_KEY"
-                            : "OPENAI_API_KEY"
-                    }
-                    autoComplete="off"
-                    disabled={isLoadingConfig}
-                    style={{
-                        ...copilotInputStyle,
-                        opacity: isLoadingConfig ? 0.6 : 1,
-                    }}
-                />
-                {configError || hasApiKey ? (
-                    <span
-                        style={{
-                            fontSize: 11,
-                            lineHeight: 1.35,
-                            color: hasApiKey ? "#7ce3b7" : "#dca96e",
-                        }}
-                    >
-                        {hasApiKey ? "Loaded from server config" : configError}
-                    </span>
-                ) : null}
-            </label>
-
-            <div style={copilotMessagesStyle}>
-                {messages.map((message) => (
-                    <div
-                        key={message.id}
-                        style={
-                            message.role === "user"
-                                ? copilotBubbleUserStyle
-                                : copilotBubbleAssistantStyle
-                        }
-                    >
-                        {message.content}
-                    </div>
-                ))}
-                {isLoading ? (
-                    <div style={copilotBubbleAssistantStyle}>Thinking…</div>
-                ) : null}
-                <div ref={messagesEndRef} />
-            </div>
+                    Copilot
+                </button>
+                <button
+                    type="button"
+                    style={tabButtonStyle(activeTab === "anomalies")}
+                    onClick={() => setActiveTab("anomalies")}
+                >
+                    Anomalies {graph.anomalies.length > 0 ? `(${graph.anomalies.length})` : ""}
+                </button>
+            </nav>
 
             <div
                 style={{
                     display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                    flexShrink: 0,
+                    flexDirection: "column",
+                    gap: 12,
+                    flex: 1,
+                    minHeight: 0,
+                    padding: 12,
                 }}
             >
-                {COPILOT_SUGGESTIONS.map((suggestion) => (
-                    <button
-                        key={suggestion}
-                        type="button"
-                        disabled={isLoading || isLoadingConfig || !hasApiKey}
-                        onClick={() => void submitPrompt(suggestion)}
+                {activeTab === "copilot" ? (
+                    <>
+                        <header style={{ flexShrink: 0 }}>
+                            <div style={panelTitleStyle}>Copilot</div>
+                            <p
+                                style={{
+                                    margin: "6px 0 0",
+                                    fontSize: 12,
+                                    lineHeight: 1.45,
+                                    color: "#7f99a7",
+                                }}
+                            >
+                                Ask about flows, hosts, and patterns in the current capture.
+                            </p>
+                        </header>
+
+                        <label
+                            style={{
+                                display: "grid",
+                                gap: 6,
+                                flexShrink: 0,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: 10,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.08em",
+                                    color: "#7b9aaa",
+                                }}
+                            >
+                                OpenAI config
+                            </span>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(event) => setApiKey(event.target.value)}
+                                placeholder={
+                                    isLoadingConfig
+                                        ? "Loading OPENAI_API_KEY"
+                                        : "OPENAI_API_KEY"
+                                }
+                                autoComplete="off"
+                                disabled={isLoadingConfig}
+                                style={{
+                                    ...copilotInputStyle,
+                                    opacity: isLoadingConfig ? 0.6 : 1,
+                                }}
+                            />
+                            {configError || hasApiKey ? (
+                                <span
+                                    style={{
+                                        fontSize: 11,
+                                        lineHeight: 1.35,
+                                        color: hasApiKey ? "#7ce3b7" : "#dca96e",
+                                    }}
+                                >
+                                    {hasApiKey ? "Loaded from server config" : configError}
+                                </span>
+                            ) : null}
+                        </label>
+
+                        <div style={copilotMessagesStyle}>
+                            {messages.map((message) => (
+                                <div
+                                    key={message.id}
+                                    style={
+                                        message.role === "user"
+                                            ? copilotBubbleUserStyle
+                                            : copilotBubbleAssistantStyle
+                                    }
+                                >
+                                    {message.content}
+                                </div>
+                            ))}
+                            {isLoading ? (
+                                <div style={copilotBubbleAssistantStyle}>Thinking…</div>
+                            ) : null}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 6,
+                                flexShrink: 0,
+                            }}
+                        >
+                            {COPILOT_SUGGESTIONS.map((suggestion) => (
+                                <button
+                                    key={suggestion}
+                                    type="button"
+                                    disabled={isLoading || isLoadingConfig || !hasApiKey}
+                                    onClick={() => void submitPrompt(suggestion)}
+                                    style={{
+                                        ...copilotSuggestionStyle,
+                                        opacity:
+                                            isLoading || isLoadingConfig || !hasApiKey
+                                                ? 0.5
+                                                : 1,
+                                        cursor:
+                                            isLoading || isLoadingConfig || !hasApiKey
+                                                ? "not-allowed"
+                                                : "pointer",
+                                    }}
+                                >
+                                    {suggestion}
+                                </button>
+                            ))}
+                        </div>
+
+                        <form
+                            onSubmit={handleSubmit}
+                            style={{
+                                display: "flex",
+                                gap: 8,
+                                flexShrink: 0,
+                                minWidth: 0,
+                            }}
+                        >
+                            <input
+                                type="text"
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                                placeholder={
+                                    isLoadingConfig
+                                        ? "Loading server config"
+                                        : hasApiKey
+                                          ? "Ask about this capture…"
+                                          : "OPENAI_API_KEY missing"
+                                }
+                                disabled={isLoading || isLoadingConfig || !hasApiKey}
+                                style={{
+                                    ...copilotInputStyle,
+                                    opacity:
+                                        isLoading || isLoadingConfig || !hasApiKey
+                                            ? 0.6
+                                            : 1,
+                                }}
+                            />
+                            <button
+                                type="submit"
+                                disabled={
+                                    isLoading ||
+                                    isLoadingConfig ||
+                                    !hasApiKey ||
+                                    !draft.trim()
+                                }
+                                style={{
+                                    ...copilotSendButtonStyle,
+                                    opacity:
+                                        isLoading ||
+                                        isLoadingConfig ||
+                                        !hasApiKey ||
+                                        !draft.trim()
+                                            ? 0.5
+                                            : 1,
+                                    cursor:
+                                        isLoading ||
+                                        isLoadingConfig ||
+                                        !hasApiKey ||
+                                        !draft.trim()
+                                            ? "not-allowed"
+                                            : "pointer",
+                                }}
+                            >
+                                {isLoading ? "…" : "Send"}
+                            </button>
+                        </form>
+                    </>
+                ) : (
+                    <div
                         style={{
-                            ...copilotSuggestionStyle,
-                            opacity:
-                                isLoading || isLoadingConfig || !hasApiKey
-                                    ? 0.5
-                                    : 1,
-                            cursor:
-                                isLoading || isLoadingConfig || !hasApiKey
-                                    ? "not-allowed"
-                                    : "pointer",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                            flex: 1,
+                            minHeight: 0,
                         }}
                     >
-                        {suggestion}
-                    </button>
-                ))}
-            </div>
+                        <header style={{ flexShrink: 0 }}>
+                            <div style={panelTitleStyle}>Anomalies</div>
+                            <p
+                                style={{
+                                    margin: "6px 0 0",
+                                    fontSize: 12,
+                                    lineHeight: 1.45,
+                                    color: "#7f99a7",
+                                }}
+                            >
+                                Heuristic-based alerts for unusual traffic patterns.
+                            </p>
+                        </header>
 
-            <form
-                onSubmit={handleSubmit}
-                style={{
-                    display: "flex",
-                    gap: 8,
-                    flexShrink: 0,
-                    minWidth: 0,
-                }}
-            >
-                <input
-                    type="text"
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    placeholder={
-                        isLoadingConfig
-                            ? "Loading server config"
-                            : hasApiKey
-                              ? "Ask about this capture…"
-                              : "OPENAI_API_KEY missing"
-                    }
-                    disabled={isLoading || isLoadingConfig || !hasApiKey}
-                    style={{
-                        ...copilotInputStyle,
-                        opacity:
-                            isLoading || isLoadingConfig || !hasApiKey
-                                ? 0.6
-                                : 1,
-                    }}
-                />
-                <button
-                    type="submit"
-                    disabled={
-                        isLoading ||
-                        isLoadingConfig ||
-                        !hasApiKey ||
-                        !draft.trim()
-                    }
-                    style={{
-                        ...copilotSendButtonStyle,
-                        opacity:
-                            isLoading ||
-                            isLoadingConfig ||
-                            !hasApiKey ||
-                            !draft.trim()
-                                ? 0.5
-                                : 1,
-                        cursor:
-                            isLoading ||
-                            isLoadingConfig ||
-                            !hasApiKey ||
-                            !draft.trim()
-                                ? "not-allowed"
-                                : "pointer",
-                    }}
-                >
-                    {isLoading ? "…" : "Send"}
-                </button>
-            </form>
+                        <div
+                            style={{
+                                flex: 1,
+                                overflow: "auto",
+                                display: "grid",
+                                gap: 8,
+                                alignContent: "start",
+                            }}
+                        >
+                            {graph.anomalies.length === 0 ? (
+                                <div
+                                    style={{
+                                        padding: 24,
+                                        textAlign: "center",
+                                        color: "#7f99a7",
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    No anomalies detected.
+                                </div>
+                            ) : (
+                                graph.anomalies.map((anomaly) => (
+                                    <div
+                                        key={anomaly.id}
+                                        style={{
+                                            ...denseAnomalyRowStyle,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 4,
+                                        }}
+                                    >
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                                            <div style={anomalyBadgeStyle(anomaly.severity)}>
+                                                {anomaly.type}
+                                            </div>
+                                            <span style={{ fontSize: 10, color: "#5c7889" }}>
+                                                {new Date(anomaly.timestamp).toLocaleTimeString()}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: "#d9e6ec" }}>
+                                            {anomaly.description}
+                                        </div>
+                                        {anomaly.flowId && (
+                                            <div style={{ fontSize: 11, color: "#66aec4", fontFamily: "monospace" }}>
+                                                Flow: {anomaly.flowId}
+                                            </div>
+                                        )}
+                                        {anomaly.hostId && (
+                                            <div style={{ fontSize: 11, color: "#66aec4", fontFamily: "monospace" }}>
+                                                Host: {anomaly.hostId}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </aside>
     );
 }

@@ -32,7 +32,7 @@ export const COPILOT_SUGGESTIONS = [
 
 const COPILOT_SYSTEM_PROMPT = `You are a network traffic analysis copilot for tx-monitor, a real-time tcpdump visualizer.
 
-Answer using only the capture context provided with each request. Be concise, practical, and specific. Call out hosts, flows, protocols, ports, and volumes when relevant. If the capture is empty or the question cannot be answered from the context, say so clearly.
+Answer using only the capture context provided with each request. Be concise, practical, and specific. Call out hosts, flows, protocols, ports, and volumes when relevant. Mention any detected anomalies if they are present in the context. If the capture is empty or the question cannot be answered from the context, say so clearly.
 
 Do not invent packets, hosts, or flows that are not in the context.`;
 
@@ -136,6 +136,7 @@ export function buildCopilotContext(
             length: packet.length,
             info: packet.info,
         })),
+        anomalies: graph.anomalies.slice(0, 10),
         recentEvents: graph.events.slice(-8),
         selection: describeSelectionContext(graph, selection),
     };

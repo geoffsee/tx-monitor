@@ -61,6 +61,18 @@ export type TrafficSnapshot = {
         bytesTotal: number;
         active: boolean;
     }>;
+    anomalies: Anomaly[];
+    events: string[];
+    totalPackets: number;
+    totalBytes: number;
+    hostCount: number;
+    flowCount: number;
+    connected: boolean;
+    sourceLabel: string;
+};
+;
+        active: boolean;
+    }>;
     events: string[];
     totalPackets: number;
     totalBytes: number;

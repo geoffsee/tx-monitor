@@ -205,6 +205,43 @@ export const denseFeedRowStyle: React.CSSProperties = {
     overflowWrap: "anywhere",
 };
 
+export const denseAnomalyRowStyle: React.CSSProperties = {
+    padding: "8px 10px",
+    borderLeft: "2px solid #dca96e",
+    background: "#16130d",
+    color: "#d9e6ec",
+    lineHeight: 1.35,
+    fontSize: 12,
+    wordBreak: "break-all",
+    overflowWrap: "anywhere",
+};
+
+export const anomalyBadgeStyle = (severity: string): React.CSSProperties => {
+    let color = "#dca96e";
+    let bg = "rgba(220, 169, 110, 0.12)";
+    let border = "rgba(220, 169, 110, 0.3)";
+
+    if (severity === "high") {
+        color = "#e37c7c";
+        bg = "rgba(227, 124, 124, 0.12)";
+        border = "rgba(227, 124, 124, 0.3)";
+    }
+
+    return {
+        padding: "2px 6px",
+        borderRadius: 4,
+        border: `1px solid ${border}`,
+        background: bg,
+        color: color,
+        fontSize: 9,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        fontWeight: 700,
+        display: "inline-block",
+        marginBottom: 4,
+    };
+};
+
 export const selectedRowStyle: React.CSSProperties = {
     borderColor: "#66aec4",
     background: "#132028",
