@@ -28,8 +28,6 @@ import {
     legendSwatchStyle,
     overlayPanelStyle,
     scanlineStyle,
-    tickerLabelStyle,
-    tickerStyle,
 } from "./styles";
 
 type TrafficGraphProps = {
@@ -152,36 +150,6 @@ export function TrafficGraph({
                             </div>
                         </div>
                     </Panel>
-                    <Panel position="top-right">
-                        <div
-                            style={{
-                                ...legendPanelStyle,
-                                display: "flex",
-                                gap: 8,
-                            }}
-                        >
-                            <div style={compactKpiStyle}>
-                                <span style={compactKpiLabelStyle}>Hosts</span>
-                                <span style={compactKpiValueStyle}>
-                                    {graph.hostCount}
-                                </span>
-                            </div>
-                            <div style={compactKpiStyle}>
-                                <span style={compactKpiLabelStyle}>Flows</span>
-                                <span style={compactKpiValueStyle}>
-                                    {graph.flowCount}
-                                </span>
-                            </div>
-                            <div style={compactKpiStyle}>
-                                <span style={compactKpiLabelStyle}>
-                                    Packets
-                                </span>
-                                <span style={compactKpiValueStyle}>
-                                    {graph.totalPackets}
-                                </span>
-                            </div>
-                        </div>
-                    </Panel>
                     <Panel position="bottom-right">
                         <div style={legendPanelStyle}>
                             <div style={legendRowStyle}>
@@ -214,11 +182,32 @@ export function TrafficGraph({
                         </div>
                     </Panel>
                     <Panel position="bottom-center">
-                        <div style={tickerStyle}>
-                            <span style={tickerLabelStyle}>Latest</span>
-                            <span>
-                                {graph.events[0] ?? "Waiting for traffic"}
-                            </span>
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 8,
+                            }}
+                        >
+                            <div style={compactKpiStyle}>
+                                <span style={compactKpiLabelStyle}>Hosts</span>
+                                <span style={compactKpiValueStyle}>
+                                    {graph.hostCount}
+                                </span>
+                            </div>
+                            <div style={compactKpiStyle}>
+                                <span style={compactKpiLabelStyle}>Flows</span>
+                                <span style={compactKpiValueStyle}>
+                                    {graph.flowCount}
+                                </span>
+                            </div>
+                            <div style={compactKpiStyle}>
+                                <span style={compactKpiLabelStyle}>
+                                    Packets
+                                </span>
+                                <span style={compactKpiValueStyle}>
+                                    {graph.totalPackets}
+                                </span>
+                            </div>
                         </div>
                     </Panel>
                 </ReactFlow>

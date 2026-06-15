@@ -21,6 +21,8 @@ import {
     summaryCardStyle,
     summaryLabelStyle,
     summaryValueStyle,
+    tickerLabelStyle,
+    tickerStyle,
 } from "./styles";
 
 type SidebarProps = {
@@ -77,6 +79,12 @@ export function Sidebar({
                 boxSizing: "border-box",
             }}
         >
+            <div style={{ ...tickerStyle, width: "100%", boxSizing: "border-box" }}>
+                <span style={tickerLabelStyle}>Latest</span>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {graph.events[0] ?? "Waiting for traffic"}
+                </span>
+            </div>
             <section
                 style={{
                     display: "grid",
