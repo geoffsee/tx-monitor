@@ -1,3 +1,5 @@
+import type { ProcessInfo } from "./processInfo";
+
 export type PacketProto = "TCP" | "UDP" | "ICMP" | "OTHER";
 
 export type ParsedPacket = {
@@ -10,6 +12,7 @@ export type ParsedPacket = {
     dstPort: number | null;
     length: number;
     info: string;
+    process?: ProcessInfo;
 };
 
 type PendingHeader = {

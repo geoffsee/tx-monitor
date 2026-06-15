@@ -70,6 +70,9 @@ export function createGraph(): TrafficSnapshot {
         const active = activeFlowIds.has(flow.id);
         const stroke = protoColor(flow.proto);
         const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
+        const processLabel = flow.processCommand
+            ? ` · ${flow.processCommand}`
+            : "";
         return {
             id: flow.id,
             source: flow.srcHost,
@@ -81,7 +84,9 @@ export function createGraph(): TrafficSnapshot {
                 color: stroke,
             },
             data: {
-                label: active ? `${flow.proto}${portLabel}` : undefined,
+                label: active
+                    ? `${flow.proto}${portLabel}${processLabel}`
+                    : undefined,
                 labelColor: stroke,
                 stroke,
                 active,
@@ -102,6 +107,17 @@ export function createGraph(): TrafficSnapshot {
                 dstHost: packet.dstHost,
                 length: packet.length,
                 info: packet.info,
+                ...(packet.processCommand &&
+                packet.processPid &&
+                packet.processUser
+                    ? {
+                          process: {
+                              command: packet.processCommand,
+                              pid: packet.processPid,
+                              user: packet.processUser,
+                          },
+                      }
+                    : {}),
             })),
         flows: trafficNetwork.flowList.slice(0, 12).map((flow) => ({
             id: flow.id,
@@ -112,6 +128,15 @@ export function createGraph(): TrafficSnapshot {
             packetCount: flow.packetCount,
             bytesTotal: flow.bytesTotal,
             active: activeFlowIds.has(flow.id),
+            ...(flow.processCommand && flow.processPid && flow.processUser
+                ? {
+                      process: {
+                          command: flow.processCommand,
+                          pid: flow.processPid,
+                          user: flow.processUser,
+                      },
+                  }
+                : {}),
         })),
         anomalies: trafficNetwork.anomalyList.map((anomaly) => ({
             id: anomaly.id,

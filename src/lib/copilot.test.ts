@@ -7,6 +7,7 @@ const emptyGraph: TrafficSnapshot = {
     edges: [],
     packets: [],
     flows: [],
+    anomalies: [],
     events: [],
     totalPackets: 0,
     totalBytes: 0,

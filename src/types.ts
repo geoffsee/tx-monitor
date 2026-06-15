@@ -39,6 +39,22 @@ export type SessionLoadProgress = {
     total: number;
 };
 
+export type Anomaly = {
+    id: string;
+    timestamp: number;
+    severity: "low" | "medium" | "high";
+    type: string;
+    description: string;
+    hostId?: string;
+    flowId?: string;
+};
+
+export type ProcessSummary = {
+    command: string;
+    pid: number;
+    user: string;
+};
+
 export type TrafficSnapshot = {
     nodes: Node<HostNodeData>[];
     edges: Edge<FlowEdgeData>[];
@@ -50,6 +66,7 @@ export type TrafficSnapshot = {
         dstHost: string;
         length: number;
         info: string;
+        process?: ProcessSummary;
     }>;
     flows: Array<{
         id: string;
@@ -60,19 +77,9 @@ export type TrafficSnapshot = {
         packetCount: number;
         bytesTotal: number;
         active: boolean;
+        process?: ProcessSummary;
     }>;
     anomalies: Anomaly[];
-    events: string[];
-    totalPackets: number;
-    totalBytes: number;
-    hostCount: number;
-    flowCount: number;
-    connected: boolean;
-    sourceLabel: string;
-};
-;
-        active: boolean;
-    }>;
     events: string[];
     totalPackets: number;
     totalBytes: number;

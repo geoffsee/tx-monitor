@@ -5,6 +5,13 @@ import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
+import {
+    isLsofEnabled,
+    lsofPollIntervalMs,
+    refreshSocketTable,
+    type SocketTable,
+} from "./lib/lsofCollector";
+import { lookupProcess } from "./lib/processInfo";
 import { loadClientSecrets } from "./lib/secrets";
 import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
@@ -79,6 +86,42 @@ const PACKET_BATCH_INTERVAL_MS = 50;
 const PACKET_BATCH_MAX = 100;
 let pendingPackets: ParsedPacket[] = [];
 let packetBatchTimer: ReturnType<typeof setTimeout> | null = null;
+let socketTable: SocketTable = new Map();
+let lsofTimer: ReturnType<typeof setInterval> | null = null;
+
+function enrichPacket(packet: ParsedPacket): ParsedPacket {
+    const process = lookupProcess(socketTable, packet);
+    return process ? { ...packet, process } : packet;
+}
+
+function startLsofCollector() {
+    if (!isLsofEnabled() || filePath) {
+        return;
+    }
+
+    const refresh = async () => {
+        try {
+            socketTable = await refreshSocketTable();
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : "lsof refresh failed";
+            console.error(message);
+        }
+    };
+
+    void refresh();
+    lsofTimer = setInterval(() => {
+        void refresh();
+    }, lsofPollIntervalMs());
+}
+
+function stopLsofCollector() {
+    if (lsofTimer) {
+        clearInterval(lsofTimer);
+        lsofTimer = null;
+    }
+    socketTable = new Map();
+}
 
 function broadcast(message: Record<string, unknown>) {
     const payload = JSON.stringify(message);
@@ -99,8 +142,9 @@ function flushPacketBatch() {
 }
 
 function emitPacket(packet: ParsedPacket) {
+    const enriched = enrichPacket(packet);
     const isFirstPacket = pendingPackets.length === 0;
-    pendingPackets.push(packet);
+    pendingPackets.push(enriched);
     if (pendingPackets.length >= PACKET_BATCH_MAX) {
         if (packetBatchTimer) {
             clearTimeout(packetBatchTimer);
@@ -244,44 +288,49 @@ async function monitorTcpdumpStderr(proc: ReturnType<typeof Bun.spawn>) {
 async function streamLiveTcpdump() {
     ensureCaptureSession("live", TCPDUMP_LABEL);
     emitStatus("live", TCPDUMP_LABEL);
-    const parser = new TcpdumpParser();
-    const proc = Bun.spawn({
-        cmd: TCPDUMP_COMMAND,
-        stdout: "pipe",
-        stderr: "pipe",
-    });
-    const stderrTask = monitorTcpdumpStderr(proc);
+    startLsofCollector();
+    try {
+        const parser = new TcpdumpParser();
+        const proc = Bun.spawn({
+            cmd: TCPDUMP_COMMAND,
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+        const stderrTask = monitorTcpdumpStderr(proc);
 
-    const reader = proc.stdout.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+        const reader = proc.stdout.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-            break;
-        }
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? "";
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() ?? "";
 
-        for (const line of lines) {
-            const packet = parser.parseLine(line);
-            if (packet) {
-                emitPacket(packet);
+            for (const line of lines) {
+                const packet = parser.parseLine(line);
+                if (packet) {
+                    emitPacket(packet);
+                }
             }
         }
-    }
 
-    await stderrTask;
-    const exitCode = await proc.exited;
-    endCaptureSession();
-    if (exitCode !== 0) {
-        broadcast({
-            type: "error",
-            message: `tcpdump exited with code ${exitCode}`,
-        });
+        await stderrTask;
+        const exitCode = await proc.exited;
+        endCaptureSession();
+        if (exitCode !== 0) {
+            broadcast({
+                type: "error",
+                message: `tcpdump exited with code ${exitCode}`,
+            });
+        }
+    } finally {
+        stopLsofCollector();
     }
 }
 

@@ -20,6 +20,9 @@ const FlowModel = types.model("Flow", {
     packetCount: types.optional(types.number, 0),
     bytesTotal: types.optional(types.number, 0),
     lastSeen: types.optional(types.number, 0),
+    processCommand: types.maybe(types.string),
+    processPid: types.maybe(types.number),
+    processUser: types.maybe(types.string),
 });
 
 const PacketModel = types.model("TrafficPacket", {
@@ -33,6 +36,9 @@ const PacketModel = types.model("TrafficPacket", {
     length: types.number,
     info: types.string,
     receivedAt: types.number,
+    processCommand: types.maybe(types.string),
+    processPid: types.maybe(types.number),
+    processUser: types.maybe(types.string),
 });
 
 const AnomalyModel = types.model("Anomaly", {
@@ -120,7 +126,11 @@ const TrafficNetworkModel = types
                 hostCategory(packet.srcHost) === "public" ||
                 hostCategory(packet.dstHost) === "public";
 
-            if (isPublic && packet.dstPort && suspiciousPorts.includes(packet.dstPort)) {
+            if (
+                isPublic &&
+                packet.dstPort &&
+                suspiciousPorts.includes(packet.dstPort)
+            ) {
                 addAnomaly({
                     id: `suspicious-port-${packet.dstHost}-${packet.dstPort}`,
                     timestamp: Date.now(),
@@ -133,7 +143,6 @@ const TrafficNetworkModel = types
         };
 
         const ensureHost = (address: string, quiet = false) => {
-// ... existing code ...
             const existing = self.hosts.get(address);
             if (existing) {
                 return existing;
@@ -192,6 +201,12 @@ const TrafficNetworkModel = types
 
             detectAnomalies(packet, flow);
 
+            if (packet.process) {
+                flow.processCommand = packet.process.command;
+                flow.processPid = packet.process.pid;
+                flow.processUser = packet.process.user;
+            }
+
             const snapshot: SnapshotIn<typeof PacketModel> = {
                 id: packet.id,
                 timestamp: packet.timestamp,
@@ -203,6 +218,13 @@ const TrafficNetworkModel = types
                 length: packet.length,
                 info: packet.info,
                 receivedAt: seenAt,
+                ...(packet.process
+                    ? {
+                          processCommand: packet.process.command,
+                          processPid: packet.process.pid,
+                          processUser: packet.process.user,
+                      }
+                    : {}),
             };
             self.packets.unshift(snapshot);
             if (self.packets.length > 80) {

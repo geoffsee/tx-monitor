@@ -24,6 +24,22 @@ import {
     statusBadgeStyle,
 } from "./styles";
 
+function ProcessDetails(props: { command: string; pid: number; user: string }) {
+    return (
+        <>
+            <div style={detailSectionTitleStyle}>Process</div>
+            <div style={detailRowStyle}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                    {props.command}
+                </div>
+                <div style={detailSubtleStyle}>
+                    pid {props.pid} · {props.user}
+                </div>
+            </div>
+        </>
+    );
+}
+
 type DetailPanelProps = {
     selection: Selection;
     onClear: () => void;
@@ -121,7 +137,10 @@ export function DetailPanel({
                                     </span>
                                     <span style={detailSubtleStyle}>
                                         {flow.proto}
-                                        {flow.dstPort ? `:${flow.dstPort}` : ""}{" "}
+                                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                                        {flow.processCommand
+                                            ? ` · ${flow.processCommand}`
+                                            : ""}{" "}
                                         · {flow.packetCount} pkts
                                     </span>
                                 </button>
@@ -223,6 +242,13 @@ export function DetailPanel({
                         </div>
                     </div>
                 </div>
+                {flow.processCommand && flow.processPid && flow.processUser ? (
+                    <ProcessDetails
+                        command={flow.processCommand}
+                        pid={flow.processPid}
+                        user={flow.processUser}
+                    />
+                ) : null}
                 {packets.length > 0 ? (
                     <>
                         <div style={detailSectionTitleStyle}>
@@ -312,6 +338,15 @@ export function DetailPanel({
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Destination</div>
                 <div style={detailSubtleStyle}>{packet.dstHost}</div>
             </div>
+            {packet.processCommand &&
+            packet.processPid &&
+            packet.processUser ? (
+                <ProcessDetails
+                    command={packet.processCommand}
+                    pid={packet.processPid}
+                    user={packet.processUser}
+                />
+            ) : null}
             <div style={detailSectionTitleStyle}>Summary</div>
             <div
                 style={{
