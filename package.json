@@ -1,6 +1,6 @@
 {
     "name": "tx-monitor",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
     "license": "MIT",
     "type": "module",
@@ -31,6 +31,7 @@
     },
     "scripts": {
         "build": "bun run build.ts",
+        "compile": "bun build --compile src/server.ts --outfile build/tx-monitor",
         "dev": "vite",
         "monitor": "bun run src/server.ts",
         "monitor:file": "bun run src/server.ts --file tcpdump.log",

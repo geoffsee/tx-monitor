@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun test
+
+      - name: Build
+        run: bun run build
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build release assets
+        run: |
+          set -euo pipefail
+
+          mkdir -p build release
+
+          bun build --compile --target=bun-linux-x64-baseline src/server.ts --outfile build/tx-monitor-linux-x64
+          bun build --compile --target=bun-linux-arm64 src/server.ts --outfile build/tx-monitor-linux-arm64
+          bun build --compile --target=bun-darwin-x64 src/server.ts --outfile build/tx-monitor-darwin-x64
+          bun build --compile --target=bun-darwin-arm64 src/server.ts --outfile build/tx-monitor-darwin-arm64
+          bun build --compile --target=bun-windows-x64 src/server.ts --outfile build/tx-monitor-windows-x64
+
+          tar -C build -czf release/tx-monitor-linux-x64.tar.gz tx-monitor-linux-x64
+          tar -C build -czf release/tx-monitor-linux-arm64.tar.gz tx-monitor-linux-arm64
+          tar -C build -czf release/tx-monitor-darwin-x64.tar.gz tx-monitor-darwin-x64
+          tar -C build -czf release/tx-monitor-darwin-arm64.tar.gz tx-monitor-darwin-arm64
+          zip -j release/tx-monitor-windows-x64.zip build/tx-monitor-windows-x64.exe
+
+          sha256sum release/* > release/SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" release/* --clobber
+          else
+            gh release create "$TAG_NAME" release/* --title "$TAG_NAME" --generate-notes
+          fi

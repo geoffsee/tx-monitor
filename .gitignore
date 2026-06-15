@@ -48,3 +48,4 @@ tcpdump.log
 /drizzle/meta/_journal.json
 /bin/tx-monitor.js
 /.env.copilot
+build

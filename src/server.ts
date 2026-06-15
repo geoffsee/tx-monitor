@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
+import appHtml from "../index.html";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
@@ -526,6 +527,9 @@ async function serveStaticFile(pathname: string): Promise<Response> {
 
 Bun.serve({
     port: listenPort,
+    routes: {
+        "/": appHtml,
+    },
     async fetch(request, server) {
         const url = new URL(request.url);
         const apiResponse = await handleApiRequest(request, url);

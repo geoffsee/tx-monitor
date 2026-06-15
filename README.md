@@ -46,12 +46,24 @@ bun run start:file   # or: bun run start
 
 Open [http://localhost:3001](http://localhost:3001).
 
+### Native Executable
+
+Build a standalone executable with the UI embedded:
+
+```bash
+bun run compile
+./build/tx-monitor --file tcpdump.log   # or: sudo ./build/tx-monitor
+```
+
+Open [http://localhost:3001](http://localhost:3001). The compiled server embeds the React UI, so it does not need a sibling `dist/` directory.
+
 ## Scripts
 
 | Script | Description |
 | --- | --- |
 | `bun run dev` | Vite dev server on port 4173 (proxies `/ws` to 3001) |
 | `bun run build` | Build browser bundle into `dist/` |
+| `bun run compile` | Build native executable into `build/tx-monitor` with embedded UI |
 | `bun run monitor` | Start server with live `tcpdump` capture |
 | `bun run monitor:file` | Start server replaying `tcpdump.log` |
 | `bun run start` | Start server (live capture; serves `dist/` if present) |
