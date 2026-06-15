@@ -77,6 +77,10 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | --- | --- | --- |
 | `PORT` | `3001` | Server listen port |
 | `TXMON_DB` | `tx-mon.db` | SQLite database path when persistence is enabled |
+| `TXMON_CODEX_AUTH` | `local` | Codex SDK auth mode for copilot requests. Use `local` for your logged-in Codex/OpenAI subscription credentials, or `api-key` to pass `OPENAI_API_KEY`. |
+| `OPENAI_API_KEY` | unset | Optional key used only when `TXMON_CODEX_AUTH=api-key`. Can also be set in `.env.copilot`. |
+| `TXMON_CODEX_MODEL` | `gpt-5.3-codex` | Optional model override for Codex SDK copilot requests |
+| `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
 | `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
 | `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
 
@@ -92,6 +96,7 @@ Read persisted data over HTTP:
 | `GET /api/sessions/:id` | Fetch one capture session |
 | `GET /api/sessions/:id/packets?offset=0&limit=5000` | Paginated packets for a session |
 | `GET /api/packets?limit=80&session=<id>` | List recent packets, optionally scoped to one session |
+| `POST /api/copilot` | Analyze the current client-provided capture snapshot using the backend Codex SDK |
 
 Schema migrations live in `drizzle/` and are applied automatically on server startup.
 

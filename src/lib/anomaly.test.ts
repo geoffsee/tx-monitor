@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-import { trafficNetwork } from "./trafficNetwork";
 import type { ParsedPacket } from "./tcpdumpParser";
+import { trafficNetwork } from "./trafficNetwork";
 
 test("identifies large flow anomaly", () => {
     trafficNetwork.reset();
-    
+
     const packet: ParsedPacket = {
         id: "p1",
         timestamp: "12:00:00.000000",
@@ -20,12 +20,12 @@ test("identifies large flow anomaly", () => {
     trafficNetwork.ingestPacket(packet);
 
     expect(trafficNetwork.anomalyList.length).toBe(1);
-    expect(trafficNetwork.anomalyList[0].type).toBe("Large Data Transfer");
+    expect(trafficNetwork.anomalyList[0]?.type).toBe("Large Data Transfer");
 });
 
 test("identifies suspicious port anomaly on public IP", () => {
     trafficNetwork.reset();
-    
+
     const packet: ParsedPacket = {
         id: "p2",
         timestamp: "12:00:01.000000",
@@ -41,5 +41,7 @@ test("identifies suspicious port anomaly on public IP", () => {
     trafficNetwork.ingestPacket(packet);
 
     expect(trafficNetwork.anomalyList.length).toBe(1);
-    expect(trafficNetwork.anomalyList[0].type).toBe("Suspicious External Port");
+    expect(trafficNetwork.anomalyList[0]?.type).toBe(
+        "Suspicious External Port",
+    );
 });

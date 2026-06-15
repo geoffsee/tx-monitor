@@ -1,3 +1,4 @@
+import type React from "react";
 import {
     type FormEvent,
     useCallback,
@@ -5,15 +6,13 @@ import {
     useRef,
     useState,
 } from "react";
-import type React from "react";
-import { fetchSecrets } from "../lib/api";
 import {
-    askCopilot,
     COPILOT_SUGGESTIONS,
     COPILOT_WELCOME,
     type CopilotMessage,
     createMessage,
 } from "../lib/copilot";
+import { askCopilot } from "../lib/copilotClient";
 import type { Selection, TrafficSnapshot } from "../types";
 import {
     anomalyBadgeStyle,
@@ -46,45 +45,8 @@ export function CopilotSidebar({
         COPILOT_WELCOME,
     ]);
     const [draft, setDraft] = useState("");
-    const [apiKey, setApiKey] = useState("");
-    const [configError, setConfigError] = useState<string | null>(null);
-    const [isLoadingConfig, setIsLoadingConfig] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const hasApiKey = apiKey.trim().length > 0;
-
-    useEffect(() => {
-        let ignore = false;
-
-        async function loadSecrets() {
-            try {
-                const secrets = await fetchSecrets();
-                if (!ignore) {
-                    setApiKey(secrets.OPENAI_API_KEY ?? "");
-                    setConfigError(null);
-                }
-            } catch (error) {
-                if (!ignore) {
-                    setApiKey("");
-                    setConfigError(
-                        error instanceof Error
-                            ? error.message
-                            : "Failed to load server config.",
-                    );
-                }
-            } finally {
-                if (!ignore) {
-                    setIsLoadingConfig(false);
-                }
-            }
-        }
-
-        void loadSecrets();
-
-        return () => {
-            ignore = true;
-        };
-    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,7 +73,6 @@ export function CopilotSidebar({
 
             try {
                 const answer = await askCopilot({
-                    apiKey,
                     prompt: trimmed,
                     history,
                     graph,
@@ -134,7 +95,7 @@ export function CopilotSidebar({
                 setIsLoading(false);
             }
         },
-        [apiKey, graph, isLoading, messages, selection],
+        [graph, isLoading, messages, selection],
     );
 
     const handleSubmit = useCallback(
@@ -196,7 +157,10 @@ export function CopilotSidebar({
                     style={tabButtonStyle(activeTab === "anomalies")}
                     onClick={() => setActiveTab("anomalies")}
                 >
-                    Anomalies {graph.anomalies.length > 0 ? `(${graph.anomalies.length})` : ""}
+                    Anomalies{" "}
+                    {graph.anomalies.length > 0
+                        ? `(${graph.anomalies.length})`
+                        : ""}
                 </button>
             </nav>
 
@@ -222,55 +186,10 @@ export function CopilotSidebar({
                                     color: "#7f99a7",
                                 }}
                             >
-                                Ask about flows, hosts, and patterns in the current capture.
+                                Ask about flows, hosts, and patterns in the
+                                current capture.
                             </p>
                         </header>
-
-                        <label
-                            style={{
-                                display: "grid",
-                                gap: 6,
-                                flexShrink: 0,
-                            }}
-                        >
-                            <span
-                                style={{
-                                    fontSize: 10,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.08em",
-                                    color: "#7b9aaa",
-                                }}
-                            >
-                                OpenAI config
-                            </span>
-                            <input
-                                type="password"
-                                value={apiKey}
-                                onChange={(event) => setApiKey(event.target.value)}
-                                placeholder={
-                                    isLoadingConfig
-                                        ? "Loading OPENAI_API_KEY"
-                                        : "OPENAI_API_KEY"
-                                }
-                                autoComplete="off"
-                                disabled={isLoadingConfig}
-                                style={{
-                                    ...copilotInputStyle,
-                                    opacity: isLoadingConfig ? 0.6 : 1,
-                                }}
-                            />
-                            {configError || hasApiKey ? (
-                                <span
-                                    style={{
-                                        fontSize: 11,
-                                        lineHeight: 1.35,
-                                        color: hasApiKey ? "#7ce3b7" : "#dca96e",
-                                    }}
-                                >
-                                    {hasApiKey ? "Loaded from server config" : configError}
-                                </span>
-                            ) : null}
-                        </label>
 
                         <div style={copilotMessagesStyle}>
                             {messages.map((message) => (
@@ -286,7 +205,9 @@ export function CopilotSidebar({
                                 </div>
                             ))}
                             {isLoading ? (
-                                <div style={copilotBubbleAssistantStyle}>Thinking…</div>
+                                <div style={copilotBubbleAssistantStyle}>
+                                    Thinking…
+                                </div>
                             ) : null}
                             <div ref={messagesEndRef} />
                         </div>
@@ -303,18 +224,16 @@ export function CopilotSidebar({
                                 <button
                                     key={suggestion}
                                     type="button"
-                                    disabled={isLoading || isLoadingConfig || !hasApiKey}
-                                    onClick={() => void submitPrompt(suggestion)}
+                                    disabled={isLoading}
+                                    onClick={() =>
+                                        void submitPrompt(suggestion)
+                                    }
                                     style={{
                                         ...copilotSuggestionStyle,
-                                        opacity:
-                                            isLoading || isLoadingConfig || !hasApiKey
-                                                ? 0.5
-                                                : 1,
-                                        cursor:
-                                            isLoading || isLoadingConfig || !hasApiKey
-                                                ? "not-allowed"
-                                                : "pointer",
+                                        opacity: isLoading ? 0.5 : 1,
+                                        cursor: isLoading
+                                            ? "not-allowed"
+                                            : "pointer",
                                     }}
                                 >
                                     {suggestion}
@@ -334,45 +253,25 @@ export function CopilotSidebar({
                             <input
                                 type="text"
                                 value={draft}
-                                onChange={(event) => setDraft(event.target.value)}
-                                placeholder={
-                                    isLoadingConfig
-                                        ? "Loading server config"
-                                        : hasApiKey
-                                          ? "Ask about this capture…"
-                                          : "OPENAI_API_KEY missing"
+                                onChange={(event) =>
+                                    setDraft(event.target.value)
                                 }
-                                disabled={isLoading || isLoadingConfig || !hasApiKey}
+                                placeholder="Ask about this capture…"
+                                disabled={isLoading}
                                 style={{
                                     ...copilotInputStyle,
-                                    opacity:
-                                        isLoading || isLoadingConfig || !hasApiKey
-                                            ? 0.6
-                                            : 1,
+                                    opacity: isLoading ? 0.6 : 1,
                                 }}
                             />
                             <button
                                 type="submit"
-                                disabled={
-                                    isLoading ||
-                                    isLoadingConfig ||
-                                    !hasApiKey ||
-                                    !draft.trim()
-                                }
+                                disabled={isLoading || !draft.trim()}
                                 style={{
                                     ...copilotSendButtonStyle,
                                     opacity:
-                                        isLoading ||
-                                        isLoadingConfig ||
-                                        !hasApiKey ||
-                                        !draft.trim()
-                                            ? 0.5
-                                            : 1,
+                                        isLoading || !draft.trim() ? 0.5 : 1,
                                     cursor:
-                                        isLoading ||
-                                        isLoadingConfig ||
-                                        !hasApiKey ||
-                                        !draft.trim()
+                                        isLoading || !draft.trim()
                                             ? "not-allowed"
                                             : "pointer",
                                 }}
@@ -401,7 +300,8 @@ export function CopilotSidebar({
                                     color: "#7f99a7",
                                 }}
                             >
-                                Heuristic-based alerts for unusual traffic patterns.
+                                Heuristic-based alerts for unusual traffic
+                                patterns.
                             </p>
                         </header>
 
@@ -436,24 +336,59 @@ export function CopilotSidebar({
                                             gap: 4,
                                         }}
                                     >
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                                            <div style={anomalyBadgeStyle(anomaly.severity)}>
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "start",
+                                            }}
+                                        >
+                                            <div
+                                                style={anomalyBadgeStyle(
+                                                    anomaly.severity,
+                                                )}
+                                            >
                                                 {anomaly.type}
                                             </div>
-                                            <span style={{ fontSize: 10, color: "#5c7889" }}>
-                                                {new Date(anomaly.timestamp).toLocaleTimeString()}
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#5c7889",
+                                                }}
+                                            >
+                                                {new Date(
+                                                    anomaly.timestamp,
+                                                ).toLocaleTimeString()}
                                             </span>
                                         </div>
-                                        <div style={{ fontWeight: 600, fontSize: 13, color: "#d9e6ec" }}>
+                                        <div
+                                            style={{
+                                                fontWeight: 600,
+                                                fontSize: 13,
+                                                color: "#d9e6ec",
+                                            }}
+                                        >
                                             {anomaly.description}
                                         </div>
                                         {anomaly.flowId && (
-                                            <div style={{ fontSize: 11, color: "#66aec4", fontFamily: "monospace" }}>
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: "#66aec4",
+                                                    fontFamily: "monospace",
+                                                }}
+                                            >
                                                 Flow: {anomaly.flowId}
                                             </div>
                                         )}
                                         {anomaly.hostId && (
-                                            <div style={{ fontSize: 11, color: "#66aec4", fontFamily: "monospace" }}>
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: "#66aec4",
+                                                    fontFamily: "monospace",
+                                                }}
+                                            >
                                                 Host: {anomaly.hostId}
                                             </div>
                                         )}

@@ -6,13 +6,17 @@ import type { ServerWebSocket } from "bun";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
+    askCopilotWithCodex,
+    CopilotRequestError,
+    parseCopilotRequest,
+} from "./lib/copilotServer";
+import {
     isLsofEnabled,
     lsofPollIntervalMs,
     refreshSocketTable,
     type SocketTable,
 } from "./lib/lsofCollector";
 import { lookupProcess } from "./lib/processInfo";
-import { loadClientSecrets } from "./lib/secrets";
 import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
@@ -378,15 +382,47 @@ function jsonResponse(
     });
 }
 
-function handleApiRequest(url: URL): Response | null {
+async function readJsonBody(request: Request): Promise<unknown> {
+    try {
+        return await request.json();
+    } catch {
+        throw new CopilotRequestError("Expected valid JSON body.");
+    }
+}
+
+async function handleApiRequest(
+    request: Request,
+    url: URL,
+): Promise<Response | null> {
     if (!url.pathname.startsWith("/api/")) {
         return null;
     }
 
-    if (url.pathname === "/api/secrets") {
-        return jsonResponse(loadClientSecrets(), 200, {
-            "cache-control": "no-store",
-        });
+    if (url.pathname === "/api/copilot") {
+        if (request.method !== "POST") {
+            return jsonResponse({ error: "Method not allowed" }, 405, {
+                allow: "POST",
+            });
+        }
+
+        try {
+            const body = await readJsonBody(request);
+            const payload = parseCopilotRequest(body);
+            const result = await askCopilotWithCodex(payload);
+            return jsonResponse(result, 200, {
+                "cache-control": "no-store",
+            });
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Copilot request failed.";
+            const status = error instanceof CopilotRequestError ? 400 : 502;
+            console.error(message);
+            return jsonResponse({ error: message }, status, {
+                "cache-control": "no-store",
+            });
+        }
     }
 
     if (!store) {
@@ -492,7 +528,7 @@ Bun.serve({
     port: listenPort,
     async fetch(request, server) {
         const url = new URL(request.url);
-        const apiResponse = handleApiRequest(url);
+        const apiResponse = await handleApiRequest(request, url);
         if (apiResponse) {
             return apiResponse;
         }

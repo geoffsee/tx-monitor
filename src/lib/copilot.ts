@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { formatBytes } from "../layout";
 import type { Selection, TrafficSnapshot } from "../types";
 
@@ -11,6 +10,17 @@ export type CopilotMessage = {
 export type CopilotChatMessage = {
     role: "user" | "assistant";
     content: string;
+};
+
+export type CopilotRequest = {
+    prompt: string;
+    history: CopilotChatMessage[];
+    context: CopilotContext;
+};
+
+export type CopilotResponse = {
+    answer: string;
+    threadId: string | null;
 };
 
 let messageCounter = 0;
@@ -30,13 +40,11 @@ export const COPILOT_SUGGESTIONS = [
     "Explain my selection",
 ] as const;
 
-const COPILOT_SYSTEM_PROMPT = `You are a network traffic analysis copilot for tx-monitor, a real-time tcpdump visualizer.
+export const COPILOT_SYSTEM_PROMPT = `You are a network traffic analysis copilot for tx-monitor, a real-time tcpdump visualizer.
 
 Answer using only the capture context provided with each request. Be concise, practical, and specific. Call out hosts, flows, protocols, ports, volumes, and local processes when relevant. Mention any detected anomalies if they are present in the context. If the capture is empty or the question cannot be answered from the context, say so clearly.
 
 Do not invent packets, hosts, or flows that are not in the context.`;
-
-const OPENAI_MODEL = "gpt-4o-mini";
 
 function topFlows(graph: TrafficSnapshot, limit = 8) {
     return [...graph.flows]
@@ -144,61 +152,9 @@ export function buildCopilotContext(
     };
 }
 
-export async function askCopilot(params: {
-    apiKey: string;
-    prompt: string;
-    history: CopilotChatMessage[];
-    graph: TrafficSnapshot;
-    selection: Selection | null;
-}): Promise<string> {
-    const apiKey = params.apiKey.trim();
-    const prompt = params.prompt.trim();
-
-    if (!apiKey) {
-        throw new Error("Enter your OpenAI API key to use copilot.");
-    }
-
-    if (!prompt) {
-        return "Ask a question about the capture, or pick one of the suggestions below.";
-    }
-
-    const client = new OpenAI({
-        apiKey,
-        dangerouslyAllowBrowser: true,
-    });
-    const context = buildCopilotContext(params.graph, params.selection);
-
-    const completion = await client.chat.completions.create({
-        model: OPENAI_MODEL,
-        temperature: 0.2,
-        messages: [
-            { role: "system", content: COPILOT_SYSTEM_PROMPT },
-            {
-                role: "user",
-                content: `Capture context (JSON):\n${JSON.stringify(context, null, 2)}`,
-            },
-            {
-                role: "assistant",
-                content:
-                    "Understood. I will analyze this capture using only the provided context.",
-            },
-            ...params.history.map((message) => ({
-                role: message.role,
-                content: message.content,
-            })),
-            { role: "user", content: prompt },
-        ],
-    });
-
-    const answer = completion.choices[0]?.message?.content?.trim();
-    if (!answer) {
-        throw new Error("OpenAI returned an empty response.");
-    }
-
-    return answer;
-}
+export type CopilotContext = ReturnType<typeof buildCopilotContext>;
 
 export const COPILOT_WELCOME = createMessage(
     "assistant",
-    "I'm your traffic copilot. I use the OpenAI key from the server config for this session.",
+    "I'm your traffic copilot. I analyze the current capture through the backend Codex SDK.",
 );
