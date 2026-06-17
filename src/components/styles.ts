@@ -1,26 +1,33 @@
 import type React from "react";
 
 export const nodeMetricStyle: React.CSSProperties = {
-    padding: "6px 8px",
-    borderRadius: 8,
+    display: "grid",
+    gap: 1,
+    minWidth: 0,
+    maxWidth: "100%",
+    padding: "3px 7px 4px",
+    borderRadius: 999,
     background: "#101d26",
     border: "1px solid #1a2c38",
-    minWidth: 0,
     overflow: "hidden",
 };
 
 export const nodeMetricLabelStyle: React.CSSProperties = {
-    fontSize: 10,
+    fontSize: 6,
+    lineHeight: 1,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
     color: "#7b9aaa",
 };
 
 export const nodeMetricValueStyle: React.CSSProperties = {
-    marginTop: 2,
-    fontSize: 13,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: 9,
     fontWeight: 700,
-    lineHeight: 1.1,
+    lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
 };
 

@@ -286,6 +286,7 @@ const TrafficNetworkModel = types
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
+            self.sourceMode = "live";
         };
 
         return {

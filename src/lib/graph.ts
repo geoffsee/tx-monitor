@@ -18,12 +18,17 @@ import { trafficNetwork } from "./trafficNetwork";
 export const MAX_GRAPH_HOSTS = 18;
 export const MAX_GRAPH_FLOWS = 48;
 export const MAX_FEED_PACKETS = 10;
+export const FLOW_ACTIVE_WINDOW_MS = 2500;
+export const FLOW_STALE_WINDOW_MS = 12000;
 
-function selectGraphHosts(hosts: TrafficHost[]): TrafficHost[] {
+function selectGraphHosts(
+    hosts: TrafficHost[],
+    eligibleFlows = trafficNetwork.flowList,
+): TrafficHost[] {
     const hostById = new Map(hosts.map((host) => [host.id, host]));
     const selectedIds = new Set<string>();
 
-    for (const flow of trafficNetwork.flowList.slice(0, MAX_GRAPH_FLOWS)) {
+    for (const flow of eligibleFlows.slice(0, MAX_GRAPH_FLOWS)) {
         if (selectedIds.size >= MAX_GRAPH_HOSTS) {
             break;
         }
@@ -70,10 +75,16 @@ function resolveLayout(hostList: TrafficHost[]) {
 }
 
 export function createGraph(): TrafficSnapshot {
-    const hostList = selectGraphHosts(trafficNetwork.hostList);
+    const now = Date.now();
+    const useLiveStaleWindow = trafficNetwork.sourceMode !== "history";
+    const staleCutoff = now - FLOW_STALE_WINDOW_MS;
+    const activeCutoff = now - FLOW_ACTIVE_WINDOW_MS;
+    const eligibleFlows = useLiveStaleWindow
+        ? trafficNetwork.flowList.filter((flow) => flow.lastSeen >= staleCutoff)
+        : trafficNetwork.flowList;
+    const hostList = selectGraphHosts(trafficNetwork.hostList, eligibleFlows);
     const hostIds = new Set(hostList.map((host) => host.id));
     const positions = resolveLayout(hostList);
-    const cutoff = Date.now() - 2500;
     const activeFlowIds = new Set<string>();
     const hostProcessMap = new Map<string, Set<string>>();
 
@@ -95,14 +106,14 @@ export function createGraph(): TrafficSnapshot {
         },
     }));
 
-    const flowSlice = trafficNetwork.flowList
+    const flowSlice = eligibleFlows
         .filter(
             (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
         )
         .slice(0, MAX_GRAPH_FLOWS);
 
     for (const flow of flowSlice) {
-        if (flow.lastSeen >= cutoff) {
+        if (!useLiveStaleWindow || flow.lastSeen >= activeCutoff) {
             activeFlowIds.add(flow.id);
         }
         if (

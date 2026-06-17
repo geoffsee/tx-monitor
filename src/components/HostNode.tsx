@@ -178,9 +178,9 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                 ) : null}
                 <div
                     style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 6,
+                        display: "flex",
+                        flexWrap: "nowrap",
+                        gap: 5,
                         marginTop: "auto",
                         flexShrink: 0,
                     }}
