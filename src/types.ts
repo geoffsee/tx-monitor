@@ -8,6 +8,9 @@ export type HostNodeData = {
     category: HostCategory;
     packetCount: number;
     bytesTotal: string;
+    processes?: string[];
+    processCount?: number;
+    resolvedDns?: string;
 };
 
 export type FlowEdgeData = {

@@ -97,10 +97,12 @@ export function TrafficGraph({
                     nodesDraggable={false}
                     nodesConnectable={false}
                     elementsSelectable
+                    elevateNodesOnSelect
+                    defaultEdgeOptions={{ zIndex: 0 }}
                     zoomOnScroll
                     panOnScroll
-                    minZoom={0.2}
-                    maxZoom={1.5}
+                    minZoom={0.45}
+                    maxZoom={1.25}
                     colorMode="dark"
                     proOptions={{ hideAttribution: true }}
                 >

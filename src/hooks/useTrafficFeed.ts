@@ -254,6 +254,7 @@ export function useTrafficFeed(): TrafficFeedState {
             const payload = JSON.parse(String(event.data)) as
                 | { type: "packet"; packet: ParsedPacket }
                 | { type: "packets"; packets: ParsedPacket[] }
+                | { type: "dns"; host: string; name: string }
                 | { type: "status"; mode: string; label: string }
                 | { type: "error"; message: string }
                 | { type: "complete" };
@@ -265,6 +266,12 @@ export function useTrafficFeed(): TrafficFeedState {
 
             if (payload.type === "packets") {
                 queuePackets(payload.packets);
+                return;
+            }
+
+            if (payload.type === "dns") {
+                trafficNetwork.setResolvedDns(payload.host, payload.name);
+                publishGraph();
                 return;
             }
 

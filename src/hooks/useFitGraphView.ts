@@ -26,7 +26,9 @@ export function useFitGraphView(
             lastFitBucket.current = fitBucket;
             requestAnimationFrame(() => {
                 flowRef.current?.fitView({
-                    padding: 0.22,
+                    padding: 0.1,
+                    minZoom: 0.55,
+                    maxZoom: 1,
                     duration: 240,
                     includeHiddenNodes: false,
                 });

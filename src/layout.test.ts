@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HOST_NODE_SIZE, layoutHosts } from "./layout";
+import { HOST_NODE_SIZE, layoutHosts, resolveEdgeHandles } from "./layout";
 import type { TrafficHost } from "./lib/trafficNetwork";
 
 function makeHost(id: string, category: TrafficHost["category"]): TrafficHost {
@@ -39,7 +39,7 @@ function minDistance(positions: Map<string, { x: number; y: number }>): number {
 }
 
 describe("layoutHosts", () => {
-    test("keeps public hosts separated on a full ring", () => {
+    test("wraps large public tiers into multiple columns", () => {
         const hosts = Array.from({ length: 18 }, (_, index) =>
             makeHost(`203.0.113.${index + 1}`, "public"),
         );
@@ -49,6 +49,10 @@ describe("layoutHosts", () => {
         expect(minDistance(positions)).toBeGreaterThan(
             HOST_NODE_SIZE.width * 0.55,
         );
+
+        const ys = [...positions.values()].map((point) => point.y);
+        const heightSpan = Math.max(...ys) - Math.min(...ys);
+        expect(heightSpan).toBeLessThan(HOST_NODE_SIZE.height * 6);
     });
 
     test("uses stable positions regardless of input order", () => {
@@ -65,5 +69,27 @@ describe("layoutHosts", () => {
         for (const host of hosts) {
             expect(forward.get(host.id)).toEqual(backward.get(host.id));
         }
+    });
+
+    test("routes same-column edges vertically", () => {
+        expect(resolveEdgeHandles({ x: 0, y: -60 }, { x: 0, y: 60 })).toEqual({
+            sourceHandle: "source-bottom",
+            targetHandle: "target-top",
+        });
+        expect(resolveEdgeHandles({ x: 0, y: 60 }, { x: 0, y: -60 })).toEqual({
+            sourceHandle: "source-top",
+            targetHandle: "target-bottom",
+        });
+    });
+
+    test("routes cross-tier edges horizontally", () => {
+        expect(resolveEdgeHandles({ x: -300, y: 0 }, { x: 0, y: 40 })).toEqual({
+            sourceHandle: "source-right",
+            targetHandle: "target-left",
+        });
+        expect(resolveEdgeHandles({ x: 0, y: 0 }, { x: -300, y: 40 })).toEqual({
+            sourceHandle: "source-left",
+            targetHandle: "target-right",
+        });
     });
 });

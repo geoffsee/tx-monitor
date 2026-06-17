@@ -1,10 +1,12 @@
 import type React from "react";
 
 export const nodeMetricStyle: React.CSSProperties = {
-    padding: 8,
+    padding: "6px 8px",
     borderRadius: 8,
     background: "#101d26",
     border: "1px solid #1a2c38",
+    minWidth: 0,
+    overflow: "hidden",
 };
 
 export const nodeMetricLabelStyle: React.CSSProperties = {
@@ -15,9 +17,11 @@ export const nodeMetricLabelStyle: React.CSSProperties = {
 };
 
 export const nodeMetricValueStyle: React.CSSProperties = {
-    marginTop: 4,
-    fontSize: 16,
+    marginTop: 2,
+    fontSize: 13,
     fontWeight: 700,
+    lineHeight: 1.1,
+    fontVariantNumeric: "tabular-nums",
 };
 
 export const scanlineStyle: React.CSSProperties = {

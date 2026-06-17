@@ -7,7 +7,7 @@ const serverProcessPort = Number.parseInt(
     process.env.TXMON_SERVER_PORT ?? "3001",
     10,
 );
-const serverProcessTarget = `http://localhost:${serverProcessPort}`;
+const serverProcessTarget = `http://127.0.0.1:${serverProcessPort}`;
 
 function pipeServerOutput(stream: Readable, log: (message: string) => void) {
     stream.setEncoding("utf8");
@@ -88,7 +88,7 @@ function launchServerProcess(): Plugin {
 export default defineConfig({
     plugins: [launchServerProcess(), react()],
     server: {
-        host: "0.0.0.0",
+        host: "127.0.0.1",
         port: 4173,
         strictPort: true,
         proxy: {

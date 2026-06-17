@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { reverse } from "node:dns/promises";
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -18,7 +19,11 @@ import {
     type SocketTable,
 } from "./lib/lsofCollector";
 import { lookupProcess } from "./lib/processInfo";
-import { type ParsedPacket, TcpdumpParser } from "./lib/tcpdumpParser";
+import {
+    hostCategory,
+    type ParsedPacket,
+    TcpdumpParser,
+} from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
 const DEFAULT_DB = "tx-mon.db";
@@ -93,6 +98,8 @@ let pendingPackets: ParsedPacket[] = [];
 let packetBatchTimer: ReturnType<typeof setTimeout> | null = null;
 let socketTable: SocketTable = new Map();
 let lsofTimer: ReturnType<typeof setInterval> | null = null;
+const dnsCache = new Map<string, string | null>();
+const pendingDnsLookups = new Set<string>();
 
 function enrichPacket(packet: ParsedPacket): ParsedPacket {
     const process = lookupProcess(socketTable, packet);
@@ -135,6 +142,44 @@ function broadcast(message: Record<string, unknown>) {
     }
 }
 
+function normalizeDnsName(name: string): string {
+    return name.trim().replace(/\.$/, "");
+}
+
+function scheduleReverseDnsLookup(host: string) {
+    if (
+        hostCategory(host) !== "public" ||
+        dnsCache.has(host) ||
+        pendingDnsLookups.has(host)
+    ) {
+        return;
+    }
+
+    pendingDnsLookups.add(host);
+    void reverse(host)
+        .then((names) => {
+            const name = names.map(normalizeDnsName).find(Boolean) ?? null;
+            dnsCache.set(host, name);
+            if (name) {
+                broadcast({ type: "dns", host, name });
+            }
+        })
+        .catch(() => {
+            dnsCache.set(host, null);
+        })
+        .finally(() => {
+            pendingDnsLookups.delete(host);
+        });
+}
+
+function sendCachedDns(ws: WsClient) {
+    for (const [host, name] of dnsCache) {
+        if (name) {
+            ws.send(JSON.stringify({ type: "dns", host, name }));
+        }
+    }
+}
+
 function flushPacketBatch() {
     if (pendingPackets.length === 0) {
         return;
@@ -148,6 +193,8 @@ function flushPacketBatch() {
 
 function emitPacket(packet: ParsedPacket) {
     const enriched = enrichPacket(packet);
+    scheduleReverseDnsLookup(enriched.srcHost);
+    scheduleReverseDnsLookup(enriched.dstHost);
     const isFirstPacket = pendingPackets.length === 0;
     pendingPackets.push(enriched);
     if (pendingPackets.length >= PACKET_BATCH_MAX) {
@@ -562,6 +609,7 @@ Bun.serve({
                 filePath ? "file" : "live",
                 filePath ? `file ${filePath}` : TCPDUMP_LABEL,
             );
+            sendCachedDns(ws);
             startCapture();
         },
         close(ws) {

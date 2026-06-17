@@ -1,0 +1,17 @@
+.react-flow__node-host {
+    z-index: 2 !important;
+}
+
+.react-flow__node-host.selected {
+    z-index: 3 !important;
+}
+
+.react-flow__edges {
+    z-index: 0;
+}
+
+.host-node-card {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}

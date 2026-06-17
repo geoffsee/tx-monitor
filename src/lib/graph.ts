@@ -1,5 +1,11 @@
 import { type Edge, MarkerType, type Node } from "@xyflow/react";
-import { formatBytes, layoutHosts, protoColor } from "../layout";
+import {
+    formatBytes,
+    HOST_NODE_SIZE,
+    layoutHosts,
+    protoColor,
+    resolveEdgeHandles,
+} from "../layout";
 import type {
     FlowEdgeData,
     HostCategory,
@@ -9,9 +15,38 @@ import type {
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
-export const MAX_GRAPH_HOSTS = 24;
+export const MAX_GRAPH_HOSTS = 18;
 export const MAX_GRAPH_FLOWS = 48;
 export const MAX_FEED_PACKETS = 10;
+
+function selectGraphHosts(hosts: TrafficHost[]): TrafficHost[] {
+    const hostById = new Map(hosts.map((host) => [host.id, host]));
+    const selectedIds = new Set<string>();
+
+    for (const flow of trafficNetwork.flowList.slice(0, MAX_GRAPH_FLOWS)) {
+        if (selectedIds.size >= MAX_GRAPH_HOSTS) {
+            break;
+        }
+        if (hostById.has(flow.srcHost)) {
+            selectedIds.add(flow.srcHost);
+        }
+        if (selectedIds.size >= MAX_GRAPH_HOSTS) {
+            break;
+        }
+        if (hostById.has(flow.dstHost)) {
+            selectedIds.add(flow.dstHost);
+        }
+    }
+
+    for (const host of hosts) {
+        if (selectedIds.size >= MAX_GRAPH_HOSTS) {
+            break;
+        }
+        selectedIds.add(host.id);
+    }
+
+    return hosts.filter((host) => selectedIds.has(host.id));
+}
 
 let cachedLayoutKey = "";
 let cachedLayout = new Map<string, { x: number; y: number }>();
@@ -35,22 +70,28 @@ function resolveLayout(hostList: TrafficHost[]) {
 }
 
 export function createGraph(): TrafficSnapshot {
-    const hostList = trafficNetwork.hostList.slice(0, MAX_GRAPH_HOSTS);
+    const hostList = selectGraphHosts(trafficNetwork.hostList);
     const hostIds = new Set(hostList.map((host) => host.id));
     const positions = resolveLayout(hostList);
     const cutoff = Date.now() - 2500;
     const activeFlowIds = new Set<string>();
+    const hostProcessMap = new Map<string, Set<string>>();
 
     const nodes: Node<HostNodeData>[] = hostList.map((host) => ({
         id: host.id,
         type: "host",
         position: positions.get(host.id) ?? { x: 0, y: 0 },
+        width: HOST_NODE_SIZE.width,
+        height: HOST_NODE_SIZE.height,
         data: {
             label: host.label,
             address: host.address,
             category: host.category as HostCategory,
             packetCount: host.packetCount,
             bytesTotal: formatBytes(host.bytesTotal),
+            processes: [],
+            processCount: 0,
+            resolvedDns: trafficNetwork.resolvedDns.get(host.id),
         },
     }));
 
@@ -64,35 +105,70 @@ export function createGraph(): TrafficSnapshot {
         if (flow.lastSeen >= cutoff) {
             activeFlowIds.add(flow.id);
         }
+        if (
+            flow.processCommand &&
+            flow.processPid !== undefined &&
+            flow.processPid !== null &&
+            flow.processUser?.trim() &&
+            flow.processCommand.trim()
+        ) {
+            const label = `${flow.processCommand.trim()} · ${flow.processPid} (${flow.processUser})`;
+            const srcSet =
+                hostProcessMap.get(flow.srcHost) ?? new Set<string>();
+            const dstSet =
+                hostProcessMap.get(flow.dstHost) ?? new Set<string>();
+            srcSet.add(label);
+            dstSet.add(label);
+            hostProcessMap.set(flow.srcHost, srcSet);
+            hostProcessMap.set(flow.dstHost, dstSet);
+        }
     }
 
-    const edges: Edge<FlowEdgeData>[] = flowSlice.map((flow) => {
-        const active = activeFlowIds.has(flow.id);
-        const stroke = protoColor(flow.proto);
-        const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
-        const processLabel = flow.processCommand
-            ? ` · ${flow.processCommand}`
-            : "";
-        return {
-            id: flow.id,
-            source: flow.srcHost,
-            target: flow.dstHost,
-            type: "flow",
-            animated: active,
-            markerEnd: {
-                type: MarkerType.ArrowClosed,
-                color: stroke,
-            },
-            data: {
-                label: active
-                    ? `${flow.proto}${portLabel}${processLabel}`
-                    : undefined,
-                labelColor: stroke,
-                stroke,
-                active,
-            },
-        };
-    });
+    for (const node of nodes) {
+        const processList = [
+            ...(hostProcessMap.get(node.id) ?? new Set<string>()),
+        ].sort((left, right) => left.localeCompare(right));
+        if (processList.length > 0) {
+            node.data.processes = processList.slice(0, 2);
+            node.data.processCount = processList.length;
+        }
+    }
+
+    const edges: Edge<FlowEdgeData>[] = flowSlice
+        .filter((flow) => flow.srcHost !== flow.dstHost)
+        .map((flow) => {
+            const active = activeFlowIds.has(flow.id);
+            const stroke = protoColor(flow.proto);
+            const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
+            const sourcePos = positions.get(flow.srcHost);
+            const targetPos = positions.get(flow.dstHost);
+            const handles =
+                sourcePos && targetPos
+                    ? resolveEdgeHandles(sourcePos, targetPos)
+                    : {
+                          sourceHandle: "source-right",
+                          targetHandle: "target-left",
+                      };
+            return {
+                id: flow.id,
+                source: flow.srcHost,
+                target: flow.dstHost,
+                sourceHandle: handles.sourceHandle,
+                targetHandle: handles.targetHandle,
+                type: "flow",
+                animated: false,
+                markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                    color: stroke,
+                },
+                data: {
+                    label: `${flow.proto}${portLabel}`,
+                    labelColor: stroke,
+                    stroke,
+                    active,
+                },
+            };
+        });
 
     return {
         nodes,

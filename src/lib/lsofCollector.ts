@@ -7,7 +7,7 @@ import {
 
 export type SocketTable = Map<string, ProcessInfo>;
 
-const LSOF_COMMAND = ["lsof", "-nP", "-iTCP", "-iUDP"];
+const LSOF_COMMAND = ["lsof", "-nP", "+c0", "-iTCP", "-iUDP"];
 const LINE_PATTERN =
     /^(\S+)\s+(\d+)\s+(\S+)\s+\S+u?\s+IPv[46]\s+\S+\s+\S+\s+(TCP|UDP)\s+(.+)$/;
 

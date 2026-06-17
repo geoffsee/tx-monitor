@@ -56,6 +56,7 @@ const TrafficNetworkModel = types
         hosts: types.map(HostModel),
         flows: types.map(FlowModel),
         packets: types.array(PacketModel),
+        resolvedDns: types.map(types.string),
         anomalies: types.map(AnomalyModel),
         events: types.array(types.string),
         totalPackets: types.optional(types.number, 0),
@@ -252,6 +253,15 @@ const TrafficNetworkModel = types
             }
         };
 
+        const setResolvedDns = (host: string, name: string) => {
+            const trimmedHost = host.trim();
+            const trimmedName = name.trim();
+            if (!trimmedHost || !trimmedName) {
+                return;
+            }
+            self.resolvedDns.set(trimmedHost, trimmedName);
+        };
+
         const setConnection = (connected: boolean) => {
             self.connected = connected;
             remember(
@@ -271,6 +281,7 @@ const TrafficNetworkModel = types
             self.hosts.clear();
             self.flows.clear();
             self.packets.clear();
+            self.resolvedDns.clear();
             self.anomalies.clear();
             self.events.clear();
             self.totalPackets = 0;
@@ -281,6 +292,7 @@ const TrafficNetworkModel = types
             ingestPacket,
             ingestBatch,
             ingestHistoricalBatch,
+            setResolvedDns,
             setConnection,
             setSource,
             reset,
@@ -290,6 +302,7 @@ const TrafficNetworkModel = types
 
 export const trafficNetwork = TrafficNetworkModel.create({
     hosts: {},
+    resolvedDns: {},
     flows: {},
     packets: [],
     events: [],

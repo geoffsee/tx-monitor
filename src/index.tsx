@@ -1,5 +1,6 @@
 import ReactDOM from "react-dom/client";
 import "@xyflow/react/dist/style.css";
+import "./graph.css";
 import App from "./App";
 
 const root = document.querySelector<HTMLDivElement>("#app");

@@ -26,6 +26,8 @@ export function FlowEdge({
         targetY,
         sourcePosition,
         targetPosition,
+        borderRadius: 12,
+        offset: 24,
     });
 
     return (
@@ -41,21 +43,24 @@ export function FlowEdge({
                     cursor: "pointer",
                 }}
             />
-            {data?.label ? (
+            {data?.label && selected ? (
                 <EdgeLabelRenderer>
                     <div
+                        className="nodrag nopan"
                         style={{
                             position: "absolute",
                             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                            background: "#141414",
+                            background: "rgba(10, 19, 26, 0.94)",
                             color: data.labelColor,
-                            padding: "4px 6px",
+                            border: `1px solid ${data.labelColor}55`,
+                            padding: "3px 6px",
                             borderRadius: 4,
                             fontSize: 10,
                             fontWeight: 700,
-                            lineHeight: 1,
+                            lineHeight: 1.2,
                             pointerEvents: "none",
                             whiteSpace: "nowrap",
+                            zIndex: 1,
                         }}
                     >
                         {data.label}
