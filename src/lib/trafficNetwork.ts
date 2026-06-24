@@ -65,6 +65,11 @@ const TrafficNetworkModel = types
         events: types.array(types.string),
         totalPackets: types.optional(types.number, 0),
         totalBytes: types.optional(types.number, 0),
+        dnsPacketCount: types.optional(types.number, 0),
+        sensitivity: types.optional(
+            types.enumeration("AnomalySensitivity", ["low", "medium", "high"]),
+            "medium",
+        ),
         sourceMode: types.optional(types.string, "live"),
         sourceLabel: types.optional(
             types.string,
@@ -101,6 +106,11 @@ const TrafficNetworkModel = types
             }
         };
 
+        // Bounded per-flow arrival history for rate and beacon detection (max 16)
+        const flowArrivals = new Map<string, number[]>();
+        // Distinct DNS target hosts seen (capped naturally by host cardinality)
+        const dnsTargets = new Set<string>();
+
         const addAnomaly = (anomaly: SnapshotIn<typeof AnomalyModel>) => {
             if (self.anomalies.has(anomaly.id)) {
                 return;
@@ -112,20 +122,29 @@ const TrafficNetworkModel = types
         const detectAnomalies = (
             packet: ParsedPacket,
             flow: typeof FlowModel.Type,
+            seenAt: number,
         ) => {
-            // 1. Large Flow Detection (> 100MB)
-            if (flow.bytesTotal > 100 * 1024 * 1024) {
+            const sens = self.sensitivity;
+
+            // 1. Large Flow Detection (threshold depends on sensitivity)
+            const largeBytes =
+                sens === "low"
+                    ? 200 * 1024 * 1024
+                    : sens === "high"
+                      ? 50 * 1024 * 1024
+                      : 100 * 1024 * 1024;
+            if (flow.bytesTotal > largeBytes) {
                 addAnomaly({
                     id: `large-flow-${flow.id}`,
                     timestamp: Date.now(),
                     severity: "medium",
                     type: "Large Data Transfer",
-                    description: `Flow ${flow.id} has transferred over 100MB`,
+                    description: `Flow ${flow.id} has transferred over ${Math.round(largeBytes / (1024 * 1024))}MB`,
                     flowId: flow.id,
                 });
             }
 
-            // 2. Suspicious Port to Public
+            // 2. Suspicious Port to Public (signature-based, always active)
             const suspiciousPorts = [137, 138, 139, 445, 3389];
             const isPublic =
                 hostCategory(packet.srcHost) === "public" ||
@@ -144,6 +163,95 @@ const TrafficNetworkModel = types
                     description: `Host ${packet.dstHost} receiving traffic on sensitive port ${packet.dstPort} from/to public IP`,
                     hostId: packet.dstHost,
                 });
+            }
+
+            // 3. Rate spike (sudden high packet count to same flow in short window)
+            const arrivals = flowArrivals.get(flow.id) ?? [];
+            const rateWindowMs = 1500;
+            const recent = arrivals.filter((t) => seenAt - t <= rateWindowMs);
+            const rateThresh = sens === "low" ? 14 : sens === "high" ? 4 : 8;
+            if (recent.length >= rateThresh) {
+                addAnomaly({
+                    id: `rate-spike-${flow.id}`,
+                    timestamp: Date.now(),
+                    severity: sens === "high" ? "medium" : "low",
+                    type: "High Rate",
+                    description: `Flow ${flow.id} received ${recent.length} packets in ~${Math.round(rateWindowMs / 1000)}s`,
+                    flowId: flow.id,
+                });
+            }
+
+            // 4. Beaconing (periodic timing to same remote)
+            if (arrivals.length >= 3) {
+                const minSamples = sens === "low" ? 6 : sens === "high" ? 3 : 4;
+                if (arrivals.length >= minSamples) {
+                    const deltas: number[] = [];
+                    for (let i = 1; i < arrivals.length; i++) {
+                        const prev = arrivals[i - 1];
+                        const curr = arrivals[i];
+                        if (prev !== undefined && curr !== undefined) {
+                            deltas.push(curr - prev);
+                        }
+                    }
+                    const sorted = [...deltas].sort((a, b) => a - b);
+                    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+                    if (median >= 150) {
+                        let regular = 0;
+                        for (const d of deltas) {
+                            if (
+                                median > 0 &&
+                                Math.abs(d - median) / median <= 0.35
+                            )
+                                regular++;
+                        }
+                        const ratio = regular / deltas.length;
+                        if (ratio >= 0.6) {
+                            addAnomaly({
+                                id: `beacon-${flow.id}`,
+                                timestamp: Date.now(),
+                                severity: "low",
+                                type: "Beaconing",
+                                description: `Flow ${flow.id} shows periodic timing (~${Math.round(median)}ms intervals)`,
+                                flowId: flow.id,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 5. Unusual DNS (high volume or broad target set)
+            const isDns = packet.dstPort === 53 || packet.srcPort === 53;
+            if (isDns) {
+                const dnsVolThresh =
+                    sens === "low" ? 75 : sens === "high" ? 15 : 35;
+                const dnsDivThresh =
+                    sens === "low" ? 12 : sens === "high" ? 4 : 7;
+                const dnsCount = self.dnsPacketCount ?? 0;
+                const targetCount = dnsTargets.size;
+                if (
+                    dnsCount >= dnsVolThresh &&
+                    !self.anomalies.has("dns-volume")
+                ) {
+                    addAnomaly({
+                        id: "dns-volume",
+                        timestamp: Date.now(),
+                        severity: "low",
+                        type: "High DNS Volume",
+                        description: `${dnsCount} DNS packets observed`,
+                    });
+                }
+                if (
+                    targetCount >= dnsDivThresh &&
+                    !self.anomalies.has("dns-diversity")
+                ) {
+                    addAnomaly({
+                        id: "dns-diversity",
+                        timestamp: Date.now(),
+                        severity: "low",
+                        type: "Broad DNS Activity",
+                        description: `DNS queries to ${targetCount} distinct destinations`,
+                    });
+                }
             }
         };
 
@@ -262,7 +370,20 @@ const TrafficNetworkModel = types
                 pruneFlows();
             }
 
-            detectAnomalies(packet, flow);
+            // Track arrivals for rate/beacon (use the ingest timestamp)
+            const arrivals = flowArrivals.get(flow.id) ?? [];
+            arrivals.push(seenAt);
+            if (arrivals.length > 16) arrivals.shift();
+            flowArrivals.set(flow.id, arrivals);
+
+            // Track DNS volume/diversity
+            const isDns = packet.dstPort === 53 || packet.srcPort === 53;
+            if (isDns) {
+                self.dnsPacketCount = (self.dnsPacketCount ?? 0) + 1;
+                dnsTargets.add(packet.dstHost);
+            }
+
+            detectAnomalies(packet, flow, seenAt);
 
             if (packet.process) {
                 flow.processCommand = packet.process.command;
@@ -348,7 +469,15 @@ const TrafficNetworkModel = types
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
+            self.dnsPacketCount = 0;
+            self.sensitivity = "medium";
+            flowArrivals.clear();
+            dnsTargets.clear();
             self.sourceMode = "live";
+        };
+
+        const setSensitivity = (level: "low" | "medium" | "high") => {
+            self.sensitivity = level;
         };
 
         return {
@@ -358,6 +487,7 @@ const TrafficNetworkModel = types
             setResolvedDns,
             setConnection,
             setSource,
+            setSensitivity,
             reset,
             remember,
         };

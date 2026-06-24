@@ -246,5 +246,8 @@ export function createGraph(): TrafficSnapshot {
         flowCount: trafficNetwork.flows.size,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,
+        sensitivity:
+            (trafficNetwork.sensitivity as "low" | "medium" | "high") ??
+            "medium",
     };
 }
