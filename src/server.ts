@@ -10,7 +10,9 @@ import { TrafficStore } from "./db/store";
 import {
     askCopilotWithCodex,
     CopilotRequestError,
+    getCopilotStatus,
     parseCopilotRequest,
+    validateCopilotSetup,
 } from "./lib/copilotServer";
 import {
     isLsofEnabled,
@@ -444,6 +446,37 @@ async function handleApiRequest(
 ): Promise<Response | null> {
     if (!url.pathname.startsWith("/api/")) {
         return null;
+    }
+
+    if (url.pathname === "/api/copilot/status") {
+        if (request.method !== "GET") {
+            return jsonResponse({ error: "Method not allowed" }, 405, {
+                allow: "GET",
+            });
+        }
+        const doValidate = url.searchParams.get("validate") === "true";
+        const status = getCopilotStatus();
+        if (!doValidate) {
+            return jsonResponse(status, 200, {
+                "cache-control": "no-store",
+            });
+        }
+        try {
+            const validation = await validateCopilotSetup();
+            return jsonResponse({ ...status, validation }, 200, {
+                "cache-control": "no-store",
+            });
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Copilot validation failed.";
+            return jsonResponse(
+                { ...status, validation: { success: false, message } },
+                200,
+                { "cache-control": "no-store" },
+            );
+        }
     }
 
     if (url.pathname === "/api/copilot") {

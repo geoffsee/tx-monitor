@@ -4,9 +4,12 @@ import { join } from "node:path";
 import { Codex, type ThreadOptions } from "@openai/codex-sdk";
 import {
     COPILOT_SYSTEM_PROMPT,
+    type CopilotAuthMode,
     type CopilotChatMessage,
     type CopilotRequest,
     type CopilotResponse,
+    type CopilotStatus,
+    type CopilotValidationResult,
 } from "./copilot";
 import { loadClientSecrets } from "./secrets";
 
@@ -26,6 +29,91 @@ let copilotRequestCounter = 0;
 
 export class CopilotRequestError extends Error {
     override name = "CopilotRequestError";
+}
+
+export function getCopilotStatus(): CopilotStatus {
+    const secrets = loadClientSecrets();
+    const hasKey = Boolean(secrets.OPENAI_API_KEY?.trim());
+    const hasCredentials = CODEX_AUTH_MODE === "local" || hasKey;
+    return {
+        authMode: CODEX_AUTH_MODE as CopilotAuthMode,
+        hasCredentials,
+        model: CODEX_MODEL,
+        timeoutMs: CODEX_TIMEOUT_MS,
+        ready: hasCredentials,
+    };
+}
+
+export async function validateCopilotSetup(): Promise<CopilotValidationResult> {
+    const pre = getCopilotStatus();
+    if (!pre.ready) {
+        return {
+            success: false,
+            message: `${pre.authMode} mode: no credentials detected. Set TXMON_CODEX_AUTH and/or OPENAI_API_KEY (or .env.copilot) and restart.`,
+        };
+    }
+
+    const requestId = nextCopilotRequestId();
+    const startedAt = performance.now();
+    const workingDirectory = await mkdtemp(join(tmpdir(), "txmon-codex-"));
+    const controller = new AbortController();
+    const VALIDATE_TIMEOUT_MS = 8000;
+    const timeout = setTimeout(() => controller.abort(), VALIDATE_TIMEOUT_MS);
+
+    try {
+        const { codex, authSource } = createCodexClient();
+        logCopilot(requestId, "validate_start", {
+            authMode: CODEX_AUTH_MODE,
+            authSource,
+            model: CODEX_MODEL,
+        });
+
+        const thread = codex.startThread(createThreadOptions(workingDirectory));
+        // Minimal prompt for setup validation; model response content is not critical.
+        const result = await thread.run(
+            "Reply with exactly the word PONG (uppercase) and nothing else.",
+            { signal: controller.signal },
+        );
+        const answer = (result.finalResponse ?? "").trim();
+
+        logCopilot(requestId, "validate_complete", {
+            durationMs: Math.round(performance.now() - startedAt),
+            answerChars: answer.length,
+        });
+
+        return {
+            success: true,
+            message: answer
+                ? `Validation succeeded. Model responded.`
+                : `Validation succeeded (no response text).`,
+        };
+    } catch (error) {
+        if (controller.signal.aborted) {
+            warnCopilot(requestId, "validate_timeout", {
+                durationMs: Math.round(performance.now() - startedAt),
+            });
+            return {
+                success: false,
+                message: "Validation timed out. Codex request took too long.",
+            };
+        }
+        const msg = errorMessage(error);
+        warnCopilot(requestId, "validate_failed", {
+            durationMs: Math.round(performance.now() - startedAt),
+            error: msg,
+        });
+        return {
+            success: false,
+            message: `Validation failed: ${msg}`,
+        };
+    } finally {
+        clearTimeout(timeout);
+        await rm(workingDirectory, { recursive: true, force: true }).catch(
+            () => {
+                /* ignore cleanup */
+            },
+        );
+    }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

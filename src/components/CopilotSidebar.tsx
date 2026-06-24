@@ -10,9 +10,14 @@ import {
     COPILOT_SUGGESTIONS,
     COPILOT_WELCOME,
     type CopilotMessage,
+    type CopilotStatus,
     createMessage,
 } from "../lib/copilot";
-import { askCopilot } from "../lib/copilotClient";
+import {
+    askCopilot,
+    fetchCopilotStatus,
+    validateCopilot,
+} from "../lib/copilotClient";
 import type { Selection, TrafficSnapshot } from "../types";
 import {
     anomalyBadgeStyle,
@@ -46,11 +51,43 @@ export function CopilotSidebar({
     ]);
     const [draft, setDraft] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [copilotStatus, setCopilotStatus] = useState<CopilotStatus | null>(
+        null,
+    );
+    const [validation, setValidation] = useState<{
+        success: boolean;
+        message: string;
+    } | null>(null);
+    const [isValidating, setIsValidating] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchCopilotStatus(false)
+            .then((s) => {
+                if (!cancelled) {
+                    setCopilotStatus(s);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setCopilotStatus({
+                        authMode: "local",
+                        hasCredentials: false,
+                        model: "unknown",
+                        timeoutMs: 120000,
+                        ready: false,
+                    });
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const submitPrompt = useCallback(
         async (prompt: string) => {
@@ -87,9 +124,21 @@ export function CopilotSidebar({
                     error instanceof Error
                         ? error.message
                         : "Copilot request failed.";
+                const lower = message.toLowerCase();
+                const guidance =
+                    lower.includes("key") ||
+                    lower.includes("auth") ||
+                    lower.includes("credential") ||
+                    lower.includes("login") ||
+                    lower.includes("timeout") ||
+                    lower.includes("codex") ||
+                    lower.includes("empty") ||
+                    lower.includes("failed")
+                        ? " — See auth status and Validate button above for setup guidance."
+                        : "";
                 setMessages((current) => [
                     ...current,
-                    createMessage("assistant", message),
+                    createMessage("assistant", message + guidance),
                 ]);
             } finally {
                 setIsLoading(false);
@@ -97,6 +146,27 @@ export function CopilotSidebar({
         },
         [graph, isLoading, messages, selection],
     );
+
+    const handleValidate = useCallback(async () => {
+        if (isValidating) {
+            return;
+        }
+        setIsValidating(true);
+        setValidation(null);
+        try {
+            const { status, validation: v } = await validateCopilot();
+            setCopilotStatus(status);
+            setValidation(v);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Validation request failed.";
+            setValidation({ success: false, message });
+        } finally {
+            setIsValidating(false);
+        }
+    }, [isValidating]);
 
     const handleSubmit = useCallback(
         (event: FormEvent) => {
@@ -189,6 +259,100 @@ export function CopilotSidebar({
                                 Ask about flows, hosts, and patterns in the
                                 current capture.
                             </p>
+                            <div
+                                style={{
+                                    marginTop: 8,
+                                    padding: "6px 8px",
+                                    borderRadius: 6,
+                                    border: "1px solid #1a2d3a",
+                                    background: "#0f1921",
+                                    fontSize: 11,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <span style={{ color: "#7f99a7" }}>
+                                        Auth:
+                                    </span>
+                                    <span style={{ fontFamily: "monospace" }}>
+                                        {copilotStatus
+                                            ? copilotStatus.authMode
+                                            : "…"}
+                                    </span>
+                                    <span
+                                        style={{
+                                            color: copilotStatus?.ready
+                                                ? "#7ce3b7"
+                                                : "#e6a07c",
+                                        }}
+                                    >
+                                        {copilotStatus
+                                            ? copilotStatus.ready
+                                                ? copilotStatus.authMode ===
+                                                  "local"
+                                                    ? "• ready (local creds)"
+                                                    : copilotStatus.hasCredentials
+                                                      ? "• key present"
+                                                      : "• key missing"
+                                                : "• not ready"
+                                            : "• checking…"}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleValidate()}
+                                        disabled={isValidating || isLoading}
+                                        style={{
+                                            marginLeft: "auto",
+                                            padding: "2px 8px",
+                                            fontSize: 10,
+                                            borderRadius: 4,
+                                            border: "1px solid #223849",
+                                            background: "#132028",
+                                            color: "#66aec4",
+                                            cursor:
+                                                isValidating || isLoading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                        }}
+                                    >
+                                        {isValidating
+                                            ? "Validating…"
+                                            : "Validate"}
+                                    </button>
+                                </div>
+                                {validation ? (
+                                    <div
+                                        style={{
+                                            marginTop: 4,
+                                            color: validation.success
+                                                ? "#7ce3b7"
+                                                : "#e6a07c",
+                                            fontSize: 10,
+                                        }}
+                                    >
+                                        {validation.message}
+                                    </div>
+                                ) : null}
+                                <div
+                                    style={{
+                                        marginTop: 4,
+                                        color: "#5c7889",
+                                        fontSize: 10,
+                                        lineHeight: 1.3,
+                                    }}
+                                >
+                                    Modes: <code>local</code> (Codex login) or{" "}
+                                    <code>api-key</code> (OPENAI_API_KEY). Set
+                                    TXMON_CODEX_AUTH and/or use .env.copilot.
+                                    Validation pings without exposing secrets.
+                                </div>
+                            </div>
                         </header>
 
                         <div style={copilotMessagesStyle}>
