@@ -28,6 +28,8 @@ export type TrafficFeedState = {
     loadSession: (sessionId: string) => Promise<void>;
     returnToLive: () => void;
     refreshSessions: () => void;
+    sensitivity: "low" | "medium" | "high";
+    setSensitivity: (level: "low" | "medium" | "high") => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -309,6 +311,14 @@ export function useTrafficFeed(): TrafficFeedState {
         };
     }, [publishGraph, refreshSessions]);
 
+    const setSensitivity = useCallback(
+        (level: "low" | "medium" | "high") => {
+            trafficNetwork.setSensitivity(level);
+            publishGraph();
+        },
+        [publishGraph],
+    );
+
     return {
         graph,
         viewMode,
@@ -318,5 +328,7 @@ export function useTrafficFeed(): TrafficFeedState {
         loadSession,
         returnToLive,
         refreshSessions,
+        sensitivity: graph.sensitivity,
+        setSensitivity,
     };
 }
