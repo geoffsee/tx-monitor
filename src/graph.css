@@ -1,9 +1,9 @@
 .react-flow__node-host {
-    z-index: 2 !important;
+    z-index: 2;
 }
 
 .react-flow__node-host.selected {
-    z-index: 3 !important;
+    z-index: 3;
 }
 
 .react-flow__edges {

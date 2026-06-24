@@ -1,149 +1,149 @@
 {
-	"problem": "Network troubleshooting usually forces developers and operators to choose between raw packet capture tools that are powerful but hard to read in real time, and dashboard tools that hide the packet-level detail needed to explain what is happening on a machine. tx-monitor bridges that gap: it tails live tcpdump output or replays a capture log, parses packet lines into typed traffic events, persists sessions in SQLite, and renders an interactive host graph with recent flows, process context, anomaly cues, and a Codex-backed copilot endpoint. The hard part is keeping the capture pipeline, WebSocket stream, database persistence, and React graph synchronized without dropping packets, leaking secrets, blocking the UI, or making live capture unsafe.",
-	"stakeholders": "Solo developer/maintainer Geoff Seemueller building and publishing the package; developers, homelab users, and operators who want a readable local network traffic visualizer; security-minded users who need packet visibility without sending raw data to a third-party service by default; downstream npm/bun users installing the `tx-monitor` CLI; and autonomous development agents that need a clear test gate and project frame before changing networking, persistence, or UI behavior.",
-	"evidence": "package.json names the project `tx-monitor`, describes it as a real-time network traffic visualizer powered by tcpdump and WebSockets, exposes a `tx-monitor` binary, and provides Bun scripts for dev, monitor, monitor:file, build, compile, typecheck, lint, format, database migrations, and tests. README.md documents live tcpdump mode, file replay mode, a Vite UI with WebSocket proxy, SQLite persistence through Drizzle, `/api/sessions`, `/api/packets`, and `/api/copilot` endpoints, Codex SDK environment variables, and a standalone compiled executable. The source tree includes React graph components, WebSocket traffic feed hooks, parser and graph tests, SQLite store tests, lsof/process enrichment, anomaly detection, copilot server/client code, and a Bun server.",
-	"desired_outcome": "A reliable local-first network traffic monitor that can be installed as a CLI, run against live tcpdump or a replay log, show an accurate real-time host graph, persist capture sessions, retrieve historical packets, and optionally summarize a client-provided capture snapshot through the backend Codex SDK. The system should be safe enough for local troubleshooting, fast enough for active traffic, predictable enough for tests, and clean enough for autonomous agents to extend without breaking packet parsing, persistence, graph state, or publish packaging.",
-	"constraints": "Bun is the runtime, test runner, bundler, and compile target. Live capture depends on tcpdump and may require sudo. The frontend is React 19 via Vite and @xyflow/react. The server is a Bun HTTP/WebSocket server and must support both live tcpdump capture and deterministic file replay from tcpdump.log. Persistence uses SQLite through Drizzle with migrations in drizzle/. Copilot requests must respect `TXMON_CODEX_AUTH`, `OPENAI_API_KEY`, `TXMON_CODEX_MODEL`, and `TXMON_CODEX_TIMEOUT_MS`; secrets must not be logged or sent to the client. The package must remain installable as an npm CLI and compile to a standalone executable.",
-	"dependencies": "Bun; tcpdump for live capture; Vite; React and React DOM; @xyflow/react for graph rendering; MobX and MobX State Tree for state; Drizzle ORM and drizzle-kit for SQLite schema/migrations; @openai/codex-sdk for optional copilot analysis; Biome for linting/formatting; TypeScript for typechecking; and the local browser environment for the UI.",
-	"existing_systems": "bin/tx-monitor.js launches the CLI. src/server.ts serves HTTP, WebSocket traffic, frontend assets, API routes, file replay, live capture, and persistence integration. src/ws.ts handles WebSocket streaming. src/lib/tcpdumpParser.ts parses tcpdump text into typed packet events. src/lib/trafficNetwork.ts, src/lib/graph.ts, and src/layout.ts build graph state and host positioning. src/components/* renders the graph, sidebars, detail panels, session history, and copilot UI. src/hooks/* manages traffic feed, graph fitting, selection, and compact layout. src/db/* owns Drizzle schema, client, and store. src/lib/copilot*.ts, secrets.ts, anomaly.ts, lsofCollector.ts, and processInfo.ts provide analysis, secret handling, anomaly flags, and local process enrichment.",
-	"hypotheses": "1) A local WebSocket graph makes packet capture understandable faster than raw tcpdump output for common debugging tasks. 2) File replay mode gives autonomous agents and tests a deterministic path to exercise packet parsing and UI state without requiring sudo or live network traffic. 3) SQLite session persistence turns a transient traffic stream into an inspectable diagnostic artifact. 4) Copilot value comes from summarizing explicit client-provided snapshots, not from uploading ambient raw traffic by default. 5) A strict autonomous gate of Biome, TypeScript, bun tests, and build catches most regressions before release.",
-	"success_metrics": "`bun run lint`, `bun run typecheck`, `bun test`, and `bun run build` pass cleanly; `bun run monitor:file` can replay tcpdump.log and drive the UI through the Vite proxy; packet parser tests cover representative tcpdump formats; graph tests preserve deterministic node/edge derivation; SQLite store tests verify sessions and packets; copilot tests verify auth, timeouts, and redaction behavior; the CLI package includes only intended files and starts from `bunx tx-monitor`; live mode does not require the UI to block or reload when packet volume spikes.",
-	"tradeoffs": "Using tcpdump keeps capture behavior familiar and powerful but inherits sudo requirements and platform-specific output formats. A local-first Bun server keeps the package small and fast but narrows runtime support. Rendering a graph instead of a table makes relationships legible but requires careful layout and selection state under high churn. Persisting packets improves historical inspection but adds schema migration and disk growth concerns. The Codex copilot can explain capture snapshots but must be optional, explicit, timeout-bounded, and secret-conscious.",
-	"risks": "tcpdump output varies by platform or flags and can break parsing; live capture may require privileges or fail silently if tcpdump is absent; high packet volume can overwhelm WebSocket clients or React rendering; SQLite writes can become a bottleneck or leave stale WAL files; graph layout may become unstable enough to obscure traffic; copilot requests can leak sensitive packet metadata if redaction and user intent are not enforced; packaging can omit built assets or include local databases/logs/screenshots by accident; autonomous agents may run live capture when file replay is the safer test path.",
-	"assumption_summary": "The primary workflow is local troubleshooting by a developer/operator running Bun and, for live mode, tcpdump. File replay is the default safe path for development and autonomous validation. The project values understandable real-time visualization, deterministic tests, local data ownership, and publishable CLI ergonomics over enterprise multi-user capture, cloud storage, or deep IDS functionality.",
-	"frame_notes": "Frame tx-monitor as a local-first packet visibility tool, not a full SIEM, not a hosted observability platform, and not a replacement for Wireshark. Its value is turning tcpdump streams into an immediate graph and persisted sessions that a developer can inspect while preserving the raw-packet mental model.",
-	"decision": "Adopt `Local-first real-time network traffic visualizer` as the Caretta frame: Bun CLI, tcpdump ingestion, WebSocket stream, React host graph, SQLite session history, optional Codex snapshot analysis, and strict automated gates for parser, graph, store, copilot, type, lint, and build behavior.",
-	"decision_rationale": "This matches the package description, README workflows, source layout, and current tests. It keeps autonomous work focused on packet ingestion, state correctness, UI legibility, persistence, privacy, and release quality rather than broadening into cloud monitoring or general cybersecurity automation.",
-	"risk_accepted": true,
-	"risk_notes": "The maintainer accepts Bun-first tooling, tcpdump-specific capture, local SQLite persistence, and optional Codex-backed analysis for this phase. Privileged live capture, platform variance, packet-volume stress, and copilot privacy risk are acknowledged and mitigated through file replay, parser fixtures, bounded APIs, redaction habits, and explicit validation commands.",
-	"assumptions": [
-		{
-			"status": "open",
-			"confidence": "high",
-			"evidence": "README.md documents `bun run monitor:file` as the development path and `bun run monitor` as live capture requiring tcpdump.",
-			"owner": "Geoff Seemueller",
-			"validation_next_step": "Keep file replay as the default agent/dev workflow and add fixtures when parser support expands."
-		},
-		{
-			"status": "open",
-			"confidence": "medium",
-			"evidence": "The source tree includes tests for parser, graph, layout, lsof collector, secrets, copilot, and SQLite store behavior.",
-			"owner": "Geoff Seemueller",
-			"validation_next_step": "Run the Caretta test command after substantial changes and add focused tests for every changed boundary."
-		},
-		{
-			"status": "open",
-			"confidence": "medium",
-			"evidence": "README.md exposes `TXMON_CODEX_AUTH`, `OPENAI_API_KEY`, model, and timeout variables for `/api/copilot`.",
-			"owner": "Geoff Seemueller",
-			"validation_next_step": "Confirm copilot payloads remain client-selected snapshots and that secrets never cross logs, responses, or persisted packet records."
-		},
-		{
-			"status": "open",
-			"confidence": "low",
-			"evidence": "Live capture relies on tcpdump output but platform coverage is not fully documented.",
-			"owner": "Geoff Seemueller",
-			"validation_next_step": "Collect representative tcpdump output from macOS and Linux and encode differences as parser fixtures."
-		}
-	],
-	"frame_comparisons": [
-		{
-			"frame": "Local-first real-time network traffic visualizer",
-			"framing": "Turn tcpdump streams into a live host graph, persisted sessions, and optional local/copilot analysis for developers and operators.",
-			"evidence": "README quick start, WebSocket server, React graph, SQLite API, and file replay workflow.",
-			"tradeoffs": "Focused on local visibility rather than multi-tenant observability or enterprise security workflows.",
-			"recommendation": "Primary frame for autonomous development."
-		},
-		{
-			"frame": "Security IDS / SIEM",
-			"framing": "Detect threats, correlate events, and maintain long-term security telemetry.",
-			"evidence": "Anomaly code and packet visibility could support security analysis.",
-			"tradeoffs": "Requires rule engines, retention policy, alerting, auth, and compliance surface well beyond the current product.",
-			"recommendation": "Do not adopt as the core frame; keep security language grounded in local troubleshooting."
-		},
-		{
-			"frame": "Wireshark replacement",
-			"framing": "Provide deep protocol dissection and packet-forensics workflows.",
-			"evidence": "tcpdump ingestion and packet listing overlap with packet analysis tools.",
-			"tradeoffs": "Deep protocol decoding would distract from the fast graph/persistence workflow and massively expand parser scope.",
-			"recommendation": "Explicit non-goal for now."
-		}
-	],
-	"decision_log": [
-		{
-			"date": "2026-06-24",
-			"decision": "Configure Caretta around `Local-first real-time network traffic visualizer` with tx-monitor-specific tests, framing, personas, deploy workflow, and agent skill references.",
-			"rationale": "Baseline copied from midi-vibe but adapted away from music/MIDI concerns into packet capture, WebSocket streaming, React graph UI, SQLite persistence, package release, and optional Codex analysis.",
-			"owner": "Geoff Seemueller"
-		}
-	],
-	"risk_dashboard": [
-		{
-			"likelihood": "medium",
-			"impact": "high",
-			"trigger": "tcpdump line format differs across platforms or capture modes and parser output becomes wrong.",
-			"mitigation": "Add fixture-based parser tests before supporting new tcpdump formats; prefer file replay for development."
-		},
-		{
-			"likelihood": "medium",
-			"impact": "high",
-			"trigger": "Packet volume overwhelms WebSocket delivery, SQLite writes, or React graph rendering.",
-			"mitigation": "Batch events, cap UI history, debounce graph updates, and test high-volume replay logs."
-		},
-		{
-			"likelihood": "medium",
-			"impact": "high",
-			"trigger": "Copilot endpoint leaks secrets, raw sensitive metadata, or environment values.",
-			"mitigation": "Keep payloads explicit and client-provided; redact secrets; test auth modes and timeout failures."
-		},
-		{
-			"likelihood": "medium",
-			"impact": "medium",
-			"trigger": "Graph layout changes make visual history jumpy or selection state inconsistent.",
-			"mitigation": "Preserve deterministic layout helpers and add focused tests around graph derivation and compact layout."
-		},
-		{
-			"likelihood": "low",
-			"impact": "medium",
-			"trigger": "npm package or compiled binary omits frontend, migrations, or CLI entry files.",
-			"mitigation": "Keep build and publish verification in the autonomous gate or release checklist."
-		}
-	],
-	"dependency_graph": [
-		{
-			"from": "tcpdump or tcpdump.log",
-			"to": "src/lib/tcpdumpParser.ts",
-			"reason": "Raw capture lines are parsed into structured packet events."
-		},
-		{
-			"from": "src/lib/tcpdumpParser.ts",
-			"to": "src/ws.ts and src/server.ts",
-			"reason": "Parsed traffic is streamed to clients and coordinated with server lifecycle."
-		},
-		{
-			"from": "src/server.ts",
-			"to": "src/db/store.ts",
-			"reason": "Capture sessions and packets are persisted to SQLite when persistence is enabled."
-		},
-		{
-			"from": "src/hooks/useTrafficFeed.ts",
-			"to": "src/lib/trafficNetwork.ts and src/lib/graph.ts",
-			"reason": "The browser converts streamed packets into network state and graph nodes/edges."
-		},
-		{
-			"from": "src/components/TrafficGraph.tsx",
-			"to": "@xyflow/react",
-			"reason": "Graph state is rendered as an interactive host/flow view."
-		},
-		{
-			"from": "src/lib/copilotServer.ts",
-			"to": "@openai/codex-sdk",
-			"reason": "Optional backend copilot analysis uses configured Codex auth and timeout settings."
-		},
-		{
-			"from": "package.json scripts",
-			"to": "Bun, TypeScript, Biome, Vite, and drizzle-kit",
-			"reason": "The autonomous development gate and release packaging depend on these tools."
-		}
-	]
+    "problem": "Network troubleshooting usually forces developers and operators to choose between raw packet capture tools that are powerful but hard to read in real time, and dashboard tools that hide the packet-level detail needed to explain what is happening on a machine. tx-monitor bridges that gap: it tails live tcpdump output or replays a capture log, parses packet lines into typed traffic events, persists sessions in SQLite, and renders an interactive host graph with recent flows, process context, anomaly cues, and a Codex-backed copilot endpoint. The hard part is keeping the capture pipeline, WebSocket stream, database persistence, and React graph synchronized without dropping packets, leaking secrets, blocking the UI, or making live capture unsafe.",
+    "stakeholders": "Solo developer/maintainer Geoff Seemueller building and publishing the package; developers, homelab users, and operators who want a readable local network traffic visualizer; security-minded users who need packet visibility without sending raw data to a third-party service by default; downstream npm/bun users installing the `tx-monitor` CLI; and autonomous development agents that need a clear test gate and project frame before changing networking, persistence, or UI behavior.",
+    "evidence": "package.json names the project `tx-monitor`, describes it as a real-time network traffic visualizer powered by tcpdump and WebSockets, exposes a `tx-monitor` binary, and provides Bun scripts for dev, monitor, monitor:file, build, compile, typecheck, lint, format, database migrations, and tests. README.md documents live tcpdump mode, file replay mode, a Vite UI with WebSocket proxy, SQLite persistence through Drizzle, `/api/sessions`, `/api/packets`, and `/api/copilot` endpoints, Codex SDK environment variables, and a standalone compiled executable. The source tree includes React graph components, WebSocket traffic feed hooks, parser and graph tests, SQLite store tests, lsof/process enrichment, anomaly detection, copilot server/client code, and a Bun server.",
+    "desired_outcome": "A reliable local-first network traffic monitor that can be installed as a CLI, run against live tcpdump or a replay log, show an accurate real-time host graph, persist capture sessions, retrieve historical packets, and optionally summarize a client-provided capture snapshot through the backend Codex SDK. The system should be safe enough for local troubleshooting, fast enough for active traffic, predictable enough for tests, and clean enough for autonomous agents to extend without breaking packet parsing, persistence, graph state, or publish packaging.",
+    "constraints": "Bun is the runtime, test runner, bundler, and compile target. Live capture depends on tcpdump and may require sudo. The frontend is React 19 via Vite and @xyflow/react. The server is a Bun HTTP/WebSocket server and must support both live tcpdump capture and deterministic file replay from tcpdump.log. Persistence uses SQLite through Drizzle with migrations in drizzle/. Copilot requests must respect `TXMON_CODEX_AUTH`, `OPENAI_API_KEY`, `TXMON_CODEX_MODEL`, and `TXMON_CODEX_TIMEOUT_MS`; secrets must not be logged or sent to the client. The package must remain installable as an npm CLI and compile to a standalone executable.",
+    "dependencies": "Bun; tcpdump for live capture; Vite; React and React DOM; @xyflow/react for graph rendering; MobX and MobX State Tree for state; Drizzle ORM and drizzle-kit for SQLite schema/migrations; @openai/codex-sdk for optional copilot analysis; Biome for linting/formatting; TypeScript for typechecking; and the local browser environment for the UI.",
+    "existing_systems": "bin/tx-monitor.js launches the CLI. src/server.ts serves HTTP, WebSocket traffic, frontend assets, API routes, file replay, live capture, and persistence integration. src/ws.ts handles WebSocket streaming. src/lib/tcpdumpParser.ts parses tcpdump text into typed packet events. src/lib/trafficNetwork.ts, src/lib/graph.ts, and src/layout.ts build graph state and host positioning. src/components/* renders the graph, sidebars, detail panels, session history, and copilot UI. src/hooks/* manages traffic feed, graph fitting, selection, and compact layout. src/db/* owns Drizzle schema, client, and store. src/lib/copilot*.ts, secrets.ts, anomaly.ts, lsofCollector.ts, and processInfo.ts provide analysis, secret handling, anomaly flags, and local process enrichment.",
+    "hypotheses": "1) A local WebSocket graph makes packet capture understandable faster than raw tcpdump output for common debugging tasks. 2) File replay mode gives autonomous agents and tests a deterministic path to exercise packet parsing and UI state without requiring sudo or live network traffic. 3) SQLite session persistence turns a transient traffic stream into an inspectable diagnostic artifact. 4) Copilot value comes from summarizing explicit client-provided snapshots, not from uploading ambient raw traffic by default. 5) A strict autonomous gate of Biome, TypeScript, bun tests, and build catches most regressions before release.",
+    "success_metrics": "`bun run lint`, `bun run typecheck`, `bun test`, and `bun run build` pass cleanly; `bun run monitor:file` can replay tcpdump.log and drive the UI through the Vite proxy; packet parser tests cover representative tcpdump formats; graph tests preserve deterministic node/edge derivation; SQLite store tests verify sessions and packets; copilot tests verify auth, timeouts, and redaction behavior; the CLI package includes only intended files and starts from `bunx tx-monitor`; live mode does not require the UI to block or reload when packet volume spikes.",
+    "tradeoffs": "Using tcpdump keeps capture behavior familiar and powerful but inherits sudo requirements and platform-specific output formats. A local-first Bun server keeps the package small and fast but narrows runtime support. Rendering a graph instead of a table makes relationships legible but requires careful layout and selection state under high churn. Persisting packets improves historical inspection but adds schema migration and disk growth concerns. The Codex copilot can explain capture snapshots but must be optional, explicit, timeout-bounded, and secret-conscious.",
+    "risks": "tcpdump output varies by platform or flags and can break parsing; live capture may require privileges or fail silently if tcpdump is absent; high packet volume can overwhelm WebSocket clients or React rendering; SQLite writes can become a bottleneck or leave stale WAL files; graph layout may become unstable enough to obscure traffic; copilot requests can leak sensitive packet metadata if redaction and user intent are not enforced; packaging can omit built assets or include local databases/logs/screenshots by accident; autonomous agents may run live capture when file replay is the safer test path.",
+    "assumption_summary": "The primary workflow is local troubleshooting by a developer/operator running Bun and, for live mode, tcpdump. File replay is the default safe path for development and autonomous validation. The project values understandable real-time visualization, deterministic tests, local data ownership, and publishable CLI ergonomics over enterprise multi-user capture, cloud storage, or deep IDS functionality.",
+    "frame_notes": "Frame tx-monitor as a local-first packet visibility tool, not a full SIEM, not a hosted observability platform, and not a replacement for Wireshark. Its value is turning tcpdump streams into an immediate graph and persisted sessions that a developer can inspect while preserving the raw-packet mental model.",
+    "decision": "Adopt `Local-first real-time network traffic visualizer` as the Caretta frame: Bun CLI, tcpdump ingestion, WebSocket stream, React host graph, SQLite session history, optional Codex snapshot analysis, and strict automated gates for parser, graph, store, copilot, type, lint, and build behavior.",
+    "decision_rationale": "This matches the package description, README workflows, source layout, and current tests. It keeps autonomous work focused on packet ingestion, state correctness, UI legibility, persistence, privacy, and release quality rather than broadening into cloud monitoring or general cybersecurity automation.",
+    "risk_accepted": true,
+    "risk_notes": "The maintainer accepts Bun-first tooling, tcpdump-specific capture, local SQLite persistence, and optional Codex-backed analysis for this phase. Privileged live capture, platform variance, packet-volume stress, and copilot privacy risk are acknowledged and mitigated through file replay, parser fixtures, bounded APIs, redaction habits, and explicit validation commands.",
+    "assumptions": [
+        {
+            "status": "open",
+            "confidence": "high",
+            "evidence": "README.md documents `bun run monitor:file` as the development path and `bun run monitor` as live capture requiring tcpdump.",
+            "owner": "Geoff Seemueller",
+            "validation_next_step": "Keep file replay as the default agent/dev workflow and add fixtures when parser support expands."
+        },
+        {
+            "status": "open",
+            "confidence": "medium",
+            "evidence": "The source tree includes tests for parser, graph, layout, lsof collector, secrets, copilot, and SQLite store behavior.",
+            "owner": "Geoff Seemueller",
+            "validation_next_step": "Run the Caretta test command after substantial changes and add focused tests for every changed boundary."
+        },
+        {
+            "status": "open",
+            "confidence": "medium",
+            "evidence": "README.md exposes `TXMON_CODEX_AUTH`, `OPENAI_API_KEY`, model, and timeout variables for `/api/copilot`.",
+            "owner": "Geoff Seemueller",
+            "validation_next_step": "Confirm copilot payloads remain client-selected snapshots and that secrets never cross logs, responses, or persisted packet records."
+        },
+        {
+            "status": "open",
+            "confidence": "low",
+            "evidence": "Live capture relies on tcpdump output but platform coverage is not fully documented.",
+            "owner": "Geoff Seemueller",
+            "validation_next_step": "Collect representative tcpdump output from macOS and Linux and encode differences as parser fixtures."
+        }
+    ],
+    "frame_comparisons": [
+        {
+            "frame": "Local-first real-time network traffic visualizer",
+            "framing": "Turn tcpdump streams into a live host graph, persisted sessions, and optional local/copilot analysis for developers and operators.",
+            "evidence": "README quick start, WebSocket server, React graph, SQLite API, and file replay workflow.",
+            "tradeoffs": "Focused on local visibility rather than multi-tenant observability or enterprise security workflows.",
+            "recommendation": "Primary frame for autonomous development."
+        },
+        {
+            "frame": "Security IDS / SIEM",
+            "framing": "Detect threats, correlate events, and maintain long-term security telemetry.",
+            "evidence": "Anomaly code and packet visibility could support security analysis.",
+            "tradeoffs": "Requires rule engines, retention policy, alerting, auth, and compliance surface well beyond the current product.",
+            "recommendation": "Do not adopt as the core frame; keep security language grounded in local troubleshooting."
+        },
+        {
+            "frame": "Wireshark replacement",
+            "framing": "Provide deep protocol dissection and packet-forensics workflows.",
+            "evidence": "tcpdump ingestion and packet listing overlap with packet analysis tools.",
+            "tradeoffs": "Deep protocol decoding would distract from the fast graph/persistence workflow and massively expand parser scope.",
+            "recommendation": "Explicit non-goal for now."
+        }
+    ],
+    "decision_log": [
+        {
+            "date": "2026-06-24",
+            "decision": "Configure Caretta around `Local-first real-time network traffic visualizer` with tx-monitor-specific tests, framing, personas, deploy workflow, and agent skill references.",
+            "rationale": "Baseline copied from midi-vibe but adapted away from music/MIDI concerns into packet capture, WebSocket streaming, React graph UI, SQLite persistence, package release, and optional Codex analysis.",
+            "owner": "Geoff Seemueller"
+        }
+    ],
+    "risk_dashboard": [
+        {
+            "likelihood": "medium",
+            "impact": "high",
+            "trigger": "tcpdump line format differs across platforms or capture modes and parser output becomes wrong.",
+            "mitigation": "Add fixture-based parser tests before supporting new tcpdump formats; prefer file replay for development."
+        },
+        {
+            "likelihood": "medium",
+            "impact": "high",
+            "trigger": "Packet volume overwhelms WebSocket delivery, SQLite writes, or React graph rendering.",
+            "mitigation": "Batch events, cap UI history, debounce graph updates, and test high-volume replay logs."
+        },
+        {
+            "likelihood": "medium",
+            "impact": "high",
+            "trigger": "Copilot endpoint leaks secrets, raw sensitive metadata, or environment values.",
+            "mitigation": "Keep payloads explicit and client-provided; redact secrets; test auth modes and timeout failures."
+        },
+        {
+            "likelihood": "medium",
+            "impact": "medium",
+            "trigger": "Graph layout changes make visual history jumpy or selection state inconsistent.",
+            "mitigation": "Preserve deterministic layout helpers and add focused tests around graph derivation and compact layout."
+        },
+        {
+            "likelihood": "low",
+            "impact": "medium",
+            "trigger": "npm package or compiled binary omits frontend, migrations, or CLI entry files.",
+            "mitigation": "Keep build and publish verification in the autonomous gate or release checklist."
+        }
+    ],
+    "dependency_graph": [
+        {
+            "from": "tcpdump or tcpdump.log",
+            "to": "src/lib/tcpdumpParser.ts",
+            "reason": "Raw capture lines are parsed into structured packet events."
+        },
+        {
+            "from": "src/lib/tcpdumpParser.ts",
+            "to": "src/ws.ts and src/server.ts",
+            "reason": "Parsed traffic is streamed to clients and coordinated with server lifecycle."
+        },
+        {
+            "from": "src/server.ts",
+            "to": "src/db/store.ts",
+            "reason": "Capture sessions and packets are persisted to SQLite when persistence is enabled."
+        },
+        {
+            "from": "src/hooks/useTrafficFeed.ts",
+            "to": "src/lib/trafficNetwork.ts and src/lib/graph.ts",
+            "reason": "The browser converts streamed packets into network state and graph nodes/edges."
+        },
+        {
+            "from": "src/components/TrafficGraph.tsx",
+            "to": "@xyflow/react",
+            "reason": "Graph state is rendered as an interactive host/flow view."
+        },
+        {
+            "from": "src/lib/copilotServer.ts",
+            "to": "@openai/codex-sdk",
+            "reason": "Optional backend copilot analysis uses configured Codex auth and timeout settings."
+        },
+        {
+            "from": "package.json scripts",
+            "to": "Bun, TypeScript, Biome, Vite, and drizzle-kit",
+            "reason": "The autonomous development gate and release packaging depend on these tools."
+        }
+    ]
 }

@@ -1,28 +1,28 @@
 {
-	"persona": {
-		"communication_style": "Prefers exact, operationally grounded communication with failure modes, packet examples, and validation commands. Responds best to changes that preserve observability under load and explain how parser, stream, persistence, and UI state interact. Dislikes vague claims about intelligence or security without packet-level evidence.",
-		"name": "Network Operator",
-		"occupation": {
-			"description": "An operator or SRE responsible for diagnosing service connectivity, noisy clients, suspicious egress, or local host behavior. They evaluate tx-monitor as a lightweight diagnostic instrument that must be honest about what it captures, when data is dropped, and how much confidence the graph can support.",
-			"organization": "Small platform team, development environment, or production-adjacent troubleshooting workflow",
-			"title": "Network-focused operator / SRE"
-		},
-		"other_facts": [
-			"jobs_to_be_done: Confirm whether traffic is present, where it is going, and whether a service is causing it.",
-			"jobs_to_be_done: Trust parser output enough to act on ports, protocols, hosts, and timestamps.",
-			"jobs_to_be_done: Preserve visibility during packet bursts without freezing the browser.",
-			"jobs_to_be_done: Use session history as a lightweight evidence trail.",
-			"pains: Silent packet drops or UI lag that look like network quiet.",
-			"pains: Parser behavior that changes without fixtures or documented tcpdump examples.",
-			"pains: Graph aggregation that hides important port/protocol changes.",
-			"adoption_yes_if: The tool reports and visualizes traffic consistently under replay and live capture.",
-			"adoption_yes_if: Tests make parser and graph derivation behavior explicit.",
-			"adoption_yes_if: The UI separates current activity from historical session inspection.",
-			"rejection_no_if: It makes security claims that exceed the actual capture and analysis model.",
-			"rejection_no_if: It cannot explain how a graph edge maps back to packet records.",
-			"anti_goals: They do not want opaque ML scoring, magical anomaly claims, or evidence-free recommendations.",
-			"recognition_cues: Uses phrases such as \"what evidence backs that edge?\", \"does replay match live capture?\", \"what happens under packet bursts?\", \"show me the session records\", and \"do not hide dropped data\"."
-		]
-	},
-	"type": "TinyPerson"
+    "persona": {
+        "communication_style": "Prefers exact, operationally grounded communication with failure modes, packet examples, and validation commands. Responds best to changes that preserve observability under load and explain how parser, stream, persistence, and UI state interact. Dislikes vague claims about intelligence or security without packet-level evidence.",
+        "name": "Network Operator",
+        "occupation": {
+            "description": "An operator or SRE responsible for diagnosing service connectivity, noisy clients, suspicious egress, or local host behavior. They evaluate tx-monitor as a lightweight diagnostic instrument that must be honest about what it captures, when data is dropped, and how much confidence the graph can support.",
+            "organization": "Small platform team, development environment, or production-adjacent troubleshooting workflow",
+            "title": "Network-focused operator / SRE"
+        },
+        "other_facts": [
+            "jobs_to_be_done: Confirm whether traffic is present, where it is going, and whether a service is causing it.",
+            "jobs_to_be_done: Trust parser output enough to act on ports, protocols, hosts, and timestamps.",
+            "jobs_to_be_done: Preserve visibility during packet bursts without freezing the browser.",
+            "jobs_to_be_done: Use session history as a lightweight evidence trail.",
+            "pains: Silent packet drops or UI lag that look like network quiet.",
+            "pains: Parser behavior that changes without fixtures or documented tcpdump examples.",
+            "pains: Graph aggregation that hides important port/protocol changes.",
+            "adoption_yes_if: The tool reports and visualizes traffic consistently under replay and live capture.",
+            "adoption_yes_if: Tests make parser and graph derivation behavior explicit.",
+            "adoption_yes_if: The UI separates current activity from historical session inspection.",
+            "rejection_no_if: It makes security claims that exceed the actual capture and analysis model.",
+            "rejection_no_if: It cannot explain how a graph edge maps back to packet records.",
+            "anti_goals: They do not want opaque ML scoring, magical anomaly claims, or evidence-free recommendations.",
+            "recognition_cues: Uses phrases such as \"what evidence backs that edge?\", \"does replay match live capture?\", \"what happens under packet bursts?\", \"show me the session records\", and \"do not hide dropped data\"."
+        ]
+    },
+    "type": "TinyPerson"
 }

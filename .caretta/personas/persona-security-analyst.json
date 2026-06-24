@@ -1,28 +1,28 @@
 {
-	"persona": {
-		"communication_style": "Prefers careful, evidence-based language that distinguishes observations from conclusions. Responds best to packet metadata, process context, redaction behavior, and clearly bounded AI analysis. Dislikes alarmist copy, unverified threat labels, and tools that move sensitive network data without explicit consent.",
-		"name": "Security Analyst",
-		"occupation": {
-			"description": "A security-aware user investigating local network behavior. They may use tx-monitor to spot unexpected egress, repeated connections, unknown destinations, or suspicious process/network pairings, but they expect the tool to stay honest about its non-IDS scope and privacy boundaries.",
-			"organization": "Individual developer, small team, or security-adjacent operations workflow",
-			"title": "Security-minded traffic reviewer"
-		},
-		"other_facts": [
-			"jobs_to_be_done: Review local traffic for unexpected hosts, ports, protocols, or process names.",
-			"jobs_to_be_done: Preserve enough packet history to support follow-up investigation.",
-			"jobs_to_be_done: Ask the copilot to summarize a selected snapshot without exposing secrets or ambient traffic by default.",
-			"jobs_to_be_done: Separate anomaly cues from confirmed threat findings.",
-			"pains: Tools that overstate detection accuracy or label traffic malicious without evidence.",
-			"pains: AI features that silently transmit local metadata or environment secrets.",
-			"pains: Missing timestamps, ports, process context, or session history that make observations hard to verify.",
-			"adoption_yes_if: The tool keeps analysis local-first and makes AI payloads explicit.",
-			"adoption_yes_if: Anomaly output is explainable and traceable back to packet/session data.",
-			"adoption_yes_if: Secret handling and timeout behavior are tested.",
-			"rejection_no_if: It uploads raw packet streams by default.",
-			"rejection_no_if: It markets itself as autonomous security remediation.",
-			"anti_goals: They do not want a black-box detector or compliance dashboard.",
-			"recognition_cues: Uses phrases such as \"what data leaves the machine?\", \"is this observation or conclusion?\", \"show the packet evidence\", \"redact the token\", and \"do not call this malware without proof\"."
-		]
-	},
-	"type": "TinyPerson"
+    "persona": {
+        "communication_style": "Prefers careful, evidence-based language that distinguishes observations from conclusions. Responds best to packet metadata, process context, redaction behavior, and clearly bounded AI analysis. Dislikes alarmist copy, unverified threat labels, and tools that move sensitive network data without explicit consent.",
+        "name": "Security Analyst",
+        "occupation": {
+            "description": "A security-aware user investigating local network behavior. They may use tx-monitor to spot unexpected egress, repeated connections, unknown destinations, or suspicious process/network pairings, but they expect the tool to stay honest about its non-IDS scope and privacy boundaries.",
+            "organization": "Individual developer, small team, or security-adjacent operations workflow",
+            "title": "Security-minded traffic reviewer"
+        },
+        "other_facts": [
+            "jobs_to_be_done: Review local traffic for unexpected hosts, ports, protocols, or process names.",
+            "jobs_to_be_done: Preserve enough packet history to support follow-up investigation.",
+            "jobs_to_be_done: Ask the copilot to summarize a selected snapshot without exposing secrets or ambient traffic by default.",
+            "jobs_to_be_done: Separate anomaly cues from confirmed threat findings.",
+            "pains: Tools that overstate detection accuracy or label traffic malicious without evidence.",
+            "pains: AI features that silently transmit local metadata or environment secrets.",
+            "pains: Missing timestamps, ports, process context, or session history that make observations hard to verify.",
+            "adoption_yes_if: The tool keeps analysis local-first and makes AI payloads explicit.",
+            "adoption_yes_if: Anomaly output is explainable and traceable back to packet/session data.",
+            "adoption_yes_if: Secret handling and timeout behavior are tested.",
+            "rejection_no_if: It uploads raw packet streams by default.",
+            "rejection_no_if: It markets itself as autonomous security remediation.",
+            "anti_goals: They do not want a black-box detector or compliance dashboard.",
+            "recognition_cues: Uses phrases such as \"what data leaves the machine?\", \"is this observation or conclusion?\", \"show the packet evidence\", \"redact the token\", and \"do not call this malware without proof\"."
+        ]
+    },
+    "type": "TinyPerson"
 }

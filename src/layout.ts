@@ -67,7 +67,10 @@ export function resolveEdgeHandles(
 
     if (Math.abs(dx) <= SAME_COLUMN_THRESHOLD) {
         if (dy >= 0) {
-            return { sourceHandle: "source-bottom", targetHandle: "target-top" };
+            return {
+                sourceHandle: "source-bottom",
+                targetHandle: "target-top",
+            };
         }
         return { sourceHandle: "source-top", targetHandle: "target-bottom" };
     }

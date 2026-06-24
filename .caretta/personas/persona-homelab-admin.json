@@ -1,29 +1,29 @@
 {
-	"persona": {
-		"communication_style": "Prefers practical, concrete language with commands, ports, hostnames, and visible outcomes. Responds best to examples that show how to start from a capture log, find a noisy host, and understand what changed. Dislikes enterprise jargon, cloud-first assumptions, and tools that require a complicated setup before showing traffic.",
-		"name": "Local Homelab Admin",
-		"occupation": {
-			"description": "A developer/operator running routers, NAS boxes, containers, laptops, and IoT devices on a home or small-office network. They use tx-monitor to answer direct questions: which host is talking, which process opened a connection, why a service is noisy, and whether traffic changed after a config update.",
-			"organization": "Home lab, small office, or personal developer network",
-			"title": "Hands-on local network operator"
-		},
-		"other_facts": [
-			"jobs_to_be_done: Start tx-monitor quickly and see live traffic without building a monitoring stack.",
-			"jobs_to_be_done: Replay a saved tcpdump log and compare behavior after changing a router, container, or service.",
-			"jobs_to_be_done: Identify noisy hosts and unexpected destinations from a graph rather than raw packet text.",
-			"jobs_to_be_done: Inspect packet history after the moment has passed.",
-			"jobs_to_be_done: Keep packet data local unless explicitly choosing to ask the copilot for analysis.",
-			"pains: Tools that hide too much behind dashboards and make raw evidence hard to inspect.",
-			"pains: Setup flows that require agents, daemons, accounts, or cloud storage before anything works.",
-			"pains: Visualizations that jump around so much that host relationships cannot be followed.",
-			"adoption_yes_if: File replay and live mode both work with clear commands.",
-			"adoption_yes_if: The graph makes host relationships obvious without losing packet details.",
-			"adoption_yes_if: Local persistence lets them return to a capture session later.",
-			"rejection_no_if: It requires a hosted backend, account, or enterprise collector.",
-			"rejection_no_if: It uploads traffic by default or obscures what data is sent to AI.",
-			"anti_goals: They do not want a SIEM, compliance platform, or packet-forensics suite.",
-			"recognition_cues: Uses phrases such as \"what is this machine talking to?\", \"why did this service get noisy?\", \"can I replay that log?\", \"show me the port and process\", and \"keep this local\"."
-		]
-	},
-	"type": "TinyPerson"
+    "persona": {
+        "communication_style": "Prefers practical, concrete language with commands, ports, hostnames, and visible outcomes. Responds best to examples that show how to start from a capture log, find a noisy host, and understand what changed. Dislikes enterprise jargon, cloud-first assumptions, and tools that require a complicated setup before showing traffic.",
+        "name": "Local Homelab Admin",
+        "occupation": {
+            "description": "A developer/operator running routers, NAS boxes, containers, laptops, and IoT devices on a home or small-office network. They use tx-monitor to answer direct questions: which host is talking, which process opened a connection, why a service is noisy, and whether traffic changed after a config update.",
+            "organization": "Home lab, small office, or personal developer network",
+            "title": "Hands-on local network operator"
+        },
+        "other_facts": [
+            "jobs_to_be_done: Start tx-monitor quickly and see live traffic without building a monitoring stack.",
+            "jobs_to_be_done: Replay a saved tcpdump log and compare behavior after changing a router, container, or service.",
+            "jobs_to_be_done: Identify noisy hosts and unexpected destinations from a graph rather than raw packet text.",
+            "jobs_to_be_done: Inspect packet history after the moment has passed.",
+            "jobs_to_be_done: Keep packet data local unless explicitly choosing to ask the copilot for analysis.",
+            "pains: Tools that hide too much behind dashboards and make raw evidence hard to inspect.",
+            "pains: Setup flows that require agents, daemons, accounts, or cloud storage before anything works.",
+            "pains: Visualizations that jump around so much that host relationships cannot be followed.",
+            "adoption_yes_if: File replay and live mode both work with clear commands.",
+            "adoption_yes_if: The graph makes host relationships obvious without losing packet details.",
+            "adoption_yes_if: Local persistence lets them return to a capture session later.",
+            "rejection_no_if: It requires a hosted backend, account, or enterprise collector.",
+            "rejection_no_if: It uploads traffic by default or obscures what data is sent to AI.",
+            "anti_goals: They do not want a SIEM, compliance platform, or packet-forensics suite.",
+            "recognition_cues: Uses phrases such as \"what is this machine talking to?\", \"why did this service get noisy?\", \"can I replay that log?\", \"show me the port and process\", and \"keep this local\"."
+        ]
+    },
+    "type": "TinyPerson"
 }

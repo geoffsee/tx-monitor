@@ -1,28 +1,28 @@
 {
-	"persona": {
-		"communication_style": "Prefers concise engineering arguments, small changes, clear scripts, and packaging discipline. Responds best to diffs that preserve the CLI contract, avoid generated junk, and explain validation scope. Dislikes broad rewrites, hidden release side effects, or agent behavior that runs privileged commands without explicit intent.",
-		"name": "Open Source Maintainer",
-		"occupation": {
-			"description": "The maintainer responsible for keeping tx-monitor installable, understandable, and safe to evolve. They care about a clean package, predictable scripts, focused tests, readable source layout, and autonomous agents that know when not to run sudo, publish, or deploy.",
-			"organization": "tx-monitor project",
-			"title": "Package maintainer"
-		},
-		"other_facts": [
-			"jobs_to_be_done: Keep the npm package small, correct, and installable.",
-			"jobs_to_be_done: Preserve Bun scripts and compiled binary behavior across releases.",
-			"jobs_to_be_done: Let autonomous agents make useful changes without crossing live-capture or deploy boundaries accidentally.",
-			"jobs_to_be_done: Keep tests close to parser, graph, persistence, and copilot boundaries.",
-			"pains: Generated screenshots, databases, logs, or tarballs leaking into package/release workflows.",
-			"pains: Changes that pass the UI manually but break CLI startup or package files.",
-			"pains: Agents that run `sudo`, live capture, publishing, or deploy commands without an explicit user request.",
-			"adoption_yes_if: Caretta gives agents a strict test command and project-local implementation guidance.",
-			"adoption_yes_if: Workflow files are small and map directly to package scripts.",
-			"adoption_yes_if: Skills tell agents where to look before touching a subsystem.",
-			"rejection_no_if: Configuration is copied blindly from another project and keeps irrelevant domain assumptions.",
-			"rejection_no_if: Release automation bumps versions or pushes tags outside an explicit deploy run.",
-			"anti_goals: They do not want autonomous agents to expand scope into unrelated infrastructure or security products.",
-			"recognition_cues: Uses phrases such as \"what files ship?\", \"does the CLI still work?\", \"do not run sudo\", \"where is the focused test?\", and \"keep generated artifacts out\"."
-		]
-	},
-	"type": "TinyPerson"
+    "persona": {
+        "communication_style": "Prefers concise engineering arguments, small changes, clear scripts, and packaging discipline. Responds best to diffs that preserve the CLI contract, avoid generated junk, and explain validation scope. Dislikes broad rewrites, hidden release side effects, or agent behavior that runs privileged commands without explicit intent.",
+        "name": "Open Source Maintainer",
+        "occupation": {
+            "description": "The maintainer responsible for keeping tx-monitor installable, understandable, and safe to evolve. They care about a clean package, predictable scripts, focused tests, readable source layout, and autonomous agents that know when not to run sudo, publish, or deploy.",
+            "organization": "tx-monitor project",
+            "title": "Package maintainer"
+        },
+        "other_facts": [
+            "jobs_to_be_done: Keep the npm package small, correct, and installable.",
+            "jobs_to_be_done: Preserve Bun scripts and compiled binary behavior across releases.",
+            "jobs_to_be_done: Let autonomous agents make useful changes without crossing live-capture or deploy boundaries accidentally.",
+            "jobs_to_be_done: Keep tests close to parser, graph, persistence, and copilot boundaries.",
+            "pains: Generated screenshots, databases, logs, or tarballs leaking into package/release workflows.",
+            "pains: Changes that pass the UI manually but break CLI startup or package files.",
+            "pains: Agents that run `sudo`, live capture, publishing, or deploy commands without an explicit user request.",
+            "adoption_yes_if: Caretta gives agents a strict test command and project-local implementation guidance.",
+            "adoption_yes_if: Workflow files are small and map directly to package scripts.",
+            "adoption_yes_if: Skills tell agents where to look before touching a subsystem.",
+            "rejection_no_if: Configuration is copied blindly from another project and keeps irrelevant domain assumptions.",
+            "rejection_no_if: Release automation bumps versions or pushes tags outside an explicit deploy run.",
+            "anti_goals: They do not want autonomous agents to expand scope into unrelated infrastructure or security products.",
+            "recognition_cues: Uses phrases such as \"what files ship?\", \"does the CLI still work?\", \"do not run sudo\", \"where is the focused test?\", and \"keep generated artifacts out\"."
+        ]
+    },
+    "type": "TinyPerson"
 }
