@@ -182,7 +182,6 @@ const TrafficNetworkModel = types
         };
 
         const pruneFlows = () => {
-            pruneOrphanFlows();
             if (self.flows.size <= MAX_MEMORY_FLOWS) {
                 return;
             }
