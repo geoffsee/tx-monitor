@@ -4,6 +4,7 @@ import {
     formatBytes,
     protoColor,
 } from "../layout";
+import { formatService, type PacketProto } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type { HostCategory, Selection } from "../types";
 import {
@@ -135,9 +136,18 @@ export function DetailPanel({
                                             ? flow.dstHost
                                             : flow.srcHost}
                                     </span>
-                                    <span style={detailSubtleStyle}>
-                                        {flow.proto}
-                                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                                    <span
+                                        style={detailSubtleStyle}
+                                        title={
+                                            flow.dstPort != null
+                                                ? `${flow.proto}/${flow.dstPort}`
+                                                : flow.proto
+                                        }
+                                    >
+                                        {formatService(
+                                            flow.dstPort,
+                                            flow.proto as PacketProto,
+                                        )}
                                         {flow.processCommand
                                             ? ` · ${flow.processCommand}`
                                             : ""}{" "}
@@ -217,9 +227,13 @@ export function DetailPanel({
                             borderColor: `${stroke}44`,
                             background: `${stroke}1f`,
                         }}
+                        title={
+                            flow.dstPort != null
+                                ? `${flow.proto}/${flow.dstPort}`
+                                : flow.proto
+                        }
                     >
-                        {flow.proto}
-                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                        {formatService(flow.dstPort, flow.proto as PacketProto)}
                     </div>
                     <div style={statusBadgeStyle(active)}>
                         {active ? "active" : "idle"}
@@ -265,10 +279,20 @@ export function DetailPanel({
                                     >
                                         {packet.timestamp} · {packet.length} B
                                     </div>
-                                    <div style={detailSubtleStyle}>
-                                        {packet.srcPort ?? "?"} →{" "}
-                                        {packet.dstPort ?? "?"} ·{" "}
-                                        {packet.info || "No payload summary"}
+                                    <div
+                                        style={detailSubtleStyle}
+                                        title={`${packet.srcPort ?? "?"} → ${packet.dstPort ?? "?"}`}
+                                    >
+                                        {formatService(
+                                            packet.srcPort ?? null,
+                                            packet.proto as PacketProto,
+                                        )}{" "}
+                                        →{" "}
+                                        {formatService(
+                                            packet.dstPort ?? null,
+                                            packet.proto as PacketProto,
+                                        )}{" "}
+                                        · {packet.info || "No payload summary"}
                                     </div>
                                 </div>
                             ))}
