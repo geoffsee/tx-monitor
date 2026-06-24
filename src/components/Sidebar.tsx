@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
 import type {
@@ -62,6 +63,47 @@ export function Sidebar({
             : graph.connected
               ? "Live"
               : "Offline";
+
+    // Windowed list state for long flow and packet lists (virtualized to bound
+    // DOM nodes under large sessions while allowing scroll through window).
+    const flowsContainerRef = useRef<HTMLDivElement>(null);
+    const [flowsScrollTop, setFlowsScrollTop] = useState(0);
+    const packetsContainerRef = useRef<HTMLUListElement>(null);
+    const [packetsScrollTop, setPacketsScrollTop] = useState(0);
+
+    const FLOW_ITEM_HEIGHT = 58;
+    const PACKET_ITEM_HEIGHT = 58;
+    const OVERSCAN = 2;
+
+    const getWindowedFlows = () => {
+        const items = graph.flows;
+        const container = flowsContainerRef.current;
+        const height = container ? container.clientHeight || 220 : 220;
+        const scroll = flowsScrollTop;
+        const start = Math.max(
+            0,
+            Math.floor(scroll / FLOW_ITEM_HEIGHT) - OVERSCAN,
+        );
+        const visibleCount =
+            Math.ceil(height / FLOW_ITEM_HEIGHT) + OVERSCAN * 2;
+        const end = Math.min(items.length, start + visibleCount);
+        return { items: items.slice(start, end), start, total: items.length };
+    };
+
+    const getWindowedPackets = () => {
+        const items = graph.packets;
+        const container = packetsContainerRef.current;
+        const height = container ? container.clientHeight || 300 : 300;
+        const scroll = packetsScrollTop;
+        const start = Math.max(
+            0,
+            Math.floor(scroll / PACKET_ITEM_HEIGHT) - OVERSCAN,
+        );
+        const visibleCount =
+            Math.ceil(height / PACKET_ITEM_HEIGHT) + OVERSCAN * 2;
+        const end = Math.min(items.length, start + visibleCount);
+        return { items: items.slice(start, end), start, total: items.length };
+    };
 
     return (
         <aside
@@ -156,61 +198,100 @@ export function Sidebar({
                         maxHeight: selection ? 180 : 240,
                         overflow: "auto",
                     }}
+                    ref={flowsContainerRef}
+                    onScroll={(e) =>
+                        setFlowsScrollTop(
+                            (e.target as HTMLDivElement).scrollTop,
+                        )
+                    }
                 >
                     <div style={panelTitleStyle}>Active Flows</div>
-                    <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-                        {graph.flows.length === 0 ? (
-                            <div style={denseFeedRowStyle}>No flows yet</div>
-                        ) : (
-                            graph.flows.map((flow) => (
-                                <button
-                                    key={flow.id}
-                                    type="button"
-                                    onClick={() => onSelectFlow(flow.id)}
+                    {(() => {
+                        const w = getWindowedFlows();
+                        if (w.total === 0) {
+                            return (
+                                <div
                                     style={{
-                                        ...denseStatusRowStyle,
-                                        cursor: "pointer",
-                                        width: "100%",
-                                        textAlign: "left",
-                                        font: "inherit",
-                                        color: "inherit",
-                                        ...(isRowSelected(
-                                            selection,
-                                            "flow",
-                                            flow.id,
-                                        )
-                                            ? selectedRowStyle
-                                            : {}),
+                                        display: "grid",
+                                        gap: 6,
+                                        marginTop: 8,
                                     }}
                                 >
-                                    <div style={{ minWidth: 0 }}>
+                                    <div style={denseFeedRowStyle}>
+                                        No flows yet
+                                    </div>
+                                </div>
+                            );
+                        }
+                        const spacerBefore = w.start * FLOW_ITEM_HEIGHT;
+                        const spacerAfter =
+                            (w.total - w.start - w.items.length) *
+                            FLOW_ITEM_HEIGHT;
+                        return (
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gap: 6,
+                                    marginTop: 8,
+                                    paddingTop: `${spacerBefore}px`,
+                                    paddingBottom: `${spacerAfter}px`,
+                                }}
+                            >
+                                {w.items.map((flow) => (
+                                    <button
+                                        key={flow.id}
+                                        type="button"
+                                        onClick={() => onSelectFlow(flow.id)}
+                                        style={{
+                                            ...denseStatusRowStyle,
+                                            cursor: "pointer",
+                                            width: "100%",
+                                            textAlign: "left",
+                                            font: "inherit",
+                                            color: "inherit",
+                                            ...(isRowSelected(
+                                                selection,
+                                                "flow",
+                                                flow.id,
+                                            )
+                                                ? selectedRowStyle
+                                                : {}),
+                                        }}
+                                    >
+                                        <div style={{ minWidth: 0 }}>
+                                            <div
+                                                style={{
+                                                    fontWeight: 700,
+                                                    fontSize: 13,
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                }}
+                                            >
+                                                {flow.srcHost} -&gt;{" "}
+                                                {flow.dstHost}
+                                            </div>
+                                            <div style={denseSubtleStyle}>
+                                                {flow.proto}
+                                                {flow.dstPort
+                                                    ? `:${flow.dstPort}`
+                                                    : ""}{" "}
+                                                · {flow.packetCount} pkts ·{" "}
+                                                {formatBytes(flow.bytesTotal)}
+                                            </div>
+                                        </div>
                                         <div
-                                            style={{
-                                                fontWeight: 700,
-                                                fontSize: 13,
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                            }}
+                                            style={statusBadgeStyle(
+                                                flow.active,
+                                            )}
                                         >
-                                            {flow.srcHost} -&gt; {flow.dstHost}
+                                            {flow.active ? "active" : "idle"}
                                         </div>
-                                        <div style={denseSubtleStyle}>
-                                            {flow.proto}
-                                            {flow.dstPort
-                                                ? `:${flow.dstPort}`
-                                                : ""}{" "}
-                                            · {flow.packetCount} pkts ·{" "}
-                                            {formatBytes(flow.bytesTotal)}
-                                        </div>
-                                    </div>
-                                    <div style={statusBadgeStyle(flow.active)}>
-                                        {flow.active ? "active" : "idle"}
-                                    </div>
-                                </button>
-                            ))
-                        )}
-                    </div>
+                                    </button>
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </section>
                 <section
                     style={{
@@ -224,6 +305,12 @@ export function Sidebar({
                 >
                     <div style={panelTitleStyle}>Packet Feed</div>
                     <ul
+                        ref={packetsContainerRef}
+                        onScroll={(e) =>
+                            setPacketsScrollTop(
+                                (e.target as HTMLUListElement).scrollTop,
+                            )
+                        }
                         style={{
                             ...listStyle,
                             gap: 6,
@@ -233,45 +320,74 @@ export function Sidebar({
                             overflow: "auto",
                         }}
                     >
-                        {graph.packets.map((packet) => (
-                            <li key={packet.id}>
-                                <button
-                                    type="button"
-                                    onClick={() => onSelectPacket(packet.id)}
-                                    style={{
-                                        ...denseListRowStyle,
-                                        cursor: "pointer",
-                                        width: "100%",
-                                        textAlign: "left",
-                                        font: "inherit",
-                                        color: "inherit",
-                                        ...(isRowSelected(
-                                            selection,
-                                            "packet",
-                                            packet.id,
-                                        )
-                                            ? selectedRowStyle
-                                            : {}),
-                                    }}
-                                >
-                                    <strong
+                        {(() => {
+                            const w = getWindowedPackets();
+                            if (w.total === 0) {
+                                return null;
+                            }
+                            const spacerBefore = w.start * PACKET_ITEM_HEIGHT;
+                            const spacerAfter =
+                                (w.total - w.start - w.items.length) *
+                                PACKET_ITEM_HEIGHT;
+                            return (
+                                <>
+                                    <div
                                         style={{
-                                            display: "block",
-                                            fontSize: 13,
+                                            height: `${spacerBefore}px`,
                                         }}
-                                    >
-                                        {packet.timestamp} {packet.proto}
-                                    </strong>
-                                    <div style={denseSubtleStyle}>
-                                        {packet.srcHost} -&gt; {packet.dstHost}{" "}
-                                        · {packet.length} B
-                                    </div>
-                                    <div style={denseSubtleStyle}>
-                                        {packet.info || "No payload summary"}
-                                    </div>
-                                </button>
-                            </li>
-                        ))}
+                                    />
+                                    {w.items.map((packet) => (
+                                        <li key={packet.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    onSelectPacket(packet.id)
+                                                }
+                                                style={{
+                                                    ...denseListRowStyle,
+                                                    cursor: "pointer",
+                                                    width: "100%",
+                                                    textAlign: "left",
+                                                    font: "inherit",
+                                                    color: "inherit",
+                                                    ...(isRowSelected(
+                                                        selection,
+                                                        "packet",
+                                                        packet.id,
+                                                    )
+                                                        ? selectedRowStyle
+                                                        : {}),
+                                                }}
+                                            >
+                                                <strong
+                                                    style={{
+                                                        display: "block",
+                                                        fontSize: 13,
+                                                    }}
+                                                >
+                                                    {packet.timestamp}{" "}
+                                                    {packet.proto}
+                                                </strong>
+                                                <div style={denseSubtleStyle}>
+                                                    {packet.srcHost} -&gt;{" "}
+                                                    {packet.dstHost} ·{" "}
+                                                    {packet.length} B
+                                                </div>
+                                                <div style={denseSubtleStyle}>
+                                                    {packet.info ||
+                                                        "No payload summary"}
+                                                </div>
+                                            </button>
+                                        </li>
+                                    ))}
+                                    <div
+                                        style={{
+                                            height: `${spacerAfter}px`,
+                                        }}
+                                    />
+                                </>
+                            );
+                        })()}
                     </ul>
                 </section>
             </div>
