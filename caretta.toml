@@ -4,6 +4,9 @@ project_name = "tx-monitor"
 command = ["bash", "-lc", "bun install && bun run lint && bun run typecheck && bun test && bun run build"]
 format_command = ["bash", "-lc", "bun install && bun run check:fix"]
 
+
+geodynamo-url = "https://geoffsee.github.io/geodynamo/"
+
 #[security_scan]
 #paths = [
 ## todo
