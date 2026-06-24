@@ -2,7 +2,7 @@ project_name = "tx-monitor"
 
 [test]
 command = ["bash", "-lc", "bun install && bun run lint && bun run typecheck && bun test && bun run build"]
-format_command = ["bash", "-lc", "bun install && bun run format && bun run lint:fix"]
+format_command = ["bash", "-lc", "bun install && bun run check:fix"]
 
 #[security_scan]
 #paths = [

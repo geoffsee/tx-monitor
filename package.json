@@ -45,7 +45,9 @@
         "db:push": "drizzle-kit push",
         "lint": "biome check .",
         "lint:fix": "biome check --write .",
-        "format": "biome format --write ."
+        "format": "biome format --write .",
+        "check:staged": "biome check --staged --write --no-errors-on-unmatched",
+        "postinstall": "./.dev/setup-git-hooks.sh"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.0",

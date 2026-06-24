@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+bun run check:staged
+git update-index --again
+bun run typecheck
