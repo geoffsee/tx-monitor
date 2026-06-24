@@ -25,10 +25,10 @@ jobs:
           task: run
           args: deploy
           preset: deploy
-          agent: codex
+          agent: xai
           github-token: ${{ secrets.GH_TOKEN }}
         env:
-          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}

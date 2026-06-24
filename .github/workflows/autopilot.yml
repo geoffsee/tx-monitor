@@ -57,14 +57,14 @@ jobs:
       - id: caretta
         uses: geoffsee/caretta-autopilot-action@main
         with:
-          agent: "codex"
+          agent: "xai"
           caretta-version: latest
           context: ${{ inputs.context || format('Autopilot triggered by {0}', github.event_name) }}
           dry-run: ${{ inputs.dry_run || 'false' }}
           enable-dispatch: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_dispatch }}
           github-token: ${{ github.token }}
         env:
-          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
