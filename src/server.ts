@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { reverse } from "node:dns/promises";
 import { existsSync } from "node:fs";
+import { hostname as getHostname } from "node:os";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
@@ -52,6 +53,8 @@ const FILE_REPLAY_SPEED = Number.parseFloat(
 const FILE_REPLAY_SLEEP_CAP_MS = Number.parseFloat(
     process.env.FILE_REPLAY_SLEEP_CAP_MS ?? "120",
 );
+
+const HOSTNAME = getHostname();
 
 type WsClient = ServerWebSocket<undefined>;
 
@@ -390,7 +393,11 @@ function ensureCaptureSession(mode: string, label: string) {
     if (!store || store.getActiveSessionId()) {
         return;
     }
-    store.startSession(mode, label);
+    const cmdline = mode === "live" ? TCPDUMP_COMMAND.join(" ") : label;
+    store.startSession(mode, label, {
+        hostname: HOSTNAME,
+        cmdline,
+    });
 }
 
 function endCaptureSession() {
