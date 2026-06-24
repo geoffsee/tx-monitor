@@ -42,6 +42,14 @@ export type SessionLoadProgress = {
     total: number;
 };
 
+export type HistoryPlayback = {
+    offset: number;
+    total: number;
+    label: string;
+    startTime?: string;
+    endTime?: string;
+};
+
 export type Anomaly = {
     id: string;
     timestamp: number;

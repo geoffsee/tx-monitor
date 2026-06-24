@@ -277,7 +277,7 @@ const TrafficNetworkModel = types
             remember(`Source: ${label}`);
         };
 
-        const reset = () => {
+        const resetData = () => {
             self.hosts.clear();
             self.flows.clear();
             self.packets.clear();
@@ -286,7 +286,13 @@ const TrafficNetworkModel = types
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
+        };
+
+        const reset = () => {
+            resetData();
             self.sourceMode = "live";
+            self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
+            self.connected = false;
         };
 
         return {
@@ -297,6 +303,7 @@ const TrafficNetworkModel = types
             setConnection,
             setSource,
             reset,
+            resetData,
             remember,
         };
     });

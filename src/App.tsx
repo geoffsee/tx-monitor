@@ -15,6 +15,12 @@ export default function App() {
         sessionsVersion,
         loadSession,
         returnToLive,
+        historyPlayback,
+        historyBookmarks,
+        seekTo,
+        addBookmark,
+        removeBookmark,
+        jumpToBookmark,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
@@ -93,8 +99,14 @@ export default function App() {
                     activeSessionId={activeSessionId}
                     sessionLoadProgress={sessionLoadProgress}
                     sessionsVersion={sessionsVersion}
+                    historyPlayback={historyPlayback}
+                    historyBookmarks={historyBookmarks}
                     onLoadSession={loadSession}
                     onReturnToLive={returnToLive}
+                    onSeek={seekTo}
+                    onAddBookmark={addBookmark}
+                    onRemoveBookmark={removeBookmark}
+                    onJumpToBookmark={jumpToBookmark}
                     onSelectFlow={handleSidebarSelectFlow}
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}
