@@ -25,23 +25,31 @@ export type TrafficFeedState = {
     activeSessionId: string | null;
     sessionLoadProgress: SessionLoadProgress | null;
     sessionsVersion: number;
+    filter: string;
+    setFilter: (next: string) => void;
     loadSession: (sessionId: string) => Promise<void>;
     returnToLive: () => void;
     refreshSessions: () => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
-    const [graph, setGraph] = useState<TrafficSnapshot>(() => createGraph());
+    const [graph, setGraph] = useState<TrafficSnapshot>(() => createGraph(""));
     const [viewMode, setViewMode] = useState<TrafficViewMode>("live");
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [sessionLoadProgress, setSessionLoadProgress] =
         useState<SessionLoadProgress | null>(null);
     const [sessionsVersion, setSessionsVersion] = useState(0);
+    const [filter, setFilterState] = useState("");
+    const filterRef = useRef("");
     const graphRafRef = useRef<number | null>(null);
     const graphTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasDisplayedPacketsRef = useRef(false);
     const livePausedRef = useRef(false);
     const loadAbortRef = useRef(0);
+
+    useEffect(() => {
+        filterRef.current = filter;
+    }, [filter]);
 
     const publishGraph = useCallback(() => {
         if (graphRafRef.current !== null) {
@@ -53,13 +61,22 @@ export function useTrafficFeed(): TrafficFeedState {
         }
         graphRafRef.current = requestAnimationFrame(() => {
             graphRafRef.current = null;
-            setGraph(createGraph());
+            setGraph(createGraph(filterRef.current));
         });
     }, []);
 
     const refreshSessions = useCallback(() => {
         setSessionsVersion((version) => version + 1);
     }, []);
+
+    const setFilter = useCallback(
+        (next: string) => {
+            filterRef.current = next;
+            setFilterState(next);
+            publishGraph();
+        },
+        [publishGraph],
+    );
 
     const returnToLive = useCallback(() => {
         loadAbortRef.current += 1;
@@ -315,6 +332,8 @@ export function useTrafficFeed(): TrafficFeedState {
         activeSessionId,
         sessionLoadProgress,
         sessionsVersion,
+        filter,
+        setFilter,
         loadSession,
         returnToLive,
         refreshSessions,

@@ -13,6 +13,8 @@ export default function App() {
         activeSessionId,
         sessionLoadProgress,
         sessionsVersion,
+        filter,
+        setFilter,
         loadSession,
         returnToLive,
     } = useTrafficFeed();
@@ -93,6 +95,8 @@ export default function App() {
                     activeSessionId={activeSessionId}
                     sessionLoadProgress={sessionLoadProgress}
                     sessionsVersion={sessionsVersion}
+                    filter={filter}
+                    onFilterChange={setFilter}
                     onLoadSession={loadSession}
                     onReturnToLive={returnToLive}
                     onSelectFlow={handleSidebarSelectFlow}
