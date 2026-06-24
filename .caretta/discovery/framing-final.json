@@ -1,0 +1,99 @@
+{
+	"artifact": "framing-final",
+	"version": "1.0.0",
+	"project": "tx-monitor",
+	"date": "2026-06-24",
+	"owner": "Geoff Seemueller",
+	"status": "finalized",
+	"supersedes": [".caretta/discovery/workspace.json"],
+	"downstream_consumers": [
+		"planning",
+		"implementation",
+		"test-selection",
+		"release-automation",
+		"agent-skills"
+	],
+	"frame": {
+		"name": "Local-first real-time network traffic visualizer",
+		"one_liner": "A Bun-powered CLI and web UI that turns tcpdump streams or replay logs into a live host graph, persisted capture sessions, and optional Codex snapshot analysis.",
+		"primary_user": "Developers, homelab users, and operators debugging local network behavior from their own machine.",
+		"primary_outcome": "A local, installable traffic monitor that makes active flows understandable without hiding the packet-level source of truth."
+	},
+	"mvp": {
+		"definition": "The smallest useful system ingests tcpdump output, parses packets into typed events, streams them over WebSocket, renders an accurate host graph, persists sessions and packets in SQLite, supports deterministic file replay, and exposes an optional copilot endpoint for explicit client-provided snapshots.",
+		"north_star": "Readable packet visibility without losing local control: the user can see what hosts and processes are talking, replay the same capture, and inspect history without relying on a hosted service.",
+		"in_scope": [
+			"CLI entrypoint via `tx-monitor` and Bun scripts.",
+			"Live tcpdump capture and deterministic `--file` replay.",
+			"tcpdump line parsing into typed packet events.",
+			"WebSocket streaming from server to browser.",
+			"React + @xyflow/react host graph with stable layout, selection, sidebars, and detail panels.",
+			"SQLite/Drizzle session and packet persistence with HTTP read APIs.",
+			"Local process enrichment where supported.",
+			"Anomaly cues that explain unusual local traffic without claiming IDS coverage.",
+			"Optional Codex copilot analysis using explicit snapshot payloads and bounded auth/timeout settings.",
+			"Bun test, TypeScript typecheck, Biome lint/format, Vite build, and publish-safe packaging."
+		],
+		"out_of_scope_v0": [
+			"Cloud-hosted packet storage or multi-user observability.",
+			"Full protocol dissection comparable to Wireshark.",
+			"Enterprise IDS/SIEM alerting, compliance, or long-retention telemetry.",
+			"Packet injection, traffic modification, or active scanning.",
+			"Always-on background daemon management.",
+			"Cross-machine fleet monitoring.",
+			"Sending raw ambient packet streams to AI services by default."
+		],
+		"explicit_non_goals": [
+			"A Wireshark replacement.",
+			"A hosted security platform.",
+			"An autonomous incident-response agent.",
+			"A traffic generator or packet manipulation tool."
+		],
+		"acceptance_criteria": [
+			{
+				"id": "AC1",
+				"metric": "`bun run lint`, `bun run typecheck`, `bun test`, and `bun run build` pass after changes."
+			},
+			{
+				"id": "AC2",
+				"metric": "File replay from `tcpdump.log` exercises packet parsing, WebSocket streaming, and the UI without requiring sudo."
+			},
+			{
+				"id": "AC3",
+				"metric": "Parser, graph, layout, persistence, lsof/process enrichment, secrets, and copilot changes include focused tests."
+			},
+			{
+				"id": "AC4",
+				"metric": "The browser graph stays legible under active traffic: node identity, edge aggregation, selection, and detail state remain stable."
+			},
+			{
+				"id": "AC5",
+				"metric": "The package remains installable as `tx-monitor`, and compiled/native builds continue to serve the embedded UI."
+			}
+		]
+	},
+	"operating_constraints": {
+		"runtime": "Bun-first ESM TypeScript project.",
+		"capture": "Use file replay by default for development; live capture requires tcpdump and may require sudo.",
+		"privacy": "Treat packet metadata, process names, hostnames, and environment variables as sensitive local data.",
+		"state": "Keep server packet/session state, SQLite persistence, and browser graph state consistent under stream churn.",
+		"release": "Do not broaden package files or generated artifacts without checking publish behavior."
+	},
+	"autonomous_development_guidance": {
+		"default_validation": "Use Caretta's configured test command for full validation when the user asks for validation.",
+		"safe_dev_path": "`bun run monitor:file` plus Vite dev server is the preferred manual workflow because it avoids sudo and live capture variability.",
+		"change_discipline": "When changing parser behavior, add fixtures first. When changing graph derivation, assert node/edge identity. When changing persistence, assert session/packet round-trips. When changing copilot behavior, assert auth, timeout, payload, and redaction paths.",
+		"avoid": "Do not run live capture, sudo tcpdump, network scans, package publishing, or deploy commands unless explicitly requested."
+	},
+	"decision": {
+		"name": "Configure Caretta for autonomous tx-monitor development",
+		"date": "2026-06-24",
+		"rationale": "The project has enough parser, graph, persistence, copilot, and packaging surface area that autonomous agents need a specific frame, practical personas, and a strict validation gate instead of generic code-generation behavior.",
+		"accepted_risks": [
+			"Bun-first tooling narrows runtime portability.",
+			"tcpdump parsing remains platform-sensitive.",
+			"Optional copilot analysis introduces privacy and timeout concerns that must stay bounded.",
+			"Graph-first visualization favors readability over packet-forensics depth."
+		]
+	}
+}

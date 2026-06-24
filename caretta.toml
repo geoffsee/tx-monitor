@@ -1,0 +1,42 @@
+project_name = "tx-monitor"
+
+[test]
+command = ["bash", "-lc", "bun install && bun run lint && bun run typecheck && bun test && bun run build"]
+format_command = ["bash", "-lc", "bun install && bun run format && bun run lint:fix"]
+
+#[security_scan]
+#paths = [
+## todo
+#]
+
+[agent_models]
+xai = "grok-build-0.1"
+
+[deploy]
+command = [
+	"bash",
+	"-lc",
+	'''
+version=$(node -p "require('./package.json').version")
+tag="v${version}"
+branch="${GITHUB_REF_NAME:-main}"
+
+git fetch --tags origin
+while git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; do
+	echo "${tag} already exists; bumping package patch version"
+	version=$(node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); const parts = pkg.version.split(".").map(Number); parts[2] += 1; pkg.version = parts.join("."); fs.writeFileSync("package.json", JSON.stringify(pkg, null, "\t") + "\n"); console.log(pkg.version);')
+	tag="v${version}"
+done
+
+if ! git diff --quiet -- package.json; then
+	git add package.json
+	git commit -m "Bump package version to ${version}"
+	git push origin "HEAD:${branch}"
+fi
+
+git tag "${tag}"
+git push origin "refs/tags/${tag}"
+''',
+]
+environment = "release"
+url = "https://github.com/geoffsee/tx-monitor/actions/workflows/release.yml"

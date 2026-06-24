@@ -1,0 +1,4 @@
+interface:
+  display_name: "tx-monitor Development"
+  short_description: "Maintainer reference for tx-monitor packet capture, graph, persistence, copilot, and release work"
+  default_prompt: "Use $tx-monitor-development to implement or review tx-monitor functionality in this codebase."

@@ -1,0 +1,35 @@
+name: Weekly Deploy
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Run caretta deploy workflow
+        uses: geoffsee/caretta-action@v0.0.6
+        with:
+          task: run
+          args: deploy
+          preset: deploy
+          agent: codex
+          github-token: ${{ secrets.GH_TOKEN }}
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
+          DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
+          DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
+          RUST_LOG: info

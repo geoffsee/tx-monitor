@@ -1,0 +1,95 @@
+name: Autopilot
+
+# The action decides which events are worth acting on. The workflow's job
+# is just to subscribe to the right events and hand them over.
+
+on:
+  issues:
+    types: [opened, labeled, closed]
+  pull_request:
+    types: [closed]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      context:
+        description: "Steering context for this run"
+        required: false
+        type: string
+      dry_run:
+        description: "Evaluate only; do not dispatch"
+        required: false
+        type: boolean
+        default: false
+      enable_dispatch:
+        description: "Allow dispatch/execution; disable for diagnostics"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: autopilot
+  cancel-in-progress: false
+
+jobs:
+  autopilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - id: caretta
+        uses: geoffsee/caretta-autopilot-action@main
+        with:
+          agent: "codex"
+          caretta-version: latest
+          context: ${{ inputs.context || format('Autopilot triggered by {0}', github.event_name) }}
+          dry-run: ${{ inputs.dry_run || 'false' }}
+          enable-dispatch: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_dispatch }}
+          github-token: ${{ github.token }}
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
+          DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
+          DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          RUST_LOG: info
+
+      - name: Autopilot diagnostics
+        if: always()
+        run: |
+          {
+            echo "## Autopilot diagnostics"
+            echo ""
+            echo "| Output | Value |"
+            echo "| --- | --- |"
+            echo "| route | \`${{ steps.caretta.outputs.route }}\` |"
+            echo "| reason | \`${{ steps.caretta.outputs.reason }}\` |"
+            echo "| tracker | \`${{ steps.caretta.outputs.tracker }}\` |"
+            echo "| open_issue_count | \`${{ steps.caretta.outputs.open_issue_count }}\` |"
+            echo "| open_pr_count | \`${{ steps.caretta.outputs.open_pr_count }}\` |"
+            echo "| stale_pr_count | \`${{ steps.caretta.outputs.stale_pr_count }}\` |"
+            echo "| pending_count | \`${{ steps.caretta.outputs.pending_count }}\` |"
+            echo "| dispatched_count | \`${{ steps.caretta.outputs.dispatched_count }}\` |"
+            echo "| active_count | \`${{ steps.caretta.outputs.active_count }}\` |"
+            echo "| current_count | \`${{ steps.caretta.outputs.current_count }}\` |"
+            echo "| failed_count | \`${{ steps.caretta.outputs.failed_count }}\` |"
+            echo "| hold_target | \`${{ steps.caretta.outputs.hold_target }}\` |"
+            echo "| target_dispatched | \`${{ steps.caretta.outputs.target_dispatched }}\` |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"

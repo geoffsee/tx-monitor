@@ -49,3 +49,4 @@ tcpdump.log
 /bin/tx-monitor.js
 /.env.copilot
 build
+.env.github-app
