@@ -164,7 +164,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 export function exportAsJson(payload: ExportPayload, filename?: string): void {
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = payload.session.exportedAt.replace(/[:.]/g, "-");
     const defaultName = `tx-monitor-${payload.kind}-${ts}.json`;
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
@@ -203,7 +203,7 @@ export function exportPacketsCsv(
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = _meta.exportedAt.replace(/[:.]/g, "-");
     const defaultName = `tx-monitor-packets-${ts}.csv`;
     triggerDownload(blob, filename ?? defaultName);
 }
@@ -241,7 +241,7 @@ export function exportFlowsCsv(
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = _meta.exportedAt.replace(/[:.]/g, "-");
     const defaultName = `tx-monitor-flows-${ts}.csv`;
     triggerDownload(blob, filename ?? defaultName);
 }
