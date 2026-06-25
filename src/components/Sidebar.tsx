@@ -82,7 +82,6 @@ export function Sidebar({
     };
 
     const handleExportPacketsCsv = () => {
-        const _copilotMessages = getCopilotMessages();
         const payload = buildExportPayload(graph, selection, {
             activeSessionId,
             viewMode,
@@ -94,7 +93,6 @@ export function Sidebar({
     };
 
     const handleExportFlowsCsv = () => {
-        const _copilotMessages = getCopilotMessages();
         const payload = buildExportPayload(graph, selection, {
             activeSessionId,
             viewMode,
