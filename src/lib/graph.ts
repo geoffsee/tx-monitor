@@ -290,7 +290,7 @@ export function createGraph(filter?: string): TrafficSnapshot {
         })),
         flows: (tokens.length > 0
             ? eligibleFlows.filter(flowMatchesFilter)
-            : trafficNetwork.flowList
+            : eligibleFlows
         )
             .slice(0, 12)
             .map((flow) => ({
