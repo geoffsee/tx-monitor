@@ -54,6 +54,7 @@ describe("createGraph", () => {
         expect(graph.edges.map((edge) => edge.id)).not.toContain(
             "10.0.0.1->203.0.113.20:TCP:443",
         );
+        trafficNetwork.reset();
     });
 
     test("does not apply live stale filtering to history sessions", () => {
