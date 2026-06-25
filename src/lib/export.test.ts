@@ -221,64 +221,76 @@ describe("download triggers (browser globals)", () => {
         created = [];
         blobs = [];
         if (typeof document !== "undefined") {
-            origCreateElement = document.createElement.bind(document);
-            document.createElement = (tag: string) => {
-                if (tag === "a") {
-                    const a: Partial<HTMLAnchorElement> = {
-                        click: () => {
-                            // no-op in test
-                        },
-                    };
-                    Object.defineProperty(a, "href", {
-                        set(v: string) {
-                            (a as { _href?: string })._href = v;
-                        },
-                        get() {
-                            return (a as { _href?: string })._href ?? "";
-                        },
-                    });
-                    Object.defineProperty(a, "download", {
-                        set(v: string) {
-                            (a as { _download?: string })._download = v;
-                            created.push({
-                                href: (a as { _href?: string })._href ?? "",
-                                download: v,
-                            });
-                        },
-                        get() {
-                            return (
-                                (a as { _download?: string })._download ?? ""
-                            );
-                        },
-                    });
-                    return a as HTMLAnchorElement;
-                }
-                return (
-                    origCreateElement?.(tag as keyof HTMLElementTagNameMap) ??
-                    ({} as HTMLAnchorElement)
-                );
-            };
+            try {
+                origCreateElement = document.createElement.bind(document);
+                document.createElement = (tag: string) => {
+                    if (tag === "a") {
+                        const a: Partial<HTMLAnchorElement> = {
+                            click: () => {
+                                // no-op in test
+                            },
+                        };
+                        Object.defineProperty(a, "href", {
+                            set(v: string) {
+                                (a as { _href?: string })._href = v;
+                            },
+                            get() {
+                                return (a as { _href?: string })._href ?? "";
+                            },
+                        });
+                        Object.defineProperty(a, "download", {
+                            set(v: string) {
+                                (a as { _download?: string })._download = v;
+                                created.push({
+                                    href: (a as { _href?: string })._href ?? "",
+                                    download: v,
+                                });
+                            },
+                            get() {
+                                return (
+                                    (a as { _download?: string })._download ??
+                                    ""
+                                );
+                            },
+                        });
+                        return a as HTMLAnchorElement;
+                    }
+                    return (
+                        origCreateElement?.(
+                            tag as keyof HTMLElementTagNameMap,
+                        ) ?? ({} as HTMLAnchorElement)
+                    );
+                };
+            } catch {}
         }
         if (typeof URL !== "undefined") {
-            origCreateObjectURL = URL.createObjectURL.bind(URL);
-            origRevoke = URL.revokeObjectURL.bind(URL);
-            URL.createObjectURL = (b: Blob) => {
-                blobs.push(b);
-                return "blob:mock";
-            };
-            URL.revokeObjectURL = () => {};
+            try {
+                origCreateObjectURL = URL.createObjectURL.bind(URL);
+                origRevoke = URL.revokeObjectURL.bind(URL);
+                URL.createObjectURL = (b: Blob) => {
+                    blobs.push(b);
+                    return "blob:mock";
+                };
+                URL.revokeObjectURL = () => {};
+            } catch {}
         }
     });
 
     afterEach(() => {
         if (origCreateElement && typeof document !== "undefined") {
-            document.createElement = origCreateElement;
+            try {
+                document.createElement = origCreateElement;
+            } catch {}
         }
         if (origCreateObjectURL) {
-            URL.createObjectURL = origCreateObjectURL;
+            try {
+                URL.createObjectURL = origCreateObjectURL;
+            } catch {}
         }
         if (origRevoke) {
-            URL.revokeObjectURL = origRevoke;
+            try {
+                URL.revokeObjectURL = origRevoke;
+            } catch {}
         }
     });
 
