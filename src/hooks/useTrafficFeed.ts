@@ -91,7 +91,10 @@ export function useTrafficFeed(): TrafficFeedState {
                     return;
                 }
 
-                trafficNetwork.setSource("history", session.label);
+                const headerLabel = session.hostname
+                    ? `${session.label} @ ${session.hostname}`
+                    : session.label;
+                trafficNetwork.setSource("history", headerLabel);
                 trafficNetwork.remember(
                     `Loading ${session.totalPackets.toLocaleString()} packets`,
                 );

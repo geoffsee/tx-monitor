@@ -191,7 +191,56 @@ export function SessionHistory({
                                         {formatSessionTime(session.startedAt)} ·{" "}
                                         {session.totalPackets.toLocaleString()}{" "}
                                         pkts · {formatBytes(session.totalBytes)}
+                                        {session.hostname
+                                            ? ` · ${session.hostname}`
+                                            : ""}
                                     </div>
+                                    {(session.cmdline &&
+                                        session.cmdline !== session.label) ||
+                                    session.notes ||
+                                    session.tags ? (
+                                        <div
+                                            style={{
+                                                ...denseSubtleStyle,
+                                                fontSize: 10,
+                                                opacity: 0.75,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                            title={
+                                                session.cmdline ||
+                                                session.notes ||
+                                                undefined
+                                            }
+                                        >
+                                            {session.cmdline &&
+                                            session.cmdline !== session.label
+                                                ? session.cmdline
+                                                : null}
+                                            {session.notes
+                                                ? `${
+                                                      session.cmdline &&
+                                                      session.cmdline !==
+                                                          session.label
+                                                          ? " · "
+                                                          : ""
+                                                  }note`
+                                                : null}
+                                            {session.tags
+                                                ? `${
+                                                      session.notes ||
+                                                      (
+                                                          session.cmdline &&
+                                                              session.cmdline !==
+                                                                  session.label
+                                                      )
+                                                          ? " · "
+                                                          : ""
+                                                  }tags`
+                                                : null}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div style={statusBadgeStyle(active)}>
                                     {session.mode}
