@@ -475,6 +475,7 @@ const TrafficNetworkModel = types
             dnsTargets.clear();
             self.sourceMode = "live";
             self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
+            self.connected = false;
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {
