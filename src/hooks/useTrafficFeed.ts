@@ -215,7 +215,7 @@ export function useTrafficFeed(): TrafficFeedState {
                 const endTime = collected[collected.length - 1]?.timestamp;
                 setHistoryPlayback({
                     offset: collected.length,
-                    total: session.totalPackets,
+                    total: collected.length,
                     label: session.label,
                     ...(startTime ? { startTime } : {}),
                     ...(endTime ? { endTime } : {}),
