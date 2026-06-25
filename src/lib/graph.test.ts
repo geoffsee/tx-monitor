@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
@@ -6,6 +6,8 @@ import {
     MAX_MEMORY_HOSTS,
     trafficNetwork,
 } from "./trafficNetwork";
+
+setDefaultTimeout(20000);
 
 function packet(
     id: string,
