@@ -297,9 +297,7 @@ export function CopilotSidebar({
                                                 ? copilotStatus.authMode ===
                                                   "local"
                                                     ? "• ready (local creds)"
-                                                    : copilotStatus.hasCredentials
-                                                      ? "• key present"
-                                                      : "• key missing"
+                                                    : "• key present"
                                                 : "• not ready"
                                             : "• checking…"}
                                     </span>
