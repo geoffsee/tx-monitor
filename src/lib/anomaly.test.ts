@@ -61,9 +61,14 @@ test("identifies high rate anomaly at default sensitivity", () => {
         info: "rate test",
     };
 
-    // Ingest many packets rapidly (same timestamp ~) for same flow
+    // Ingest many packets in quick succession (synthetic times to avoid wall-clock variance)
+    const baseTime = Date.now();
     for (let i = 0; i < 10; i++) {
-        trafficNetwork.ingestPacket({ ...base, id: `r${i}` });
+        trafficNetwork.ingestPacket(
+            { ...base, id: `r${i}` },
+            false,
+            baseTime + i * 10,
+        );
     }
 
     const rate = trafficNetwork.anomalyList.find((a) => a.type === "High Rate");
