@@ -70,5 +70,6 @@ describe("createGraph", () => {
         expect(graph.edges.map((edge) => edge.id)).toContain(
             "10.0.0.1->203.0.113.30:TCP:443",
         );
+        trafficNetwork.reset();
     });
 });
