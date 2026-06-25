@@ -59,6 +59,7 @@ function getRaw(
     env: NodeJS.ProcessEnv,
     file: ConfigValues,
 ): string | undefined {
+    const f = Object.keys(file).length === 0 ? loadAppConfigFile() : file;
     if (cliValue != null && cliValue !== "") {
         return cliValue;
     }
@@ -66,7 +67,7 @@ function getRaw(
     if (envVal != null && envVal !== "") {
         return envVal;
     }
-    const fileVal = file[envKey];
+    const fileVal = f[envKey];
     if (fileVal != null && fileVal !== "") {
         return fileVal;
     }
