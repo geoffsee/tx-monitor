@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { reverse } from "node:dns/promises";
 import { existsSync } from "node:fs";
+import { hostname as getHostname } from "node:os";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
@@ -39,6 +40,8 @@ const PACKAGE_ROOT = join(import.meta.dirname, "..");
 
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
+
+const HOSTNAME = getHostname();
 
 type WsClient = ServerWebSocket<undefined>;
 
@@ -399,7 +402,11 @@ function ensureCaptureSession(mode: string, label: string) {
     if (!store || store.getActiveSessionId()) {
         return;
     }
-    store.startSession(mode, label);
+    const cmdline = mode === "live" ? TCPDUMP_COMMAND.join(" ") : label;
+    store.startSession(mode, label, {
+        hostname: HOSTNAME,
+        cmdline,
+    });
 }
 
 function endCaptureSession() {

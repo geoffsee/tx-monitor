@@ -17,16 +17,34 @@ export class TrafficStore {
 
     constructor(private readonly db: DatabaseClient) {}
 
-    startSession(mode: string, label: string): CaptureSession {
+    startSession(
+        mode: string,
+        label: string,
+        metadata: {
+            hostname?: string | null;
+            cmdline?: string | null;
+            notes?: string | null;
+            tags?: string | null;
+        } = {},
+    ): CaptureSession {
         const row = {
             id: sessionId(),
             mode,
             label,
+            hostname: metadata.hostname ?? null,
+            cmdline: metadata.cmdline ?? null,
+            notes: metadata.notes ?? null,
+            tags: metadata.tags ?? null,
             startedAt: Date.now(),
         };
         this.db.insert(captureSessions).values(row).run();
         this.activeSessionId = row.id;
-        return { ...row, endedAt: null, totalPackets: 0, totalBytes: 0 };
+        return {
+            ...row,
+            endedAt: null,
+            totalPackets: 0,
+            totalBytes: 0,
+        };
     }
 
     endSession(): void {
@@ -40,6 +58,30 @@ export class TrafficStore {
             .where(eq(captureSessions.id, this.activeSessionId))
             .run();
         this.activeSessionId = null;
+    }
+
+    updateSessionMetadata(
+        id: string,
+        metadata: {
+            notes?: string | null;
+            tags?: string | null;
+        },
+    ): void {
+        const updates: Record<string, string | null> = {};
+        if (metadata.notes !== undefined) {
+            updates.notes = metadata.notes;
+        }
+        if (metadata.tags !== undefined) {
+            updates.tags = metadata.tags;
+        }
+        if (Object.keys(updates).length === 0) {
+            return;
+        }
+        this.db
+            .update(captureSessions)
+            .set(updates)
+            .where(eq(captureSessions.id, id))
+            .run();
     }
 
     getActiveSessionId(): string | null {
