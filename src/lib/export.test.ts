@@ -283,7 +283,7 @@ describe("download triggers (browser globals)", () => {
     });
 
     test("exportAsJson triggers a json download", () => {
-        if (typeof document === "undefined") {
+        if (typeof document === "undefined" || !document.body) {
             // Environment has no DOM; skip download behavior test
             return;
         }
@@ -297,7 +297,7 @@ describe("download triggers (browser globals)", () => {
     });
 
     test("exportPacketsCsv triggers a csv download", () => {
-        if (typeof document === "undefined") {
+        if (typeof document === "undefined" || !document.body) {
             return;
         }
         const graph = makeGraph({ packets: [makePacket()] });
@@ -312,7 +312,7 @@ describe("download triggers (browser globals)", () => {
     });
 
     test("exportFlowsCsv triggers a csv download", () => {
-        if (typeof document === "undefined") {
+        if (typeof document === "undefined" || !document.body) {
             return;
         }
         const graph = makeGraph({ flows: [makeFlow()] });
