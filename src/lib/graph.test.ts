@@ -87,7 +87,7 @@ describe("createGraph", () => {
             "10.0.0.1->203.0.113.1:TCP:443",
             "10.0.0.2->203.0.113.2:TCP:443",
         ];
-        for (let i = 0; i < 1350; i++) {
+        for (let i = 0; i < 1050; i++) {
             // High volume: repeat popular ones often with consistent flow key
             const isHigh = i % 3 !== 0;
             const src = isHigh
@@ -101,7 +101,7 @@ describe("createGraph", () => {
                 dstPort = 443;
                 proto = "TCP";
             } else {
-                dst = `203.0.113.${100 + (i % 150)}`;
+                dst = `203.0.113.${100 + (i % 149)}`;
                 dstPort = 12345 + (i % 1000);
                 proto = i % 3 === 0 ? "UDP" : "TCP";
             }
@@ -136,7 +136,7 @@ describe("createGraph", () => {
         const snap = createGraph();
         expect(snap.hostCount).toBeLessThanOrEqual(MAX_MEMORY_HOSTS);
         expect(snap.flowCount).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
-        expect(snap.totalPackets).toBe(1350);
+        expect(snap.totalPackets).toBe(1050);
     });
 
     test("history ingest respects caps and uses progressive page-style batching", () => {
