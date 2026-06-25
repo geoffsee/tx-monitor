@@ -66,7 +66,7 @@ test("identifies high rate anomaly at default sensitivity", () => {
     };
 
     // Ingest many packets in quick succession (synthetic times to avoid wall-clock variance)
-    const baseTime = Date.now();
+    const baseTime = 1_000_000;
     for (let i = 0; i < 10; i++) {
         trafficNetwork.ingestPacket(
             { ...base, id: `r${i}` },
