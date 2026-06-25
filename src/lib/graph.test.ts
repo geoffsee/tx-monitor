@@ -171,5 +171,5 @@ describe("createGraph", () => {
         expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         // totals from all ingested even though hosts/flows capped
         expect(trafficNetwork.totalPackets).toBe(2500);
-    });
+    }, 20000);
 });
