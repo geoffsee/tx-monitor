@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
 import type { ParsedPacket } from "./tcpdumpParser";
 import { trafficNetwork } from "./trafficNetwork";
@@ -25,6 +25,7 @@ function packet(
 }
 
 describe("createGraph", () => {
+    beforeEach(trafficNetwork.reset);
     test("keeps live flows visible through the stale window", () => {
         trafficNetwork.reset();
 
