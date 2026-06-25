@@ -59,7 +59,6 @@ function getRaw(
     env: NodeJS.ProcessEnv,
     file: ConfigValues,
 ): string | undefined {
-    const f = Object.keys(file).length === 0 ? loadAppConfigFile() : file;
     if (cliValue != null && cliValue !== "") {
         return cliValue;
     }
@@ -67,7 +66,7 @@ function getRaw(
     if (envVal != null && envVal !== "") {
         return envVal;
     }
-    const fileVal = f[envKey];
+    const fileVal = file[envKey];
     if (fileVal != null && fileVal !== "") {
         return fileVal;
     }
@@ -132,7 +131,7 @@ export function resolveFileReplaySleepCapMs(
 
 export function resolveCodexModel(
     env: NodeJS.ProcessEnv = process.env,
-    file: ConfigValues = {},
+    file: ConfigValues = loadAppConfigFile(),
 ): string {
     const raw = getRaw("TXMON_CODEX_MODEL", undefined, env, file);
     if (!raw) return DEFAULTS.codexModel;
@@ -142,7 +141,7 @@ export function resolveCodexModel(
 
 export function resolveCodexTimeoutMs(
     env: NodeJS.ProcessEnv = process.env,
-    file: ConfigValues = {},
+    file: ConfigValues = loadAppConfigFile(),
 ): number {
     const raw = getRaw("TXMON_CODEX_TIMEOUT_MS", undefined, env, file);
     if (!raw) return DEFAULTS.codexTimeoutMs;
@@ -159,7 +158,7 @@ export function resolveTcpdumpArgs(
 
 export function resolveLsofDisabled(
     env: NodeJS.ProcessEnv = process.env,
-    file: ConfigValues = {},
+    file: ConfigValues = loadAppConfigFile(),
 ): boolean {
     const raw = getRaw("TXMON_LSOF_DISABLE", undefined, env, file);
     return raw === "1";
@@ -167,7 +166,7 @@ export function resolveLsofDisabled(
 
 export function resolveLsofIntervalMs(
     env: NodeJS.ProcessEnv = process.env,
-    file: ConfigValues = {},
+    file: ConfigValues = loadAppConfigFile(),
 ): number {
     const raw = getRaw("TXMON_LSOF_INTERVAL_MS", undefined, env, file);
     if (!raw) return 1500;
