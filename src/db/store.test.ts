@@ -41,6 +41,10 @@ describe("TrafficStore", () => {
         expect(sessions[0]?.id).toBe(session.id);
         expect(sessions[0]?.totalPackets).toBe(2);
         expect(sessions[0]?.totalBytes).toBe(192);
+        expect(sessions[0]?.hostname).toBeNull();
+        expect(sessions[0]?.cmdline).toBeNull();
+        expect(sessions[0]?.notes).toBeNull();
+        expect(sessions[0]?.tags).toBeNull();
 
         const recent = store.listRecentPackets(10, session.id);
         expect(recent).toHaveLength(2);
@@ -109,5 +113,32 @@ describe("TrafficStore", () => {
                 .listSessionPackets(session.id, 0, 10)
                 .map((packet) => packet.id),
         ).toEqual(["pkt-a", "pkt-b"]);
+    });
+
+    test("captures and updates extended session metadata", () => {
+        const store = createTestStore();
+        const session = store.startSession("live", "tcpdump -i any", {
+            hostname: "testhost",
+            cmdline: "tcpdump -i any -Q out",
+            notes: "initial note",
+            tags: "test,net",
+        });
+
+        let loaded = store.getSession(session.id);
+        expect(loaded?.hostname).toBe("testhost");
+        expect(loaded?.cmdline).toBe("tcpdump -i any -Q out");
+        expect(loaded?.notes).toBe("initial note");
+        expect(loaded?.tags).toBe("test,net");
+
+        store.updateSessionMetadata(session.id, {
+            notes: "updated reason for capture",
+            tags: "prod,incident-42",
+        });
+
+        loaded = store.getSession(session.id);
+        expect(loaded?.notes).toBe("updated reason for capture");
+        expect(loaded?.tags).toBe("prod,incident-42");
+        // hostname/cmdline unchanged
+        expect(loaded?.hostname).toBe("testhost");
     });
 });

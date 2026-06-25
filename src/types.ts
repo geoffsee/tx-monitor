@@ -33,6 +33,10 @@ export type CaptureSessionSummary = {
     endedAt: number | null;
     totalPackets: number;
     totalBytes: number;
+    hostname: string | null;
+    cmdline: string | null;
+    notes: string | null;
+    tags: string | null;
 };
 
 export type TrafficViewMode = "live" | "history";
