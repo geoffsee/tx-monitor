@@ -36,7 +36,7 @@ export function parseConfigFile(content: string): ConfigValues {
 
 export function loadAppConfigFile(cwd = process.cwd()): ConfigValues {
     const override = process.env.TXMON_CONFIG?.trim();
-    const candidate = override || join(cwd, ".tx-monitor/config");
+    const candidate = override ?? join(cwd, ".tx-monitor/config");
     if (!candidate || !existsSync(candidate)) {
         return {};
     }
