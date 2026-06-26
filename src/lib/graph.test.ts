@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
@@ -27,6 +27,7 @@ function packet(
 }
 
 describe("createGraph", () => {
+    setDefaultTimeout(20000);
     test("keeps live flows visible through the stale window", () => {
         trafficNetwork.reset();
 
@@ -137,7 +138,7 @@ describe("createGraph", () => {
         expect(snap.hostCount).toBeLessThanOrEqual(MAX_MEMORY_HOSTS);
         expect(snap.flowCount).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         expect(snap.totalPackets).toBe(1050);
-    }, 20000);
+    });
 
     test("history ingest respects caps and uses progressive page-style batching", () => {
         trafficNetwork.reset();
@@ -171,5 +172,5 @@ describe("createGraph", () => {
         expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         // totals from all ingested even though hosts/flows capped
         expect(trafficNetwork.totalPackets).toBe(2500);
-    }, 20000);
+    });
 });
