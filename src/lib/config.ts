@@ -104,7 +104,8 @@ export function resolveFilePath(
     if (cliFile != null && cliFile !== "") return cliFile;
     const envVal = env.TXMON_FILE;
     if (envVal != null && envVal !== "") return envVal;
-    const cfgVal = file.file ?? file.TXMON_FILE;
+    const cfgVal =
+        file.file != null && file.file !== "" ? file.file : file.TXMON_FILE;
     if (cfgVal != null && cfgVal !== "") return cfgVal;
     return undefined;
 }
