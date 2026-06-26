@@ -75,9 +75,13 @@ test("identifies high rate anomaly at default sensitivity", () => {
         );
     }
 
-    const rate = trafficNetwork.anomalyList.find((a) => a.type === "High Rate");
-    expect(rate).toBeTruthy();
-    expect(rate?.flowId).toContain("10.0.0.1->10.0.0.2");
+    expect(
+        trafficNetwork.anomalyList.some(
+            (a) =>
+                a.type === "High Rate" &&
+                a.flowId?.includes("10.0.0.1->10.0.0.2"),
+        ),
+    ).toBe(true);
 });
 
 test("large transfer threshold varies with sensitivity", () => {
