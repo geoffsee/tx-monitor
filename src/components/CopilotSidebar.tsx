@@ -11,6 +11,7 @@ import {
     COPILOT_WELCOME,
     type CopilotMessage,
     type CopilotStatus,
+    type CopilotValidationResult,
     createMessage,
 } from "../lib/copilot";
 import {
@@ -54,10 +55,8 @@ export function CopilotSidebar({
     const [copilotStatus, setCopilotStatus] = useState<CopilotStatus | null>(
         null,
     );
-    const [validation, setValidation] = useState<{
-        success: boolean;
-        message: string;
-    } | null>(null);
+    const [validation, setValidation] =
+        useState<CopilotValidationResult | null>(null);
     const [isValidating, setIsValidating] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
