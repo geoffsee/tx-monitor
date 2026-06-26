@@ -161,7 +161,7 @@ export function shortHost(address: string): string {
     return `${address.slice(0, 8)}…${address.slice(-6)}`;
 }
 
-export function formatService(port: number | null, proto: string): string {
+export function formatService(port: number | null, proto: PacketProto): string {
     if (port === null) {
         return proto;
     }
