@@ -80,10 +80,8 @@ export function Sidebar({
         const container = flowsContainerRef.current;
         const height = container ? container.clientHeight || 220 : 220;
         const scroll = flowsScrollTop;
-        const start = Math.max(
-            0,
-            Math.floor(scroll / FLOW_ITEM_HEIGHT) - OVERSCAN,
-        );
+        const raw = Math.floor(scroll / FLOW_ITEM_HEIGHT) - OVERSCAN;
+        const start = Math.max(0, Math.min(items.length, raw));
         const visibleCount =
             Math.ceil(height / FLOW_ITEM_HEIGHT) + OVERSCAN * 2;
         const end = Math.min(items.length, start + visibleCount);
@@ -95,10 +93,8 @@ export function Sidebar({
         const container = packetsContainerRef.current;
         const height = container ? container.clientHeight || 300 : 300;
         const scroll = packetsScrollTop;
-        const start = Math.max(
-            0,
-            Math.floor(scroll / PACKET_ITEM_HEIGHT) - OVERSCAN,
-        );
+        const raw = Math.floor(scroll / PACKET_ITEM_HEIGHT) - OVERSCAN;
+        const start = Math.max(0, Math.min(items.length, raw));
         const visibleCount =
             Math.ceil(height / PACKET_ITEM_HEIGHT) + OVERSCAN * 2;
         const end = Math.min(items.length, start + visibleCount);
