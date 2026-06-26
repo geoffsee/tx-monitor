@@ -261,6 +261,10 @@ describe("download triggers (browser globals)", () => {
                         ) ?? ({} as HTMLAnchorElement)
                     );
                 };
+                (document as { body: object }).body = {
+                    appendChild() {},
+                    removeChild() {},
+                };
             } catch {}
         }
         if (typeof URL !== "undefined") {
