@@ -267,7 +267,7 @@ describe("download triggers (browser globals)", () => {
                 };
             } catch {}
         }
-        if (typeof URL !== "undefined") {
+        if (typeof document !== "undefined" && typeof URL !== "undefined") {
             try {
                 origCreateObjectURL = URL.createObjectURL.bind(URL);
                 origRevoke = URL.revokeObjectURL.bind(URL);
