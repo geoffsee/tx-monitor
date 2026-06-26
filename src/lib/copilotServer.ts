@@ -28,7 +28,10 @@ const API_KEY_ENV_KEYS = new Set(["CODEX_API_KEY", "OPENAI_API_KEY"]);
 let copilotRequestCounter = 0;
 
 export class CopilotRequestError extends Error {
-    override name = "CopilotRequestError";
+    constructor(message?: string) {
+        super(message);
+        this.name = "CopilotRequestError";
+    }
 }
 
 export function getCopilotStatus(): CopilotStatus {
