@@ -302,7 +302,8 @@ describe("download triggers (browser globals)", () => {
         if (
             typeof document === "undefined" ||
             typeof document.createElement !== "function" ||
-            !document?.body
+            !document?.body ||
+            typeof document.createElement("a")?.click !== "function"
         ) {
             // Environment has no DOM; skip download behavior test
             return;
@@ -320,7 +321,8 @@ describe("download triggers (browser globals)", () => {
         if (
             typeof document === "undefined" ||
             typeof document.createElement !== "function" ||
-            !document?.body
+            !document?.body ||
+            typeof document.createElement("a")?.click !== "function"
         ) {
             return;
         }
@@ -339,7 +341,8 @@ describe("download triggers (browser globals)", () => {
         if (
             typeof document === "undefined" ||
             typeof document.createElement !== "function" ||
-            !document?.body
+            !document?.body ||
+            typeof document.createElement("a")?.click !== "function"
         ) {
             return;
         }
