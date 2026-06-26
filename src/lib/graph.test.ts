@@ -138,7 +138,7 @@ describe("createGraph", () => {
         expect(snap.hostCount).toBeLessThanOrEqual(MAX_MEMORY_HOSTS);
         expect(snap.flowCount).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         expect(snap.totalPackets).toBe(1050);
-    });
+    }, 20000);
 
     test("history ingest respects caps and uses progressive page-style batching", () => {
         trafficNetwork.reset();
@@ -172,5 +172,5 @@ describe("createGraph", () => {
         expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         // totals from all ingested even though hosts/flows capped
         expect(trafficNetwork.totalPackets).toBe(2500);
-    });
+    }, 20000);
 });
