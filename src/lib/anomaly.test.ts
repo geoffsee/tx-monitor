@@ -148,11 +148,11 @@ test("detects beaconing with periodic arrivals", () => {
         );
     }
 
-    const beacon = trafficNetwork.anomalyList.find(
-        (a) => a.type === "Beaconing",
-    );
-    expect(beacon).toBeTruthy();
-    expect(beacon?.flowId).toContain("203.0.113.9");
+    expect(
+        trafficNetwork.anomalyList.some(
+            (a) => a.type === "Beaconing" && a.flowId?.includes("203.0.113.9"),
+        ),
+    ).toBe(true);
 });
 
 test("detects high DNS volume and broad DNS targets at high sensitivity", () => {
