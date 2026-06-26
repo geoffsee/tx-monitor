@@ -16,6 +16,7 @@ const graph: TrafficSnapshot = {
     flowCount: 0,
     connected: true,
     sourceLabel: "tcpdump -i any",
+    sensitivity: "medium",
 };
 
 const context = buildCopilotContext(graph, null);

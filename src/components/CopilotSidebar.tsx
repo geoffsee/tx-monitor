@@ -31,6 +31,8 @@ type CopilotSidebarProps = {
     graph: TrafficSnapshot;
     selection: Selection | null;
     isCompact: boolean;
+    sensitivity: "low" | "medium" | "high";
+    onSetSensitivity: (level: "low" | "medium" | "high") => void;
 };
 
 type Tab = "copilot" | "anomalies";
@@ -39,6 +41,8 @@ export function CopilotSidebar({
     graph,
     selection,
     isCompact,
+    sensitivity,
+    onSetSensitivity,
 }: CopilotSidebarProps) {
     const [activeTab, setActiveTab] = useState<Tab>("copilot");
     const [messages, setMessages] = useState<CopilotMessage[]>([
@@ -303,6 +307,49 @@ export function CopilotSidebar({
                                 Heuristic-based alerts for unusual traffic
                                 patterns.
                             </p>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    gap: 4,
+                                    marginTop: 6,
+                                    flexWrap: "wrap",
+                                }}
+                            >
+                                {(["low", "medium", "high"] as const).map(
+                                    (level) => {
+                                        const active = sensitivity === level;
+                                        return (
+                                            <button
+                                                key={level}
+                                                type="button"
+                                                onClick={() =>
+                                                    onSetSensitivity(level)
+                                                }
+                                                style={{
+                                                    fontSize: 10,
+                                                    padding: "2px 8px",
+                                                    borderRadius: 999,
+                                                    border: active
+                                                        ? "1px solid #66aec4"
+                                                        : "1px solid #33414a",
+                                                    background: active
+                                                        ? "rgba(102, 174, 196, 0.15)"
+                                                        : "#0f1921",
+                                                    color: active
+                                                        ? "#66aec4"
+                                                        : "#7f99a7",
+                                                    cursor: "pointer",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.06em",
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                {level}
+                                            </button>
+                                        );
+                                    },
+                                )}
+                            </div>
                         </header>
 
                         <div
