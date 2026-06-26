@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Codex, type ThreadOptions } from "@openai/codex-sdk";
+import type { ThreadOptions } from "@openai/codex-sdk";
 import {
     COPILOT_SYSTEM_PROMPT,
     type CopilotAuthMode,
@@ -61,7 +61,7 @@ export async function validateCopilotSetup(): Promise<CopilotValidationResult> {
     const timeout = setTimeout(() => controller.abort(), VALIDATE_TIMEOUT_MS);
 
     try {
-        const { codex, authSource } = createCodexClient();
+        const { codex, authSource } = await createCodexClient();
         logCopilot(requestId, "validate_start", {
             authMode: CODEX_AUTH_MODE,
             authSource,
@@ -234,7 +234,8 @@ function localAuthEnv() {
     return env;
 }
 
-function createCodexClient() {
+async function createCodexClient() {
+    const { Codex } = await import("@openai/codex-sdk");
     if (CODEX_AUTH_MODE === "local") {
         return {
             codex: new Codex({ env: localAuthEnv() }),
@@ -276,7 +277,7 @@ export async function askCopilotWithCodex(
     const timeout = setTimeout(() => controller.abort(), CODEX_TIMEOUT_MS);
 
     try {
-        const { codex, authSource } = createCodexClient();
+        const { codex, authSource } = await createCodexClient();
         logCopilot(requestId, "start", {
             model: CODEX_MODEL,
             authMode: CODEX_AUTH_MODE,
