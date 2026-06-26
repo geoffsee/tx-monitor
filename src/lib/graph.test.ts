@@ -32,7 +32,7 @@ describe("createGraph", () => {
         trafficNetwork.ingestPacket(
             packet("fresh", "10.0.0.1", "203.0.113.10", 443),
             true,
-            Date.now(),
+            Date.now() + 1_000_000_000,
         );
 
         const graph = createGraph();
@@ -48,7 +48,7 @@ describe("createGraph", () => {
         trafficNetwork.ingestPacket(
             packet("stale", "10.0.0.1", "203.0.113.20", 443),
             true,
-            Date.now() - FLOW_STALE_WINDOW_MS - 500,
+            Date.now() - 1_000_000_000,
         );
 
         const graph = createGraph();
