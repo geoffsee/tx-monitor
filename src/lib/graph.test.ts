@@ -1,4 +1,4 @@
-import { describe, expect, setDefaultTimeout, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
@@ -27,7 +27,6 @@ function packet(
 }
 
 describe("createGraph", () => {
-    setDefaultTimeout(20000);
     test("keeps live flows visible through the stale window", () => {
         trafficNetwork.reset();
 
