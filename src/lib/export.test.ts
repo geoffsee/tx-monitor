@@ -286,12 +286,12 @@ describe("download triggers (browser globals)", () => {
                 document.createElement = origCreateElement;
             } catch {}
         }
-        if (origCreateObjectURL) {
+        if (origCreateObjectURL && typeof URL !== "undefined") {
             try {
                 URL.createObjectURL = origCreateObjectURL;
             } catch {}
         }
-        if (origRevoke) {
+        if (origRevoke && typeof URL !== "undefined") {
             try {
                 URL.revokeObjectURL = origRevoke;
             } catch {}
