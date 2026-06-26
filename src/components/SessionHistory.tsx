@@ -205,9 +205,10 @@ export function SessionHistory({
                         max={historyPlayback.total}
                         step={1}
                         value={historyPlayback.offset}
-                        onChange={(e) =>
-                            onSeek(Number.parseInt(e.target.value, 10))
-                        }
+                        onChange={(e) => {
+                            const v = Number.parseInt(e.target.value, 10);
+                            if (!Number.isNaN(v)) onSeek(v);
+                        }}
                         style={{ width: "100%", accentColor: "#7ce3b7" }}
                     />
                     <div
