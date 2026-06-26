@@ -109,8 +109,10 @@ export async function validateCopilotSetup(): Promise<CopilotValidationResult> {
     } finally {
         clearTimeout(timeout);
         await rm(workingDirectory, { recursive: true, force: true }).catch(
-            () => {
-                /* ignore cleanup */
+            (error: unknown) => {
+                warnCopilot(requestId, "cleanup_failed", {
+                    error: errorMessage(error),
+                });
             },
         );
     }
