@@ -12,6 +12,7 @@ import type {
     HostNodeData,
     TrafficSnapshot,
 } from "../types";
+import { formatService, type PacketProto } from "./tcpdumpParser";
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
@@ -150,7 +151,10 @@ export function createGraph(): TrafficSnapshot {
         .map((flow) => {
             const active = activeFlowIds.has(flow.id);
             const stroke = protoColor(flow.proto);
-            const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
+            const serviceLabel = formatService(
+                flow.dstPort,
+                flow.proto as PacketProto,
+            );
             const sourcePos = positions.get(flow.srcHost);
             const targetPos = positions.get(flow.dstHost);
             const handles =
@@ -173,7 +177,7 @@ export function createGraph(): TrafficSnapshot {
                     color: stroke,
                 },
                 data: {
-                    label: `${flow.proto}${portLabel}`,
+                    label: serviceLabel,
                     labelColor: stroke,
                     stroke,
                     active,
