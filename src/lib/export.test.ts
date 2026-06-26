@@ -213,7 +213,7 @@ describe("CSV export formatting (pure shape)", () => {
 describe("download triggers (browser globals)", () => {
     let created: { href: string; download: string }[] = [];
     let blobs: Blob[] = [];
-    let origCreateElement: typeof document.createElement | null = null;
+    let origCreateElement: ((tag: string) => HTMLElement) | null = null;
     let origCreateObjectURL: typeof URL.createObjectURL | null = null;
     let origRevoke: typeof URL.revokeObjectURL | null = null;
 
