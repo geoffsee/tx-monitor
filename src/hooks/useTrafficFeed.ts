@@ -84,6 +84,8 @@ export function useTrafficFeed(): TrafficFeedState {
         setSessionLoadProgress(null);
         setActiveSessionId(null);
         setViewMode("live");
+        filterRef.current = "";
+        setFilterState("");
         trafficNetwork.reset();
         publishGraph();
         refreshSessions();
