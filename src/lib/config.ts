@@ -161,7 +161,7 @@ export function resolveLsofDisabled(
     file: ConfigValues = loadAppConfigFile(),
 ): boolean {
     const raw = getRaw("TXMON_LSOF_DISABLE", undefined, env, file);
-    return raw?.trim() === "1";
+    return raw === "1";
 }
 
 export function resolveLsofIntervalMs(
