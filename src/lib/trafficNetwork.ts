@@ -260,7 +260,6 @@ const TrafficNetworkModel = types
                 });
                 self.flows.set(key, flow);
                 pruneFlows();
-                pruneOrphanFlows();
             }
 
             detectAnomalies(packet, flow);
