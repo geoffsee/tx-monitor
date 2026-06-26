@@ -148,7 +148,7 @@ export function CopilotSidebar({
     );
 
     const handleValidate = useCallback(async () => {
-        if (isValidating) {
+        if (isValidating || isLoading) {
             return;
         }
         setIsValidating(true);
@@ -166,7 +166,7 @@ export function CopilotSidebar({
         } finally {
             setIsValidating(false);
         }
-    }, [isValidating]);
+    }, [isValidating, isLoading]);
 
     const handleSubmit = useCallback(
         (event: FormEvent) => {
