@@ -308,7 +308,8 @@ describe("download triggers (browser globals)", () => {
             document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
-            typeof document.createElement("a")?.click !== "function"
+            typeof document.createElement("a")?.click !== "function" ||
+            !origCreateObjectURL
         ) {
             // Environment has no DOM; skip download behavior test
             return;
