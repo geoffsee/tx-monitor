@@ -133,15 +133,17 @@ describe("resolveTcpdumpArgs", () => {
 
 describe("resolveLsofDisabled / resolveLsofIntervalMs", () => {
     test("lsof disabled only when exactly '1'", () => {
-        expect(resolveLsofDisabled({ TXMON_LSOF_DISABLE: "1" })).toBe(true);
-        expect(resolveLsofDisabled({ TXMON_LSOF_DISABLE: "0" })).toBe(false);
+        expect(resolveLsofDisabled({ TXMON_LSOF_DISABLE: "1" }, {})).toBe(true);
+        expect(resolveLsofDisabled({ TXMON_LSOF_DISABLE: "0" }, {})).toBe(
+            false,
+        );
         expect(resolveLsofDisabled({}, { TXMON_LSOF_DISABLE: "1" })).toBe(true);
     });
 
     test("lsof interval from env/file or 1500", () => {
-        expect(resolveLsofIntervalMs({ TXMON_LSOF_INTERVAL_MS: "800" })).toBe(
-            800,
-        );
+        expect(
+            resolveLsofIntervalMs({ TXMON_LSOF_INTERVAL_MS: "800" }, {}),
+        ).toBe(800);
         expect(resolveLsofIntervalMs({}, {})).toBe(1500);
     });
 });
