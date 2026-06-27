@@ -75,6 +75,8 @@ Open [http://localhost:3001](http://localhost:3001). The compiled server embeds 
 bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db]
 ```
 
+CLI flags take precedence over environment variables and local config (see below).
+
 | Flag | Description |
 | --- | --- |
 | `--file <path>` | Replay a `tcpdump` log instead of live capture |
@@ -95,6 +97,40 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
 | `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
 | `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
+| `TXMON_TCPDUMP_ARGS` | unset | Custom tcpdump command/args (advanced) |
+| `TXMON_LSOF_DISABLE` | unset | Set to `1` to disable lsof process enrichment |
+| `TXMON_LSOF_INTERVAL_MS` | `1500` | Polling interval for lsof enrichment (ms) |
+| `TXMON_FILE` | unset | Alternative to `--file` for replay path |
+
+## Local Configuration
+
+An optional local config file supplies defaults without repeating CLI flags or environment variables on every run.
+
+- Location: `.tx-monitor/config` (relative to current working directory), or the path specified by the `TXMON_CONFIG` environment variable.
+- Format: simple `KEY=VALUE` assignments (supports `export`, single/double quotes, inline `#` comments, and blank lines — same syntax as `.env` files).
+- Supported keys include the environment variables listed above plus `file` (or `TXMON_FILE`) for capture replay path and `SERVE` for serving the built UI.
+
+Precedence (highest wins):
+1. CLI flags (`--file`, `--port`, `--db`, `--no-db`, `--serve`)
+2. Direct environment variables
+3. Local config file
+4. Built-in defaults
+
+Example `.tx-monitor/config`:
+
+```
+PORT=3002
+TXMON_DB=/var/lib/tx-mon.db
+FILE_REPLAY_SPEED=1.0
+TXMON_CODEX_MODEL=gpt-test
+file=/home/user/captures/home.pcap
+```
+
+CLI flags and direct environment variables always override values from the config file.
+
+Secrets (e.g. `OPENAI_API_KEY`) are never read from the config file. Use the process environment or `.env.copilot` for secrets.
+
+Config loading performs only local filesystem reads, requires no network, and has no side effects when using the pure parsing/resolution helpers in tests.
 
 ## Persistence
 

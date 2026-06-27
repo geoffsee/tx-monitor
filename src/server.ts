@@ -9,6 +9,16 @@ import appHtml from "../index.html";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
+    loadAppConfigFile,
+    resolveDbPath,
+    resolveFilePath,
+    resolveFileReplaySleepCapMs,
+    resolveFileReplaySpeed,
+    resolvePort,
+    resolveServe,
+    resolveTcpdumpArgs,
+} from "./lib/config";
+import {
     askCopilotWithCodex,
     CopilotRequestError,
     parseCopilotRequest,
@@ -27,32 +37,9 @@ import {
 } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
-const DEFAULT_DB = "tx-mon.db";
 
-function resolveTcpdumpCommand(): string[] {
-    const envArgs = process.env.TXMON_TCPDUMP_ARGS?.trim();
-    if (envArgs) {
-        const parts = envArgs.split(/\s+/);
-        return parts[0] === "sudo" || process.getuid?.() === 0
-            ? parts
-            : ["sudo", ...parts];
-    }
-
-    const args = ["tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv", "-l"];
-    return process.getuid?.() === 0 ? args : ["sudo", ...args];
-}
-
-const TCPDUMP_COMMAND = resolveTcpdumpCommand();
-const TCPDUMP_LABEL = TCPDUMP_COMMAND.join(" ");
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
-const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
-const FILE_REPLAY_SPEED = Number.parseFloat(
-    process.env.FILE_REPLAY_SPEED ?? "0",
-);
-const FILE_REPLAY_SLEEP_CAP_MS = Number.parseFloat(
-    process.env.FILE_REPLAY_SLEEP_CAP_MS ?? "120",
-);
 
 const HOSTNAME = getHostname();
 
@@ -80,12 +67,35 @@ const { values } = parseArgs({
     allowPositionals: false,
 });
 
-const filePath = values.file;
-const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
-const serveStatic = values.serve || existsSync(join(DIST, "index.html"));
-const dbPath = values["no-db"]
-    ? null
-    : (values.db ?? process.env.TXMON_DB ?? DEFAULT_DB);
+const configFile = loadAppConfigFile();
+
+function resolveTcpdumpCommand(): string[] {
+    const envArgs = resolveTcpdumpArgs(process.env, configFile)?.trim();
+    if (envArgs) {
+        const parts = envArgs.split(/\s+/);
+        return parts[0] === "sudo" || process.getuid?.() === 0
+            ? parts
+            : ["sudo", ...parts];
+    }
+
+    const args = ["tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv", "-l"];
+    return process.getuid?.() === 0 ? args : ["sudo", ...args];
+}
+
+const TCPDUMP_COMMAND = resolveTcpdumpCommand();
+const TCPDUMP_LABEL = TCPDUMP_COMMAND.join(" ");
+
+const filePath = resolveFilePath(values.file, process.env, configFile);
+const listenPort = resolvePort(values.port, process.env, configFile);
+const serveStatic =
+    resolveServe(values.serve, process.env, configFile) ||
+    existsSync(join(DIST, "index.html"));
+const dbPath = resolveDbPath(
+    values.db,
+    values["no-db"],
+    process.env,
+    configFile,
+);
 const store = dbPath
     ? new TrafficStore(
           openDatabase(
@@ -232,7 +242,9 @@ async function replayFileOnce(path: string) {
     const decoder = new TextDecoder();
     let buffer = "";
     let previousTimestamp: number | null = null;
-    const replayRealtime = FILE_REPLAY_SPEED > 0;
+    const replaySpeed = resolveFileReplaySpeed(process.env, configFile);
+    const replaySleepCap = resolveFileReplaySleepCapMs(process.env, configFile);
+    const replayRealtime = replaySpeed > 0;
 
     while (true) {
         const { value, done } = await reader.read();
@@ -257,10 +269,7 @@ async function replayFileOnce(path: string) {
                         0,
                         currentTimestamp - previousTimestamp,
                     );
-                    const delay = Math.min(
-                        delta / FILE_REPLAY_SPEED,
-                        FILE_REPLAY_SLEEP_CAP_MS,
-                    );
+                    const delay = Math.min(delta / replaySpeed, replaySleepCap);
                     if (delay > 0) {
                         await Bun.sleep(delay);
                     }
