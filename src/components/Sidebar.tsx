@@ -9,10 +9,12 @@ import type {
 import { DetailPanel } from "./DetailPanel";
 import { SessionHistory } from "./SessionHistory";
 import {
+    copilotInputStyle,
     denseFeedRowStyle,
     denseListRowStyle,
     denseStatusRowStyle,
     denseSubtleStyle,
+    detailCloseButtonStyle,
     listStyle,
     panelTitleStyle,
     selectedRowStyle,
@@ -33,6 +35,8 @@ type SidebarProps = {
     activeSessionId: string | null;
     sessionLoadProgress: SessionLoadProgress | null;
     sessionsVersion: number;
+    filter: string;
+    onFilterChange: (value: string) => void;
     onLoadSession: (sessionId: string) => void;
     onReturnToLive: () => void;
     onSelectFlow: (id: string) => void;
@@ -49,6 +53,8 @@ export function Sidebar({
     activeSessionId,
     sessionLoadProgress,
     sessionsVersion,
+    filter,
+    onFilterChange,
     onLoadSession,
     onReturnToLive,
     onSelectFlow,
@@ -96,6 +102,41 @@ export function Sidebar({
                 >
                     {graph.events[0] ?? "Waiting for traffic"}
                 </span>
+            </div>
+            <div
+                style={{
+                    flexShrink: 0,
+                    minWidth: 0,
+                    display: "flex",
+                    gap: 6,
+                }}
+            >
+                <input
+                    type="text"
+                    value={filter}
+                    onChange={(e) => onFilterChange(e.target.value)}
+                    placeholder="Filter: addr/port/proto/process/vol"
+                    style={{
+                        ...copilotInputStyle,
+                        fontSize: 12,
+                        padding: "6px 8px",
+                        flex: 1,
+                    }}
+                />
+                {filter ? (
+                    <button
+                        type="button"
+                        onClick={() => onFilterChange("")}
+                        style={{
+                            ...detailCloseButtonStyle,
+                            padding: "6px 8px",
+                            fontSize: 10,
+                            flexShrink: 0,
+                        }}
+                    >
+                        Clear
+                    </button>
+                ) : null}
             </div>
             <section
                 style={{

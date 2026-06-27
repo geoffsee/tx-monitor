@@ -12,7 +12,7 @@ import type {
     HostNodeData,
     TrafficSnapshot,
 } from "../types";
-import type { TrafficHost } from "./trafficNetwork";
+import type { TrafficFlow, TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
 export const MAX_GRAPH_HOSTS = 18;
@@ -74,7 +74,33 @@ function resolveLayout(hostList: TrafficHost[]) {
     return cachedLayout;
 }
 
-export function createGraph(): TrafficSnapshot {
+function parseFilter(filter?: string): string[] {
+    if (!filter) {
+        return [];
+    }
+    return filter
+        .toLowerCase()
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+}
+
+function itemMatchesFilter(
+    tokens: string[],
+    fields: Array<string | number | null | undefined>,
+): boolean {
+    if (tokens.length === 0) {
+        return true;
+    }
+    const hay = fields
+        .filter((f) => f != null)
+        .map((f) => String(f).toLowerCase())
+        .join(" ");
+    return tokens.every((tok) => hay.includes(tok));
+}
+
+export function createGraph(filter?: string): TrafficSnapshot {
+    const tokens = parseFilter(filter);
     const now = Date.now();
     const useLiveStaleWindow = trafficNetwork.sourceMode !== "history";
     const staleCutoff = now - FLOW_STALE_WINDOW_MS;
@@ -82,7 +108,49 @@ export function createGraph(): TrafficSnapshot {
     const eligibleFlows = useLiveStaleWindow
         ? trafficNetwork.flowList.filter((flow) => flow.lastSeen >= staleCutoff)
         : trafficNetwork.flowList;
-    const hostList = selectGraphHosts(trafficNetwork.hostList, eligibleFlows);
+
+    const flowMatchesFilter = (flow: TrafficFlow) =>
+        itemMatchesFilter(tokens, [
+            flow.srcHost,
+            flow.dstHost,
+            flow.proto,
+            flow.dstPort,
+            flow.processCommand,
+            flow.packetCount,
+            flow.bytesTotal,
+        ]);
+
+    const hostMatchesFilter = (host: TrafficHost) => {
+        const dns = trafficNetwork.resolvedDns.get(host.id) ?? "";
+        return itemMatchesFilter(tokens, [
+            host.id,
+            host.address,
+            host.label,
+            host.category,
+            host.packetCount,
+            host.bytesTotal,
+            dns,
+        ]);
+    };
+
+    const filteredEligibleFlows =
+        tokens.length > 0
+            ? eligibleFlows.filter(flowMatchesFilter)
+            : eligibleFlows;
+
+    const flowMatchHostIds = new Set<string>();
+    for (const f of filteredEligibleFlows) {
+        flowMatchHostIds.add(f.srcHost);
+        flowMatchHostIds.add(f.dstHost);
+    }
+    const hostPool =
+        tokens.length > 0
+            ? trafficNetwork.hostList.filter(
+                  (h) => hostMatchesFilter(h) || flowMatchHostIds.has(h.id),
+              )
+            : trafficNetwork.hostList;
+
+    const hostList = selectGraphHosts(hostPool, filteredEligibleFlows);
     const hostIds = new Set(hostList.map((host) => host.id));
     const positions = resolveLayout(hostList);
     const activeFlowIds = new Set<string>();
@@ -106,7 +174,7 @@ export function createGraph(): TrafficSnapshot {
         },
     }));
 
-    const flowSlice = eligibleFlows
+    const flowSlice = filteredEligibleFlows
         .filter(
             (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
         )
@@ -181,50 +249,69 @@ export function createGraph(): TrafficSnapshot {
             };
         });
 
+    const packetMatchesFilter = (
+        packet: (typeof trafficNetwork.packets)[number],
+    ) =>
+        itemMatchesFilter(tokens, [
+            packet.srcHost,
+            packet.dstHost,
+            packet.proto,
+            packet.srcPort,
+            packet.dstPort,
+            packet.info,
+            packet.length,
+            packet.processCommand,
+        ]);
+    const packetSlice =
+        tokens.length > 0
+            ? trafficNetwork.packets.filter(packetMatchesFilter)
+            : trafficNetwork.packets;
+
     return {
         nodes,
         edges,
-        packets: trafficNetwork.packets
-            .slice(0, MAX_FEED_PACKETS)
-            .map((packet) => ({
-                id: packet.id,
-                timestamp: packet.timestamp,
-                proto: packet.proto,
-                srcHost: packet.srcHost,
-                dstHost: packet.dstHost,
-                length: packet.length,
-                info: packet.info,
-                ...(packet.processCommand &&
-                packet.processPid &&
-                packet.processUser
-                    ? {
-                          process: {
-                              command: packet.processCommand,
-                              pid: packet.processPid,
-                              user: packet.processUser,
-                          },
-                      }
-                    : {}),
-            })),
-        flows: trafficNetwork.flowList.slice(0, 12).map((flow) => ({
-            id: flow.id,
-            srcHost: flow.srcHost,
-            dstHost: flow.dstHost,
-            proto: flow.proto,
-            dstPort: flow.dstPort,
-            packetCount: flow.packetCount,
-            bytesTotal: flow.bytesTotal,
-            active: activeFlowIds.has(flow.id),
-            ...(flow.processCommand && flow.processPid && flow.processUser
+        packets: packetSlice.slice(0, MAX_FEED_PACKETS).map((packet) => ({
+            id: packet.id,
+            timestamp: packet.timestamp,
+            proto: packet.proto,
+            srcHost: packet.srcHost,
+            dstHost: packet.dstHost,
+            length: packet.length,
+            info: packet.info,
+            ...(packet.processCommand && packet.processPid && packet.processUser
                 ? {
                       process: {
-                          command: flow.processCommand,
-                          pid: flow.processPid,
-                          user: flow.processUser,
+                          command: packet.processCommand,
+                          pid: packet.processPid,
+                          user: packet.processUser,
                       },
                   }
                 : {}),
         })),
+        flows: (tokens.length > 0
+            ? eligibleFlows.filter(flowMatchesFilter)
+            : eligibleFlows
+        )
+            .slice(0, 12)
+            .map((flow) => ({
+                id: flow.id,
+                srcHost: flow.srcHost,
+                dstHost: flow.dstHost,
+                proto: flow.proto,
+                dstPort: flow.dstPort,
+                packetCount: flow.packetCount,
+                bytesTotal: flow.bytesTotal,
+                active: activeFlowIds.has(flow.id),
+                ...(flow.processCommand && flow.processPid && flow.processUser
+                    ? {
+                          process: {
+                              command: flow.processCommand,
+                              pid: flow.processPid,
+                              user: flow.processUser,
+                          },
+                      }
+                    : {}),
+            })),
         anomalies: trafficNetwork.anomalyList.map((anomaly) => ({
             id: anomaly.id,
             timestamp: anomaly.timestamp,
@@ -234,7 +321,12 @@ export function createGraph(): TrafficSnapshot {
             hostId: anomaly.hostId,
             flowId: anomaly.flowId,
         })),
-        events: [...trafficNetwork.events],
+        events:
+            tokens.length > 0
+                ? trafficNetwork.events.filter((event) =>
+                      tokens.every((tok) => event.toLowerCase().includes(tok)),
+                  )
+                : [...trafficNetwork.events],
         totalPackets: trafficNetwork.totalPackets,
         totalBytes: trafficNetwork.totalBytes,
         hostCount: trafficNetwork.hosts.size,
