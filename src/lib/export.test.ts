@@ -266,7 +266,9 @@ describe("download triggers (browser globals)", () => {
                     removeChild() {},
                 };
             } catch {
-                (document as { body?: object }).body = undefined;
+                try {
+                    (document as { body?: object }).body = undefined;
+                } catch {}
             }
         }
         if (typeof document !== "undefined" && typeof URL !== "undefined") {
