@@ -1,6 +1,7 @@
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
 import type {
+    HistoryPlayback,
     Selection,
     SessionLoadProgress,
     TrafficSnapshot,
@@ -33,8 +34,14 @@ type SidebarProps = {
     activeSessionId: string | null;
     sessionLoadProgress: SessionLoadProgress | null;
     sessionsVersion: number;
+    historyPlayback: HistoryPlayback | null;
+    historyBookmarks: Array<{ name: string; offset: number }>;
     onLoadSession: (sessionId: string) => void;
     onReturnToLive: () => void;
+    onSeek: (offset: number) => void;
+    onAddBookmark: (name: string) => void;
+    onRemoveBookmark: (name: string) => void;
+    onJumpToBookmark: (name: string) => void;
     onSelectFlow: (id: string) => void;
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
@@ -49,8 +56,14 @@ export function Sidebar({
     activeSessionId,
     sessionLoadProgress,
     sessionsVersion,
+    historyPlayback,
+    historyBookmarks,
     onLoadSession,
     onReturnToLive,
+    onSeek,
+    onAddBookmark,
+    onRemoveBookmark,
+    onJumpToBookmark,
     onSelectFlow,
     onSelectPacket,
     onNavigateToFlow,
@@ -129,8 +142,14 @@ export function Sidebar({
                 activeSessionId={activeSessionId}
                 sessionLoadProgress={sessionLoadProgress}
                 sessionsVersion={sessionsVersion}
+                historyPlayback={historyPlayback}
+                historyBookmarks={historyBookmarks}
                 onLoadSession={onLoadSession}
                 onReturnToLive={onReturnToLive}
+                onSeek={onSeek}
+                onAddBookmark={onAddBookmark}
+                onRemoveBookmark={onRemoveBookmark}
+                onJumpToBookmark={onJumpToBookmark}
             />
             <section style={{ flexShrink: 0, minWidth: 0 }}>
                 <div style={panelTitleStyle}>Capture Source</div>

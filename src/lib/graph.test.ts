@@ -29,7 +29,7 @@ describe("createGraph", () => {
         trafficNetwork.ingestPacket(
             packet("fresh", "10.0.0.1", "203.0.113.10", 443),
             true,
-            Date.now() - FLOW_STALE_WINDOW_MS + 500,
+            Date.now() - FLOW_STALE_WINDOW_MS + 2000,
         );
 
         const graph = createGraph();
@@ -37,6 +37,7 @@ describe("createGraph", () => {
         expect(graph.edges.map((edge) => edge.id)).toContain(
             "10.0.0.1->203.0.113.10:TCP:443",
         );
+        trafficNetwork.reset();
     });
 
     test("hides live flows after the stale window", () => {
@@ -53,6 +54,7 @@ describe("createGraph", () => {
         expect(graph.edges.map((edge) => edge.id)).not.toContain(
             "10.0.0.1->203.0.113.20:TCP:443",
         );
+        trafficNetwork.reset();
     });
 
     test("does not apply live stale filtering to history sessions", () => {
@@ -70,5 +72,6 @@ describe("createGraph", () => {
         expect(graph.edges.map((edge) => edge.id)).toContain(
             "10.0.0.1->203.0.113.30:TCP:443",
         );
+        trafficNetwork.reset();
     });
 });

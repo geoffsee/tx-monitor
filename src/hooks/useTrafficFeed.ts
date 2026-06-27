@@ -3,16 +3,58 @@ import {
     fetchSession,
     fetchSessionPackets,
     SESSION_PAGE_SIZE,
+    type StoredPacketRow,
 } from "../lib/api";
 import { createGraph } from "../lib/graph";
 import type { ParsedPacket } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type {
+    HistoryPlayback,
     SessionLoadProgress,
     TrafficSnapshot,
     TrafficViewMode,
 } from "../types";
 import { resolveWsUrl } from "../ws";
+
+const BOOKMARKS_KEY_PREFIX = "txmon-bookmarks-";
+
+function loadBookmarksForSession(
+    sessionId: string,
+): Array<{ name: string; offset: number }> {
+    try {
+        const raw = localStorage.getItem(BOOKMARKS_KEY_PREFIX + sessionId);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            return parsed.filter(
+                (b: unknown): b is { name: string; offset: number } =>
+                    typeof b === "object" &&
+                    b !== null &&
+                    "name" in b &&
+                    "offset" in b &&
+                    typeof (b as { name: unknown }).name === "string" &&
+                    typeof (b as { offset: unknown }).offset === "number",
+            );
+        }
+    } catch {
+        // ignore storage errors
+    }
+    return [];
+}
+
+function saveBookmarksForSession(
+    sessionId: string,
+    bms: Array<{ name: string; offset: number }>,
+) {
+    try {
+        localStorage.setItem(
+            BOOKMARKS_KEY_PREFIX + sessionId,
+            JSON.stringify(bms),
+        );
+    } catch {
+        // ignore storage errors
+    }
+}
 
 const FLUSH_INTERVAL_MS = 80;
 const MAX_INGEST_PER_FLUSH = 1000;
@@ -25,9 +67,15 @@ export type TrafficFeedState = {
     activeSessionId: string | null;
     sessionLoadProgress: SessionLoadProgress | null;
     sessionsVersion: number;
+    historyPlayback: HistoryPlayback | null;
+    historyBookmarks: Array<{ name: string; offset: number }>;
     loadSession: (sessionId: string) => Promise<void>;
     returnToLive: () => void;
     refreshSessions: () => void;
+    seekTo: (offset: number) => void;
+    addBookmark: (name: string) => void;
+    removeBookmark: (name: string) => void;
+    jumpToBookmark: (name: string) => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -37,11 +85,20 @@ export function useTrafficFeed(): TrafficFeedState {
     const [sessionLoadProgress, setSessionLoadProgress] =
         useState<SessionLoadProgress | null>(null);
     const [sessionsVersion, setSessionsVersion] = useState(0);
+    const [historyPlayback, setHistoryPlayback] =
+        useState<HistoryPlayback | null>(null);
+    const [historyBookmarks, setHistoryBookmarks] = useState<
+        Array<{ name: string; offset: number }>
+    >([]);
     const graphRafRef = useRef<number | null>(null);
     const graphTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasDisplayedPacketsRef = useRef(false);
     const livePausedRef = useRef(false);
     const loadAbortRef = useRef(0);
+    const historyPacketsRef = useRef<StoredPacketRow[]>([]);
+    const historyBookmarksRef = useRef<Array<{ name: string; offset: number }>>(
+        [],
+    );
 
     const publishGraph = useCallback(() => {
         if (graphRafRef.current !== null) {
@@ -67,6 +124,10 @@ export function useTrafficFeed(): TrafficFeedState {
         setSessionLoadProgress(null);
         setActiveSessionId(null);
         setViewMode("live");
+        historyPacketsRef.current = [];
+        setHistoryPlayback(null);
+        historyBookmarksRef.current = [];
+        setHistoryBookmarks([]);
         trafficNetwork.reset();
         publishGraph();
         refreshSessions();
@@ -80,6 +141,10 @@ export function useTrafficFeed(): TrafficFeedState {
             setActiveSessionId(sessionId);
             setViewMode("history");
             setSessionLoadProgress({ loaded: 0, total: 0 });
+            historyPacketsRef.current = [];
+            setHistoryPlayback(null);
+            historyBookmarksRef.current = [];
+            setHistoryBookmarks([]);
             trafficNetwork.reset();
             publishGraph();
 
@@ -102,6 +167,7 @@ export function useTrafficFeed(): TrafficFeedState {
                 });
                 publishGraph();
 
+                const collected: StoredPacketRow[] = [];
                 let offset = 0;
                 while (offset < session.totalPackets) {
                     if (loadAbortRef.current !== loadId) {
@@ -116,6 +182,8 @@ export function useTrafficFeed(): TrafficFeedState {
                     if (batch.length === 0) {
                         break;
                     }
+
+                    collected.push(...batch);
 
                     for (
                         let index = 0;
@@ -142,6 +210,20 @@ export function useTrafficFeed(): TrafficFeedState {
                     return;
                 }
 
+                historyPacketsRef.current = collected;
+                const startTime = collected[0]?.timestamp;
+                const endTime = collected[collected.length - 1]?.timestamp;
+                setHistoryPlayback({
+                    offset: collected.length,
+                    total: collected.length,
+                    label: session.label,
+                    ...(startTime ? { startTime } : {}),
+                    ...(endTime ? { endTime } : {}),
+                });
+                const bms = loadBookmarksForSession(sessionId);
+                historyBookmarksRef.current = bms;
+                setHistoryBookmarks(bms);
+
                 trafficNetwork.remember(
                     `Loaded session · ${session.totalPackets.toLocaleString()} packets`,
                 );
@@ -162,6 +244,86 @@ export function useTrafficFeed(): TrafficFeedState {
             }
         },
         [publishGraph, refreshSessions],
+    );
+
+    const seekTo = useCallback(
+        (targetOffset: number) => {
+            if (viewMode !== "history" || !activeSessionId) {
+                return;
+            }
+            const packets = historyPacketsRef.current;
+            if (packets.length === 0) {
+                return;
+            }
+            const clamped = Math.max(
+                0,
+                Math.min(Math.floor(targetOffset), packets.length),
+            );
+            trafficNetwork.resetData();
+            if (clamped > 0) {
+                const prefix = packets.slice(0, clamped);
+                for (
+                    let index = 0;
+                    index < prefix.length;
+                    index += HISTORY_INGEST_CHUNK
+                ) {
+                    trafficNetwork.ingestHistoricalBatch(
+                        prefix.slice(index, index + HISTORY_INGEST_CHUNK),
+                    );
+                }
+            }
+            setHistoryPlayback((prev) =>
+                prev ? { ...prev, offset: clamped } : null,
+            );
+            publishGraph();
+        },
+        [viewMode, activeSessionId, publishGraph],
+    );
+
+    const addBookmark = useCallback(
+        (name: string) => {
+            const trimmed = name.trim();
+            if (!trimmed || !activeSessionId || !historyPlayback) {
+                return;
+            }
+            const currentOffset = historyPlayback.offset;
+            const existing = historyBookmarksRef.current.filter(
+                (b) => b.name !== trimmed,
+            );
+            const updated = [
+                ...existing,
+                { name: trimmed, offset: currentOffset },
+            ].sort((a, b) => a.offset - b.offset);
+            historyBookmarksRef.current = updated;
+            setHistoryBookmarks(updated);
+            saveBookmarksForSession(activeSessionId, updated);
+        },
+        [activeSessionId, historyPlayback],
+    );
+
+    const removeBookmark = useCallback(
+        (name: string) => {
+            if (!activeSessionId) {
+                return;
+            }
+            const updated = historyBookmarksRef.current.filter(
+                (b) => b.name !== name,
+            );
+            historyBookmarksRef.current = updated;
+            setHistoryBookmarks(updated);
+            saveBookmarksForSession(activeSessionId, updated);
+        },
+        [activeSessionId],
+    );
+
+    const jumpToBookmark = useCallback(
+        (name: string) => {
+            const bm = historyBookmarksRef.current.find((b) => b.name === name);
+            if (bm) {
+                seekTo(bm.offset);
+            }
+        },
+        [seekTo],
     );
 
     useEffect(() => {
@@ -318,8 +480,14 @@ export function useTrafficFeed(): TrafficFeedState {
         activeSessionId,
         sessionLoadProgress,
         sessionsVersion,
+        historyPlayback,
+        historyBookmarks,
         loadSession,
         returnToLive,
         refreshSessions,
+        seekTo,
+        addBookmark,
+        removeBookmark,
+        jumpToBookmark,
     };
 }
