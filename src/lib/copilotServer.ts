@@ -299,7 +299,7 @@ export async function askCopilotWithCodex(
         const result = await thread.run(buildCodexCopilotPrompt(params), {
             signal: controller.signal,
         });
-        const answer = result.finalResponse.trim();
+        const answer = (result.finalResponse ?? "").trim();
 
         if (!answer) {
             throw new Error("Codex returned an empty response.");
