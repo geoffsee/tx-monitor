@@ -25,7 +25,7 @@ function packet(
 }
 
 describe("createGraph", () => {
-    beforeEach(trafficNetwork.reset);
+    beforeEach(() => trafficNetwork.reset());
     test("keeps live flows visible through the stale window", () => {
         trafficNetwork.reset();
 
