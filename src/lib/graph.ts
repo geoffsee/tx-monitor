@@ -96,7 +96,7 @@ function itemMatchesFilter(
         .filter((f) => f != null)
         .map((f) => String(f).toLowerCase())
         .join(" ");
-    return tokens.every((tok) => hay.includes(tok));
+    return tokens.every((tok) => new RegExp(`\\b${tok}`).test(hay));
 }
 
 export function createGraph(filter?: string): TrafficSnapshot {
