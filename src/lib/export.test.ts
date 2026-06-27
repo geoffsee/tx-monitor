@@ -329,7 +329,8 @@ describe("download triggers (browser globals)", () => {
             document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
-            typeof document.createElement("a")?.click !== "function"
+            typeof document.createElement("a")?.click !== "function" ||
+            !origCreateObjectURL
         ) {
             return;
         }
@@ -350,7 +351,8 @@ describe("download triggers (browser globals)", () => {
             document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
-            typeof document.createElement("a")?.click !== "function"
+            typeof document.createElement("a")?.click !== "function" ||
+            !origCreateObjectURL
         ) {
             return;
         }
