@@ -13,6 +13,7 @@ import {
     createMessage,
 } from "../lib/copilot";
 import { askCopilot } from "../lib/copilotClient";
+import { setCopilotMessages } from "../lib/copilotThread";
 import type { Selection, TrafficSnapshot } from "../types";
 import {
     anomalyBadgeStyle,
@@ -51,6 +52,10 @@ export function CopilotSidebar({
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
+
+    useEffect(() => {
+        setCopilotMessages(messages);
+    }, [messages]);
 
     const submitPrompt = useCallback(
         async (prompt: string) => {

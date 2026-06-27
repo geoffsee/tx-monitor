@@ -1,4 +1,11 @@
 import { formatBytes } from "../layout";
+import { getCopilotMessages } from "../lib/copilotThread";
+import {
+    buildExportPayload,
+    exportAsJson,
+    exportFlowsCsv,
+    exportPacketsCsv,
+} from "../lib/export";
 import { isRowSelected } from "../lib/selection";
 import type {
     Selection,
@@ -63,6 +70,39 @@ export function Sidebar({
               ? "Live"
               : "Offline";
 
+    const handleExportJson = () => {
+        const copilotMessages = getCopilotMessages();
+        const payload = buildExportPayload(graph, selection, {
+            includeCopilot: copilotMessages.length > 1,
+            copilotMessages,
+            activeSessionId,
+            viewMode,
+        });
+        exportAsJson(payload);
+    };
+
+    const handleExportPacketsCsv = () => {
+        const payload = buildExportPayload(graph, selection, {
+            activeSessionId,
+            viewMode,
+        });
+        exportPacketsCsv(payload.packets, {
+            sourceLabel: graph.sourceLabel,
+            exportedAt: payload.session.exportedAt,
+        });
+    };
+
+    const handleExportFlowsCsv = () => {
+        const payload = buildExportPayload(graph, selection, {
+            activeSessionId,
+            viewMode,
+        });
+        exportFlowsCsv(payload.flows, {
+            sourceLabel: graph.sourceLabel,
+            exportedAt: payload.session.exportedAt,
+        });
+    };
+
     return (
         <aside
             style={{
@@ -115,6 +155,82 @@ export function Sidebar({
                     <div style={summaryValueStyle}>
                         {formatBytes(graph.totalBytes)}
                     </div>
+                </div>
+            </section>
+            <section style={{ flexShrink: 0, minWidth: 0 }}>
+                <div style={panelTitleStyle}>Export</div>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 6,
+                        marginTop: 6,
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={handleExportJson}
+                        style={{
+                            ...denseSubtleStyle,
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: "1px solid #33414a",
+                            background: "#101d26",
+                            color: "#d9e6ec",
+                            cursor: "pointer",
+                            font: "inherit",
+                            fontSize: 11,
+                        }}
+                        title="Export current view as JSON (includes copilot thread if active)"
+                    >
+                        JSON
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleExportPacketsCsv}
+                        disabled={graph.packets.length === 0}
+                        style={{
+                            ...denseSubtleStyle,
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: "1px solid #33414a",
+                            background: "#101d26",
+                            color: "#d9e6ec",
+                            cursor:
+                                graph.packets.length === 0
+                                    ? "default"
+                                    : "pointer",
+                            font: "inherit",
+                            fontSize: 11,
+                            opacity: graph.packets.length === 0 ? 0.5 : 1,
+                        }}
+                        title="Export packet rows as CSV"
+                    >
+                        CSV Packets
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleExportFlowsCsv}
+                        disabled={graph.flows.length === 0}
+                        style={{
+                            ...denseSubtleStyle,
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: "1px solid #33414a",
+                            background: "#101d26",
+                            color: "#d9e6ec",
+                            cursor:
+                                graph.flows.length === 0
+                                    ? "default"
+                                    : "pointer",
+                            font: "inherit",
+                            fontSize: 11,
+                            opacity: graph.flows.length === 0 ? 0.5 : 1,
+                        }}
+                        title="Export flow rows as CSV"
+                    >
+                        CSV Flows
+                    </button>
                 </div>
             </section>
             {selection ? (
