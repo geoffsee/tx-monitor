@@ -1,6 +1,6 @@
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
-import { formatService, type PacketProto } from "../lib/tcpdumpParser";
+import { formatService } from "../lib/tcpdumpParser";
 import type {
     Selection,
     SessionLoadProgress,
@@ -206,7 +206,7 @@ export function Sidebar({
                                         >
                                             {formatService(
                                                 flow.dstPort,
-                                                flow.proto as PacketProto,
+                                                flow.proto,
                                             )}{" "}
                                             · {flow.packetCount} pkts ·{" "}
                                             {formatBytes(flow.bytesTotal)}

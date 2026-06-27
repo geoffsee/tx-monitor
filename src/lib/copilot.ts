@@ -1,6 +1,6 @@
 import { formatBytes } from "../layout";
 import type { Selection, TrafficSnapshot } from "../types";
-import { formatService, type PacketProto } from "./tcpdumpParser";
+import { formatService } from "./tcpdumpParser";
 
 export type CopilotMessage = {
     id: string;
@@ -96,7 +96,7 @@ function describeSelectionContext(
         return {
             kind: "flow",
             ...flow,
-            service: formatService(flow.dstPort, flow.proto as PacketProto),
+            service: formatService(flow.dstPort, flow.proto),
         };
     }
 
@@ -135,7 +135,7 @@ export function buildCopilotContext(
             dstHost: flow.dstHost,
             proto: flow.proto,
             dstPort: flow.dstPort,
-            service: formatService(flow.dstPort, flow.proto as PacketProto),
+            service: formatService(flow.dstPort, flow.proto),
             packetCount: flow.packetCount,
             bytesTotal: flow.bytesTotal,
             bytesTotalLabel: formatBytes(flow.bytesTotal),

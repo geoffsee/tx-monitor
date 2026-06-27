@@ -4,7 +4,7 @@ import {
     formatBytes,
     protoColor,
 } from "../layout";
-import { formatService, type PacketProto } from "../lib/tcpdumpParser";
+import { formatService } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type { HostCategory, Selection } from "../types";
 import {
@@ -146,7 +146,7 @@ export function DetailPanel({
                                     >
                                         {formatService(
                                             flow.dstPort,
-                                            flow.proto as PacketProto,
+                                            flow.proto,
                                         )}
                                         {flow.processCommand
                                             ? ` · ${flow.processCommand}`
@@ -233,7 +233,7 @@ export function DetailPanel({
                                 : flow.proto
                         }
                     >
-                        {formatService(flow.dstPort, flow.proto as PacketProto)}
+                        {formatService(flow.dstPort, flow.proto)}
                     </div>
                     <div style={statusBadgeStyle(active)}>
                         {active ? "active" : "idle"}
@@ -285,12 +285,12 @@ export function DetailPanel({
                                     >
                                         {formatService(
                                             packet.srcPort ?? null,
-                                            packet.proto as PacketProto,
+                                            packet.proto,
                                         )}{" "}
                                         →{" "}
                                         {formatService(
                                             packet.dstPort ?? null,
-                                            packet.proto as PacketProto,
+                                            packet.proto,
                                         )}{" "}
                                         · {packet.info || "No payload summary"}
                                     </div>
