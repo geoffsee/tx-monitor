@@ -301,6 +301,7 @@ describe("download triggers (browser globals)", () => {
     test("exportAsJson triggers a json download", () => {
         if (
             typeof document === "undefined" ||
+            document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
             typeof document.createElement("a")?.click !== "function"
@@ -320,6 +321,7 @@ describe("download triggers (browser globals)", () => {
     test("exportPacketsCsv triggers a csv download", () => {
         if (
             typeof document === "undefined" ||
+            document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
             typeof document.createElement("a")?.click !== "function"
@@ -340,6 +342,7 @@ describe("download triggers (browser globals)", () => {
     test("exportFlowsCsv triggers a csv download", () => {
         if (
             typeof document === "undefined" ||
+            document === null ||
             typeof document.createElement !== "function" ||
             !document?.body ||
             typeof document.createElement("a")?.click !== "function"
