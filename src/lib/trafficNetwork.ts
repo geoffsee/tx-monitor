@@ -2,6 +2,10 @@ import type { SnapshotIn } from "mobx-state-tree";
 import { types } from "mobx-state-tree";
 import { hostCategory, type ParsedPacket, shortHost } from "./tcpdumpParser";
 
+export const MAX_MEMORY_HOSTS = 500;
+export const MAX_MEMORY_FLOWS = 2000;
+export const MAX_MEMORY_PACKETS = 80;
+
 const HostModel = types.model("Host", {
     id: types.identifier,
     address: types.string,
@@ -143,6 +147,59 @@ const TrafficNetworkModel = types
             }
         };
 
+        const pruneOrphanFlows = () => {
+            const toDelete: string[] = [];
+            for (const flow of self.flows.values()) {
+                if (
+                    !self.hosts.has(flow.srcHost) ||
+                    !self.hosts.has(flow.dstHost)
+                ) {
+                    toDelete.push(flow.id);
+                }
+            }
+            for (const id of toDelete) {
+                self.flows.delete(id);
+            }
+        };
+
+        const pruneHosts = () => {
+            if (self.hosts.size <= MAX_MEMORY_HOSTS) {
+                return;
+            }
+            const excess = self.hosts.size - MAX_MEMORY_HOSTS;
+            const sorted = Array.from(self.hosts.values()).sort((a, b) => {
+                if (a.packetCount !== b.packetCount)
+                    return a.packetCount - b.packetCount;
+                return a.id.localeCompare(b.id);
+            });
+            for (let i = 0; i < excess; i++) {
+                const victim = sorted[i];
+                if (victim) {
+                    self.hosts.delete(victim.id);
+                }
+            }
+            pruneOrphanFlows();
+        };
+
+        const pruneFlows = () => {
+            if (self.flows.size <= MAX_MEMORY_FLOWS) {
+                return;
+            }
+            const excess = self.flows.size - MAX_MEMORY_FLOWS;
+            const sorted = Array.from(self.flows.values()).sort((a, b) => {
+                if (a.packetCount !== b.packetCount)
+                    return a.packetCount - b.packetCount;
+                if (a.lastSeen !== b.lastSeen) return a.lastSeen - b.lastSeen;
+                return a.id.localeCompare(b.id);
+            });
+            for (let i = 0; i < excess; i++) {
+                const victim = sorted[i];
+                if (victim) {
+                    self.flows.delete(victim.id);
+                }
+            }
+        };
+
         const ensureHost = (address: string, quiet = false) => {
             const existing = self.hosts.get(address);
             if (existing) {
@@ -178,6 +235,10 @@ const TrafficNetworkModel = types
             dst.packetCount += 1;
             dst.bytesTotal += packet.length;
 
+            // prune after count bumps so newly added hosts (now >=1) are not
+            // immediate prune victims; keeps returned refs live for this action
+            pruneHosts();
+
             const key = flowKey(packet);
             const existingFlow = self.flows.get(key);
             let flow: typeof FlowModel.Type;
@@ -198,6 +259,7 @@ const TrafficNetworkModel = types
                     lastSeen: seenAt,
                 });
                 self.flows.set(key, flow);
+                pruneFlows();
             }
 
             detectAnomalies(packet, flow);
@@ -228,7 +290,7 @@ const TrafficNetworkModel = types
                     : {}),
             };
             self.packets.unshift(snapshot);
-            if (self.packets.length > 80) {
+            if (self.packets.length > MAX_MEMORY_PACKETS) {
                 self.packets.pop();
             }
 

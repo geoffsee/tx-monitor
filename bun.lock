@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "harness-0",
+      "name": "tx-monitor",
       "dependencies": {
         "@openai/codex-sdk": "^0.139.0",
         "@xyflow/react": "^12.10.2",
