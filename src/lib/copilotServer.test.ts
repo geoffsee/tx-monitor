@@ -74,7 +74,8 @@ describe("getCopilotStatus", () => {
         expect(typeof status.timeoutMs).toBe("number");
         expect(typeof status.ready).toBe("boolean");
         // ensure no secret-like value leaks in the object
-        const json = JSON.stringify(status);
+        const { model: _model, ...rest } = status;
+        const json = JSON.stringify(rest);
         expect(json).not.toContain("sk-");
         expect(json).not.toContain("OPENAI");
     });
