@@ -17,7 +17,8 @@ import { trafficNetwork } from "./trafficNetwork";
 
 export const MAX_GRAPH_HOSTS = 18;
 export const MAX_GRAPH_FLOWS = 48;
-export const MAX_FEED_PACKETS = 10;
+export const MAX_FEED_PACKETS = 30;
+export const MAX_SNAPSHOT_FLOWS = 64;
 export const FLOW_ACTIVE_WINDOW_MS = 2500;
 export const FLOW_STALE_WINDOW_MS = 12000;
 
@@ -206,25 +207,29 @@ export function createGraph(): TrafficSnapshot {
                       }
                     : {}),
             })),
-        flows: trafficNetwork.flowList.slice(0, 12).map((flow) => ({
-            id: flow.id,
-            srcHost: flow.srcHost,
-            dstHost: flow.dstHost,
-            proto: flow.proto,
-            dstPort: flow.dstPort,
-            packetCount: flow.packetCount,
-            bytesTotal: flow.bytesTotal,
-            active: activeFlowIds.has(flow.id),
-            ...(flow.processCommand && flow.processPid && flow.processUser
-                ? {
-                      process: {
-                          command: flow.processCommand,
-                          pid: flow.processPid,
-                          user: flow.processUser,
-                      },
-                  }
-                : {}),
-        })),
+        // Provide a larger window of recent flows for sidebar lists (virtualized
+        // to keep DOM bounded even when many flows present under the model cap).
+        flows: trafficNetwork.flowList
+            .slice(0, MAX_SNAPSHOT_FLOWS)
+            .map((flow) => ({
+                id: flow.id,
+                srcHost: flow.srcHost,
+                dstHost: flow.dstHost,
+                proto: flow.proto,
+                dstPort: flow.dstPort,
+                packetCount: flow.packetCount,
+                bytesTotal: flow.bytesTotal,
+                active: activeFlowIds.has(flow.id),
+                ...(flow.processCommand && flow.processPid && flow.processUser
+                    ? {
+                          process: {
+                              command: flow.processCommand,
+                              pid: flow.processPid,
+                              user: flow.processUser,
+                          },
+                      }
+                    : {}),
+            })),
         anomalies: trafficNetwork.anomalyList.map((anomaly) => ({
             id: anomaly.id,
             timestamp: anomaly.timestamp,
