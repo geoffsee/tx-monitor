@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Codex, type ThreadOptions } from "@openai/codex-sdk";
+import { resolveCodexModel, resolveCodexTimeoutMs } from "./config";
 import {
     COPILOT_SYSTEM_PROMPT,
     type CopilotChatMessage,
@@ -10,14 +11,6 @@ import {
 } from "./copilot";
 import { loadClientSecrets } from "./secrets";
 
-const parsedCodexTimeoutMs = Number.parseInt(
-    process.env.TXMON_CODEX_TIMEOUT_MS ?? "120000",
-    10,
-);
-const CODEX_TIMEOUT_MS = Number.isFinite(parsedCodexTimeoutMs)
-    ? parsedCodexTimeoutMs
-    : 120000;
-const CODEX_MODEL = process.env.TXMON_CODEX_MODEL?.trim() || "gpt-5.5";
 const CODEX_AUTH_MODE =
     process.env.TXMON_CODEX_AUTH?.trim() === "api-key" ? "api-key" : "local";
 const COPILOT_LOG_PREFIX = "[copilot]";
@@ -121,8 +114,9 @@ Return only the concise answer for the user.`;
 }
 
 function createThreadOptions(workingDirectory: string): ThreadOptions {
+    const model = resolveCodexModel();
     return {
-        ...(CODEX_MODEL ? { model: CODEX_MODEL } : {}),
+        ...(model ? { model } : {}),
         workingDirectory,
         skipGitRepoCheck: true,
         sandboxMode: "read-only",
@@ -183,15 +177,16 @@ export async function askCopilotWithCodex(
     const contextJson = JSON.stringify(params.context);
     const workingDirectory = await mkdtemp(join(tmpdir(), "txmon-codex-"));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CODEX_TIMEOUT_MS);
+    const timeoutMs = resolveCodexTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
         const { codex, authSource } = createCodexClient();
         logCopilot(requestId, "start", {
-            model: CODEX_MODEL,
+            model: resolveCodexModel(),
             authMode: CODEX_AUTH_MODE,
             authSource,
-            timeoutMs: CODEX_TIMEOUT_MS,
+            timeoutMs: resolveCodexTimeoutMs(),
             promptChars: prompt.length,
             historyMessages: params.history.length,
             contextChars: contextJson.length,
@@ -228,7 +223,7 @@ export async function askCopilotWithCodex(
         if (controller.signal.aborted) {
             warnCopilot(requestId, "timeout", {
                 durationMs: Math.round(performance.now() - startedAt),
-                timeoutMs: CODEX_TIMEOUT_MS,
+                timeoutMs: resolveCodexTimeoutMs(),
             });
             throw new Error("Codex copilot request timed out.");
         }

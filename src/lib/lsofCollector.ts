@@ -1,3 +1,4 @@
+import { resolveLsofDisabled, resolveLsofIntervalMs } from "./config";
 import {
     normalizeHost,
     type ProcessInfo,
@@ -127,18 +128,14 @@ export async function refreshSocketTable(): Promise<SocketTable> {
 }
 
 export function isLsofEnabled(): boolean {
-    if (process.env.TXMON_LSOF_DISABLE === "1") {
+    if (resolveLsofDisabled()) {
         return false;
     }
     return process.platform === "darwin" || process.platform === "linux";
 }
 
 export function lsofPollIntervalMs(): number {
-    const parsed = Number.parseInt(
-        process.env.TXMON_LSOF_INTERVAL_MS ?? "1500",
-        10,
-    );
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1500;
+    return resolveLsofIntervalMs();
 }
 
 export { normalizeHost };
