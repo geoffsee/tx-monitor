@@ -163,7 +163,8 @@ test("detects high DNS volume and broad DNS targets at high sensitivity", () => 
     trafficNetwork.reset();
     trafficNetwork.setSensitivity("high");
 
-    // Generate many DNS packets to distinct targets to trigger both
+    // Generate many DNS packets to distinct targets to trigger both (synthetic times)
+    const baseTime = 1_000_000;
     for (let i = 0; i < 20; i++) {
         const pkt: ParsedPacket = {
             id: `d${i}`,
@@ -176,7 +177,7 @@ test("detects high DNS volume and broad DNS targets at high sensitivity", () => 
             length: 60,
             info: "DNS",
         };
-        trafficNetwork.ingestPacket(pkt);
+        trafficNetwork.ingestPacket(pkt, false, baseTime + i * 10);
     }
 
     const types = trafficNetwork.anomalyList.map((a) => a.type);
