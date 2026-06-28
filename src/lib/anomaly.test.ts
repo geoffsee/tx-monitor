@@ -1,6 +1,10 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import type { ParsedPacket } from "./tcpdumpParser";
 import { trafficNetwork } from "./trafficNetwork";
+
+beforeEach(() => {
+    trafficNetwork.reset();
+});
 
 test("identifies large flow anomaly", () => {
     trafficNetwork.reset();
