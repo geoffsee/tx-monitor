@@ -15,6 +15,8 @@ export default function App() {
         sessionsVersion,
         loadSession,
         returnToLive,
+        sensitivity,
+        setSensitivity,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
@@ -76,6 +78,8 @@ export default function App() {
                     graph={graph}
                     selection={selection}
                     isCompact={isCompact}
+                    sensitivity={sensitivity}
+                    onSetSensitivity={setSensitivity}
                 />
                 <TrafficGraph
                     graph={graph}
