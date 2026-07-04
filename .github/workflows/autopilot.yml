@@ -59,6 +59,11 @@ jobs:
           GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
         run: bash scripts/restore-grok-credentials.sh
 
+      - name: Verify Grok OAuth and model
+        env:
+          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
+        run: bash scripts/verify-grok-auth.sh
+
       - id: caretta
         uses: geoffsee/caretta-autopilot-action@main
         with:
