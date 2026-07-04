@@ -77,8 +77,6 @@ jobs:
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          RUST_LOG: info
 
       - name: Autopilot diagnostics
         if: always()
