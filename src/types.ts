@@ -94,5 +94,10 @@ export type TrafficSnapshot = {
     flowCount: number;
     connected: boolean;
     sourceLabel: string;
+    capture: {
+        iface: string;
+        direction: string;
+        bpf: string;
+    };
     sensitivity: "low" | "medium" | "high";
 };

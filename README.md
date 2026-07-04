@@ -72,7 +72,7 @@ Open [http://localhost:3001](http://localhost:3001). The compiled server embeds 
 ## Server Options
 
 ```bash
-bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db]
+bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db] [--iface <name>] [--direction <dir>] [--bpf <expr>]
 ```
 
 | Flag | Description |
@@ -82,6 +82,11 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `--serve` | Serve the built frontend from `dist/` |
 | `--db <path>` | SQLite database path for packet persistence (default: `~/.tx-monitor`) |
 | `--no-db` | Disable SQLite persistence |
+| `--iface <name>` | Live capture interface (default: `any`) |
+| `--direction <dir>` | Live capture direction: `in`, `out`, or `inout` (default: `out`) |
+| `--bpf <expr>` | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53` |
+
+Capture params (iface, direction, effective command, BPF) are surfaced in UI "Capture Source", status updates, and server logs. Controls in the sidebar let you change them at runtime for live capture (restarts subprocess cleanly) and apply basic BPF to file replays without full server restart. Session continuity preserved on live param changes.
 
 ## Environment Variables
 
@@ -95,6 +100,10 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
 | `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
 | `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
+| `TXMON_IFACE` | `any` | Default live capture interface (overridden by --iface) |
+| `TXMON_DIRECTION` | `out` | Default live capture direction |
+| `TXMON_BPF` | (none) | Default BPF filter expression |
+| `TXMON_TCPDUMP_ARGS` | (none) | Full custom tcpdump command (initial only; e.g. "tcpdump -i eth0 ...") |
 
 ## Persistence
 

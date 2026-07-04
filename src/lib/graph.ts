@@ -246,6 +246,11 @@ export function createGraph(): TrafficSnapshot {
         flowCount: trafficNetwork.flows.size,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,
+        capture: {
+            iface: trafficNetwork.captureIface,
+            direction: trafficNetwork.captureDirection,
+            bpf: trafficNetwork.captureBpf,
+        },
         sensitivity:
             (trafficNetwork.sensitivity as "low" | "medium" | "high") ??
             "medium",

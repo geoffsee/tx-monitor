@@ -31,21 +31,6 @@ import {
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
 const DEFAULT_DB = join(homedir(), ".tx-monitor");
 
-function resolveTcpdumpCommand(): string[] {
-    const envArgs = process.env.TXMON_TCPDUMP_ARGS?.trim();
-    if (envArgs) {
-        const parts = envArgs.split(/\s+/);
-        return parts[0] === "sudo" || process.getuid?.() === 0
-            ? parts
-            : ["sudo", ...parts];
-    }
-
-    const args = ["tcpdump", "-i", "any", "-Q", "out", "-nn", "-vv", "-l"];
-    return process.getuid?.() === 0 ? args : ["sudo", ...args];
-}
-
-const TCPDUMP_COMMAND = resolveTcpdumpCommand();
-const TCPDUMP_LABEL = TCPDUMP_COMMAND.join(" ");
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
@@ -92,10 +77,32 @@ const { values } = parseArgs({
         serve: { type: "boolean", default: false },
         db: { type: "string" },
         "no-db": { type: "boolean", default: false },
+        iface: { type: "string" },
+        direction: { type: "string" },
+        bpf: { type: "string" },
+        help: { type: "boolean", default: false },
     },
     strict: true,
     allowPositionals: false,
 });
+
+if (values.help) {
+    console.log(
+        "Usage: bun run src/server.ts [options]\n\n" +
+            "Options:\n" +
+            "  --file <path>     Replay from tcpdump log instead of live\n" +
+            "  --port <port>     Listen port (default 3001)\n" +
+            "  --serve           Serve built dist/\n" +
+            "  --db <path>       DB path (default ~/.tx-monitor)\n" +
+            "  --no-db           Disable persistence\n" +
+            "  --iface <name>    Capture interface (default any)\n" +
+            "  --direction <d>   Capture direction in|out|inout (default out)\n" +
+            "  --bpf <expr>      BPF filter (e.g. 'host 1.2.3.4 or port 53')\n" +
+            "  --help            Show help\n\n" +
+            "Env: TXMON_IFACE, TXMON_DIRECTION, TXMON_BPF, TXMON_TCPDUMP_ARGS (full override)",
+    );
+    process.exit(0);
+}
 
 const filePath = values.file;
 const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
@@ -114,6 +121,159 @@ const store = dbPath
     : null;
 const clients = new Set<WsClient>();
 let captureStarted = false;
+
+// Capture control state (iface, direction, BPF) with CLI/env init + runtime updates
+const cliIface =
+    (values.iface as string | undefined) ?? process.env.TXMON_IFACE;
+const cliDirection =
+    (values.direction as string | undefined) ?? process.env.TXMON_DIRECTION;
+const cliBpf = (values.bpf as string | undefined) ?? process.env.TXMON_BPF;
+let captureIface = cliIface ?? "any";
+let captureDirection = cliDirection ?? "out";
+let captureBpf = cliBpf ?? "";
+const activeFilePath: string | null = filePath ?? null;
+let useFullOverride = false;
+const tcpdumpFullOverride = process.env.TXMON_TCPDUMP_ARGS?.trim() ?? null;
+if (tcpdumpFullOverride) {
+    useFullOverride = true;
+    const iM = tcpdumpFullOverride.match(/-i\s+(\S+)/);
+    if (iM?.[1]) captureIface = iM[1];
+    const qM = tcpdumpFullOverride.match(/-Q\s+(\S+)/);
+    if (qM?.[1]) captureDirection = qM[1];
+    // crude tail for bpf after standard flags
+    const tail = tcpdumpFullOverride
+        .replace(/^(\s*sudo\s+)?\s*tcpdump\s+/, "")
+        .replace(/\s*(-i\s+\S+|-Q\s+\S+|-nn|-vv|-l)\s*/g, " ")
+        .trim();
+    if (tail && !tail.startsWith("-")) {
+        captureBpf = tail;
+    }
+}
+
+let liveProc: ReturnType<typeof Bun.spawn> | null = null;
+let captureGeneration = 0;
+
+function getLiveCommand(): string[] {
+    if (useFullOverride && tcpdumpFullOverride) {
+        const parts = tcpdumpFullOverride.split(/\s+/);
+        return parts[0] === "sudo" || process.getuid?.() === 0
+            ? parts
+            : ["sudo", ...parts];
+    }
+    const base = [
+        "tcpdump",
+        "-i",
+        captureIface,
+        "-Q",
+        captureDirection,
+        "-nn",
+        "-vv",
+        "-l",
+    ];
+    const b = captureBpf.trim();
+    if (b) {
+        base.push(...b.split(/\s+/));
+    }
+    return process.getuid?.() === 0 ? base : ["sudo", ...base];
+}
+
+function getLiveLabel(): string {
+    return getLiveCommand().join(" ");
+}
+
+function packetMatchesBpf(p: ParsedPacket, expr: string): boolean {
+    const filter = expr.trim();
+    if (!filter) return true;
+    const f = filter.toLowerCase();
+    const sh = p.srcHost.toLowerCase();
+    const dh = p.dstHost.toLowerCase();
+    const sp = p.srcPort != null ? String(p.srcPort) : "";
+    const dp = p.dstPort != null ? String(p.dstPort) : "";
+    const hosts: string[] = [];
+    const ports: string[] = [];
+    const hostRe = /(?:^|[\s(])(?:(src|dst)\s+)?host\s+([^\s)&|]+)/g;
+    for (let m = hostRe.exec(f); m !== null; m = hostRe.exec(f)) {
+        if (m[2]) hosts.push(m[2]);
+    }
+    const portRe = /(?:^|[\s(])(?:(src|dst)\s+)?port\s+([^\s)&|]+)/g;
+    for (let m = portRe.exec(f); m !== null; m = portRe.exec(f)) {
+        if (m[2]) ports.push(m[2]);
+    }
+    if (hosts.length === 0 && ports.length === 0) {
+        const tokens = f
+            .split(/[\s|&()]+/)
+            .filter((t) => t && !["and", "or"].includes(t));
+        for (const t of tokens) {
+            if (t.startsWith("-")) continue;
+            if (/[.:]/.test(t) || /^[0-9a-f]{3,}$/.test(t)) {
+                hosts.push(t);
+            } else if (/^\d+$/.test(t)) {
+                ports.push(t);
+            }
+        }
+    }
+    const hostOk =
+        hosts.length === 0 || hosts.some((h) => sh === h || dh === h);
+    const portOk =
+        ports.length === 0 || ports.some((pt) => sp === pt || dp === pt);
+    return hostOk && portOk;
+}
+
+function shouldIncludePacket(p: ParsedPacket): boolean {
+    return packetMatchesBpf(p, captureBpf);
+}
+
+function applyCaptureUpdate(updates: {
+    iface?: string;
+    direction?: string;
+    bpf?: string;
+}) {
+    let changed = false;
+    if (updates.iface !== undefined) {
+        const v = updates.iface.trim() || "any";
+        if (v !== captureIface) {
+            captureIface = v;
+            changed = true;
+        }
+    }
+    if (updates.direction !== undefined) {
+        const v = updates.direction;
+        if (["in", "out", "inout"].includes(v) && v !== captureDirection) {
+            captureDirection = v;
+            changed = true;
+        }
+    }
+    if (updates.bpf !== undefined) {
+        const v = updates.bpf;
+        if (v !== captureBpf) {
+            captureBpf = v;
+            changed = true;
+        }
+    }
+    if (!changed) return;
+    useFullOverride = false;
+    const newLabel = activeFilePath ? `file ${activeFilePath}` : getLiveLabel();
+    console.log(
+        `Updated capture: iface=${captureIface} dir=${captureDirection} bpf="${captureBpf}"`,
+    );
+    const isLive = !activeFilePath;
+    if (isLive) {
+        captureGeneration += 1;
+        if (liveProc) {
+            try {
+                liveProc.kill();
+            } catch {
+                /* ignore */
+            }
+            liveProc = null;
+        }
+        captureStarted = false;
+        startCapture();
+    }
+    // file mode: BPF filter applies to subsequent parsed packets without restart
+    emitStatus(activeFilePath ? "file" : "live", newLabel);
+}
+
 const PACKET_BATCH_INTERVAL_MS = 50;
 const PACKET_BATCH_MAX = 100;
 let pendingPackets: ParsedPacket[] = [];
@@ -129,7 +289,7 @@ function enrichPacket(packet: ParsedPacket): ParsedPacket {
 }
 
 function startLsofCollector() {
-    if (!isLsofEnabled() || filePath) {
+    if (!isLsofEnabled() || activeFilePath) {
         return;
     }
 
@@ -236,10 +396,17 @@ function emitPacket(packet: ParsedPacket) {
 }
 
 function emitStatus(mode: string, label: string) {
-    broadcast({ type: "status", mode, label });
+    broadcast({
+        type: "status",
+        mode,
+        label,
+        iface: captureIface,
+        direction: captureDirection,
+        bpf: captureBpf,
+    });
 }
 
-async function replayFileOnce(path: string) {
+async function replayFileOnce(path: string, expectedGen = captureGeneration) {
     const resolved = join(process.cwd(), path);
     if (!existsSync(resolved)) {
         throw new Error(`File not found: ${resolved}`);
@@ -264,6 +431,9 @@ async function replayFileOnce(path: string) {
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
+            if (captureGeneration !== expectedGen) {
+                return;
+            }
             const packet = parser.parseLine(line);
             if (!packet) {
                 continue;
@@ -283,30 +453,38 @@ async function replayFileOnce(path: string) {
                     if (delay > 0) {
                         await Bun.sleep(delay);
                     }
+                    if (captureGeneration !== expectedGen) {
+                        return;
+                    }
                 }
                 if (currentTimestamp !== null) {
                     previousTimestamp = currentTimestamp;
                 }
             }
 
-            emitPacket(packet);
+            if (shouldIncludePacket(packet)) {
+                emitPacket(packet);
+            }
         }
     }
 }
 
-async function replayFile(path: string) {
+async function replayFile(path: string, expectedGen = captureGeneration) {
     try {
-        while (clients.size > 0) {
+        while (clients.size > 0 && captureGeneration === expectedGen) {
             ensureCaptureSession("file", `file ${path}`);
             emitStatus("file", `file ${path}`);
-            await replayFileOnce(path);
+            await replayFileOnce(path, expectedGen);
             flushPacketBatch();
             broadcast({ type: "complete" });
             await Bun.sleep(750);
+            if (captureGeneration !== expectedGen) break;
         }
     } finally {
-        endCaptureSession();
-        captureStarted = false;
+        if (captureGeneration === expectedGen) {
+            endCaptureSession();
+            captureStarted = false;
+        }
     }
 }
 
@@ -359,24 +537,35 @@ async function monitorTcpdumpStderr(proc: ReturnType<typeof Bun.spawn>) {
     }
 }
 
-async function streamLiveTcpdump() {
-    ensureCaptureSession("live", TCPDUMP_LABEL);
-    emitStatus("live", TCPDUMP_LABEL);
+async function streamLiveTcpdump(expectedGen = captureGeneration) {
+    const myGen = expectedGen;
+    ensureCaptureSession("live", getLiveLabel());
+    emitStatus("live", getLiveLabel());
     startLsofCollector();
+    let proc: ReturnType<typeof Bun.spawn> | null = null;
     try {
         const parser = new TcpdumpParser();
-        const proc = Bun.spawn({
-            cmd: TCPDUMP_COMMAND,
+        const cmd = getLiveCommand();
+        proc = Bun.spawn({
+            cmd,
             stdout: "pipe",
             stderr: "pipe",
         });
+        liveProc = proc;
         const stderrTask = monitorTcpdumpStderr(proc);
 
-        const reader = proc.stdout.getReader();
+        const reader = (
+            proc.stdout as unknown as {
+                getReader(): ReadableStreamDefaultReader<Uint8Array>;
+            }
+        ).getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
         while (true) {
+            if (captureGeneration !== myGen) {
+                break;
+            }
             const { value, done } = await reader.read();
             if (done) {
                 break;
@@ -387,24 +576,36 @@ async function streamLiveTcpdump() {
             buffer = lines.pop() ?? "";
 
             for (const line of lines) {
+                if (captureGeneration !== myGen) {
+                    break;
+                }
                 const packet = parser.parseLine(line);
-                if (packet) {
+                if (packet && shouldIncludePacket(packet)) {
                     emitPacket(packet);
                 }
             }
         }
 
         await stderrTask;
-        const exitCode = await proc.exited;
-        endCaptureSession();
-        if (exitCode !== 0) {
-            broadcast({
-                type: "error",
-                message: `tcpdump exited with code ${exitCode}`,
-            });
+        const exitCode = await (proc as unknown as { exited: Promise<number> })
+            .exited;
+        if (captureGeneration === myGen) {
+            endCaptureSession();
+            if (exitCode !== 0) {
+                broadcast({
+                    type: "error",
+                    message: `tcpdump exited with code ${exitCode}`,
+                });
+            }
         }
     } finally {
+        if (liveProc === proc) {
+            liveProc = null;
+        }
         stopLsofCollector();
+        if (captureGeneration === myGen) {
+            endCaptureSession();
+        }
     }
 }
 
@@ -412,7 +613,7 @@ function ensureCaptureSession(mode: string, label: string) {
     if (!store || store.getActiveSessionId()) {
         return;
     }
-    const cmdline = mode === "live" ? TCPDUMP_COMMAND.join(" ") : label;
+    const cmdline = mode === "live" ? getLiveCommand().join(" ") : label;
     store.startSession(mode, label, {
         hostname: HOSTNAME,
         cmdline,
@@ -429,7 +630,10 @@ function startCapture() {
     }
     captureStarted = true;
 
-    const task = filePath ? replayFile(filePath) : streamLiveTcpdump();
+    const launchGen = captureGeneration;
+    const task = activeFilePath
+        ? replayFile(activeFilePath, launchGen)
+        : streamLiveTcpdump(launchGen);
     void task
         .catch((error: unknown) => {
             const message =
@@ -440,8 +644,10 @@ function startCapture() {
             broadcast({ type: "error", message });
         })
         .finally(() => {
-            endCaptureSession();
-            captureStarted = false;
+            if (captureGeneration === launchGen) {
+                endCaptureSession();
+                captureStarted = false;
+            }
         });
 }
 
@@ -635,73 +841,114 @@ async function serveStaticFile(pathname: string): Promise<Response> {
     });
 }
 
-Bun.serve({
-    port: listenPort,
-    ...(serveStatic
-        ? {}
-        : {
-              routes: {
-                  "/": appHtml,
-              },
-          }),
-    async fetch(request, server) {
-        const url = new URL(request.url);
-        const apiResponse = await handleApiRequest(request, url);
-        if (apiResponse) {
-            return apiResponse;
-        }
+// Test helpers for exercising capture path (CLI variations, BPF filtering, no regression on file replay)
+export function testBuildLiveCommand(
+    iface: string,
+    direction: string,
+    bpf: string,
+) {
+    const base = ["tcpdump", "-i", iface, "-Q", direction, "-nn", "-vv", "-l"];
+    const b = bpf.trim();
+    if (b) base.push(...b.split(/\s+/));
+    return process.getuid?.() === 0 ? base : ["sudo", ...base];
+}
+export { packetMatchesBpf as testPacketMatchesBpf };
 
-        if (url.pathname === WS_PATH) {
-            const upgraded = server.upgrade(request);
-            if (!upgraded) {
-                return new Response("WebSocket upgrade failed", {
-                    status: 400,
+if (import.meta.main) {
+    Bun.serve({
+        port: listenPort,
+        ...(serveStatic
+            ? {}
+            : {
+                  routes: {
+                      "/": appHtml,
+                  },
+              }),
+        async fetch(request, server) {
+            const url = new URL(request.url);
+            const apiResponse = await handleApiRequest(request, url);
+            if (apiResponse) {
+                return apiResponse;
+            }
+
+            if (url.pathname === WS_PATH) {
+                const upgraded = server.upgrade(request);
+                if (!upgraded) {
+                    return new Response("WebSocket upgrade failed", {
+                        status: 400,
+                    });
+                }
+                return undefined;
+            }
+
+            if (serveStatic) {
+                return serveStaticFile(url.pathname);
+            }
+
+            if (isStaticAssetPath(url.pathname)) {
+                return new Response("Not found", {
+                    status: 404,
+                    headers: { "content-type": "text/plain" },
                 });
             }
-            return undefined;
-        }
 
-        if (serveStatic) {
-            return serveStaticFile(url.pathname);
-        }
-
-        if (isStaticAssetPath(url.pathname)) {
-            return new Response("Not found", {
-                status: 404,
+            return new Response("Traffic monitor websocket server", {
                 headers: { "content-type": "text/plain" },
             });
-        }
-
-        return new Response("Traffic monitor websocket server", {
-            headers: { "content-type": "text/plain" },
-        });
-    },
-    websocket: {
-        open(ws) {
-            clients.add(ws);
-            emitStatus(
-                filePath ? "file" : "live",
-                filePath ? `file ${filePath}` : TCPDUMP_LABEL,
-            );
-            sendCachedDns(ws);
-            startCapture();
         },
-        close(ws) {
-            clients.delete(ws);
+        websocket: {
+            open(ws) {
+                clients.add(ws);
+                const mode0 = activeFilePath ? "file" : "live";
+                const label0 = activeFilePath
+                    ? `file ${activeFilePath}`
+                    : getLiveLabel();
+                emitStatus(mode0, label0);
+                sendCachedDns(ws);
+                startCapture();
+            },
+            close(ws) {
+                clients.delete(ws);
+            },
+            message(_ws, message) {
+                try {
+                    const data = JSON.parse(String(message)) as {
+                        type?: string;
+                        [k: string]: unknown;
+                    };
+                    if (data.type === "set-capture") {
+                        applyCaptureUpdate({
+                            iface:
+                                typeof data.iface === "string"
+                                    ? data.iface
+                                    : undefined,
+                            direction:
+                                typeof data.direction === "string"
+                                    ? data.direction
+                                    : undefined,
+                            bpf:
+                                typeof data.bpf === "string"
+                                    ? data.bpf
+                                    : undefined,
+                        });
+                    }
+                } catch {
+                    // ignore malformed control messages
+                }
+            },
         },
-        message() {},
-    },
-});
+    });
 
-console.log(
-    `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
-);
-if (store && dbPath) {
-    console.log(`Persisting traffic to ${dbPath}`);
-}
-if (filePath) {
-    console.log(`Replay capture file on connect: ${filePath}`);
-} else {
-    console.log(`Live capture: ${TCPDUMP_LABEL}`);
-    startCapture();
+    console.log(
+        `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
+    );
+    if (store && dbPath) {
+        console.log(`Persisting traffic to ${dbPath}`);
+    }
+    if (activeFilePath) {
+        console.log(`Replay capture file on connect: ${activeFilePath}`);
+    } else {
+        console.log(`Live capture: ${getLiveLabel()}`);
+        startCapture();
+    }
 }

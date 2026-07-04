@@ -17,6 +17,7 @@ export default function App() {
         returnToLive,
         sensitivity,
         setSensitivity,
+        updateCapture,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
@@ -103,6 +104,7 @@ export default function App() {
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}
                     onClearSelection={clearSelection}
+                    onUpdateCapture={updateCapture}
                 />
             </section>
         </main>

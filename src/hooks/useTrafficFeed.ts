@@ -30,6 +30,11 @@ export type TrafficFeedState = {
     refreshSessions: () => void;
     sensitivity: "low" | "medium" | "high";
     setSensitivity: (level: "low" | "medium" | "high") => void;
+    updateCapture: (updates: {
+        iface?: string;
+        direction?: string;
+        bpf?: string;
+    }) => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -44,6 +49,7 @@ export function useTrafficFeed(): TrafficFeedState {
     const hasDisplayedPacketsRef = useRef(false);
     const livePausedRef = useRef(false);
     const loadAbortRef = useRef(0);
+    const socketRef = useRef<WebSocket | null>(null);
 
     const publishGraph = useCallback(() => {
         if (graphRafRef.current !== null) {
@@ -73,6 +79,16 @@ export function useTrafficFeed(): TrafficFeedState {
         publishGraph();
         refreshSessions();
     }, [publishGraph, refreshSessions]);
+
+    const updateCapture = useCallback(
+        (updates: { iface?: string; direction?: string; bpf?: string }) => {
+            const ws = socketRef.current;
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: "set-capture", ...updates }));
+            }
+        },
+        [],
+    );
 
     const loadSession = useCallback(
         async (sessionId: string) => {
@@ -191,6 +207,7 @@ export function useTrafficFeed(): TrafficFeedState {
         };
 
         const socket = new WebSocket(resolveWsUrl());
+        socketRef.current = socket;
         const pendingPackets: ParsedPacket[] = [];
         let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -260,7 +277,14 @@ export function useTrafficFeed(): TrafficFeedState {
                 | { type: "packet"; packet: ParsedPacket }
                 | { type: "packets"; packets: ParsedPacket[] }
                 | { type: "dns"; host: string; name: string }
-                | { type: "status"; mode: string; label: string }
+                | {
+                      type: "status";
+                      mode: string;
+                      label: string;
+                      iface?: string;
+                      direction?: string;
+                      bpf?: string;
+                  }
                 | { type: "error"; message: string }
                 | { type: "complete" };
 
@@ -282,6 +306,13 @@ export function useTrafficFeed(): TrafficFeedState {
 
             if (payload.type === "status") {
                 trafficNetwork.setSource(payload.mode, payload.label);
+                if (typeof payload.iface === "string") {
+                    trafficNetwork.setCapture(
+                        payload.iface,
+                        payload.direction || "out",
+                        payload.bpf || "",
+                    );
+                }
                 publishGraph();
                 return;
             }
@@ -310,6 +341,7 @@ export function useTrafficFeed(): TrafficFeedState {
             if (graphTimerRef.current !== null) {
                 clearTimeout(graphTimerRef.current);
             }
+            socketRef.current = null;
             socket.close();
         };
     }, [publishGraph, refreshSessions]);
@@ -333,5 +365,6 @@ export function useTrafficFeed(): TrafficFeedState {
         refreshSessions,
         sensitivity: graph.sensitivity,
         setSensitivity,
+        updateCapture,
     };
 }

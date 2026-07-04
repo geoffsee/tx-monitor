@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
 import type {
@@ -40,6 +40,11 @@ type SidebarProps = {
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
     onClearSelection: () => void;
+    onUpdateCapture?: (updates: {
+        iface?: string;
+        direction?: string;
+        bpf?: string;
+    }) => void;
 };
 
 export function Sidebar({
@@ -56,6 +61,7 @@ export function Sidebar({
     onSelectPacket,
     onNavigateToFlow,
     onClearSelection,
+    onUpdateCapture,
 }: SidebarProps) {
     const feedLabel =
         viewMode === "history"
@@ -70,6 +76,22 @@ export function Sidebar({
     const [flowsScrollTop, setFlowsScrollTop] = useState(0);
     const packetsContainerRef = useRef<HTMLUListElement>(null);
     const [packetsScrollTop, setPacketsScrollTop] = useState(0);
+
+    // Pending capture control drafts (synced from live graph.capture)
+    const [pendingIface, setPendingIface] = useState("any");
+    const [pendingDirection, setPendingDirection] = useState<
+        "in" | "out" | "inout"
+    >("out");
+    const [pendingBpf, setPendingBpf] = useState("");
+    useEffect(() => {
+        if (graph.capture) {
+            setPendingIface(graph.capture.iface || "any");
+            const d = graph.capture.direction as "in" | "out" | "inout";
+            if (d === "in" || d === "out" || d === "inout")
+                setPendingDirection(d);
+            setPendingBpf(graph.capture.bpf ?? "");
+        }
+    }, [graph.capture]);
 
     const FLOW_ITEM_HEIGHT = 58;
     const PACKET_ITEM_HEIGHT = 58;
@@ -175,6 +197,94 @@ export function Sidebar({
                 <div style={{ ...denseFeedRowStyle, marginTop: 8 }}>
                     {graph.sourceLabel}
                 </div>
+                {viewMode !== "history" && graph.capture ? (
+                    <div
+                        style={{
+                            marginTop: 6,
+                            display: "grid",
+                            gap: 4,
+                            fontSize: 11,
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 4,
+                                alignItems: "center",
+                            }}
+                        >
+                            <span>iface</span>
+                            <input
+                                value={pendingIface}
+                                onChange={(e) =>
+                                    setPendingIface(e.target.value)
+                                }
+                                style={{
+                                    flex: 1,
+                                    fontSize: 11,
+                                    padding: "1px 3px",
+                                    minWidth: 0,
+                                }}
+                                placeholder="any"
+                            />
+                            <span>dir</span>
+                            <select
+                                value={pendingDirection}
+                                onChange={(e) =>
+                                    setPendingDirection(
+                                        e.target.value as
+                                            | "in"
+                                            | "out"
+                                            | "inout",
+                                    )
+                                }
+                                style={{ fontSize: 11 }}
+                            >
+                                <option value="out">out</option>
+                                <option value="in">in</option>
+                                <option value="inout">inout</option>
+                            </select>
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 4,
+                                alignItems: "center",
+                            }}
+                        >
+                            <span>bpf</span>
+                            <input
+                                value={pendingBpf}
+                                onChange={(e) => setPendingBpf(e.target.value)}
+                                style={{
+                                    flex: 1,
+                                    fontSize: 11,
+                                    padding: "1px 3px",
+                                    minWidth: 0,
+                                }}
+                                placeholder="host 1.2.3.4 or port 53"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onUpdateCapture?.({
+                                    iface: pendingIface || "any",
+                                    direction: pendingDirection,
+                                    bpf: pendingBpf,
+                                })
+                            }
+                            style={{
+                                fontSize: 11,
+                                padding: "1px 4px",
+                                cursor: "pointer",
+                                alignSelf: "start",
+                            }}
+                        >
+                            Apply (restart live capture)
+                        </button>
+                    </div>
+                ) : null}
             </section>
             <div
                 style={{

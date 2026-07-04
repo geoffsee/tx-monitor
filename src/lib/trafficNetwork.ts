@@ -76,6 +76,9 @@ const TrafficNetworkModel = types
             "sudo tcpdump -i any -Q out -nn -vv",
         ),
         connected: types.optional(types.boolean, false),
+        captureIface: types.optional(types.string, "any"),
+        captureDirection: types.optional(types.string, "out"),
+        captureBpf: types.optional(types.string, ""),
     })
     .views((self) => ({
         get hostList() {
@@ -460,6 +463,12 @@ const TrafficNetworkModel = types
             remember(`Source: ${label}`);
         };
 
+        const setCapture = (iface: string, direction: string, bpf: string) => {
+            self.captureIface = iface || "any";
+            self.captureDirection = direction || "out";
+            self.captureBpf = bpf ?? "";
+        };
+
         const reset = () => {
             self.hosts.clear();
             self.flows.clear();
@@ -476,6 +485,9 @@ const TrafficNetworkModel = types
             self.sourceMode = "live";
             self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
             self.connected = false;
+            self.captureIface = "any";
+            self.captureDirection = "out";
+            self.captureBpf = "";
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {
@@ -489,6 +501,7 @@ const TrafficNetworkModel = types
             setResolvedDns,
             setConnection,
             setSource,
+            setCapture,
             setSensitivity,
             reset,
             remember,
