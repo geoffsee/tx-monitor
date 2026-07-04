@@ -5,6 +5,8 @@ import {
     type CopilotChatMessage,
     type CopilotRequest,
     type CopilotResponse,
+    type CopilotStatus,
+    type CopilotValidationResult,
 } from "./copilot";
 
 type ErrorResponse = {
@@ -53,4 +55,54 @@ export async function askCopilot(params: AskCopilotParams): Promise<string> {
     }
 
     return answer;
+}
+
+type StatusResponse = CopilotStatus & {
+    validation?: CopilotValidationResult;
+};
+
+export async function fetchCopilotStatus(
+    validate = false,
+): Promise<CopilotStatus & { validation?: CopilotValidationResult }> {
+    const url = resolveApiUrl(
+        validate ? "/api/copilot/status?validate=true" : "/api/copilot/status",
+    );
+    const response = await fetch(url, {
+        method: "GET",
+        headers: { accept: "application/json" },
+    });
+    const body = await readJson(response);
+    if (!response.ok) {
+        const error =
+            body && typeof body === "object" && "error" in body
+                ? (body as ErrorResponse).error
+                : null;
+        throw new Error(error || `Copilot status failed (${response.status})`);
+    }
+    return (
+        (body as StatusResponse) ?? {
+            authMode: "local",
+            hasCredentials: false,
+            model: "unknown",
+            timeoutMs: 120000,
+            ready: false,
+        }
+    );
+}
+
+export async function validateCopilot(): Promise<{
+    status: CopilotStatus;
+    validation: CopilotValidationResult;
+}> {
+    const result = await fetchCopilotStatus(true);
+    if (!result.validation) {
+        return {
+            status: result,
+            validation: {
+                success: false,
+                message: "No validation result returned.",
+            },
+        };
+    }
+    return { status: result, validation: result.validation };
 }

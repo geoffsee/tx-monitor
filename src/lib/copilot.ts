@@ -23,6 +23,21 @@ export type CopilotResponse = {
     threadId: string | null;
 };
 
+export type CopilotAuthMode = "local" | "api-key";
+
+export type CopilotStatus = {
+    authMode: CopilotAuthMode;
+    hasCredentials: boolean;
+    model: string;
+    timeoutMs: number;
+    ready: boolean;
+};
+
+export type CopilotValidationResult = {
+    success: boolean;
+    message: string;
+};
+
 let messageCounter = 0;
 
 export function createMessage(
@@ -156,5 +171,5 @@ export type CopilotContext = ReturnType<typeof buildCopilotContext>;
 
 export const COPILOT_WELCOME = createMessage(
     "assistant",
-    "I'm your traffic copilot. I analyze the current capture through the backend Codex SDK.",
+    "I'm your traffic copilot. I analyze the current capture through the backend Codex SDK.\n\nSetup uses TXMON_CODEX_AUTH (local or api-key) and OPENAI_API_KEY (for api-key mode, via env or .env.copilot). Status and Validate are shown above.",
 );
