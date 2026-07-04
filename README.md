@@ -108,7 +108,7 @@ Read persisted data over HTTP:
 | `GET /api/sessions/:id` | Fetch one capture session |
 | `GET /api/sessions/:id/packets?offset=0&limit=5000` | Paginated packets for a session |
 | `GET /api/packets?limit=80&session=<id>` | List recent packets, optionally scoped to one session |
-| `POST /api/copilot` | Analyze the current client-provided capture snapshot using the backend Codex SDK |
+| `POST /api/copilot` | Analyze the client-provided capture snapshot (strict snapshot model) using the backend Codex SDK |
 
 Schema migrations live in `drizzle/` and are applied automatically on server startup.
 
