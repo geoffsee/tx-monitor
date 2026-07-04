@@ -294,6 +294,8 @@ async function replayFileOnce(path: string) {
     }
 }
 
+// replayFile and replayFileOnce also use only TcpdumpParser + tcpdump text files
+// (zero-dependency ingestion boundary retained per #39).
 async function replayFile(path: string) {
     try {
         while (clients.size > 0) {
@@ -359,6 +361,8 @@ async function monitorTcpdumpStderr(proc: ReturnType<typeof Bun.spawn>) {
     }
 }
 
+// Retention guard (#39): live and file ingestion both route exclusively through
+// TcpdumpParser on human-readable tcpdump text. This is the canonical boundary.
 async function streamLiveTcpdump() {
     ensureCaptureSession("live", TCPDUMP_LABEL);
     emitStatus("live", TCPDUMP_LABEL);
@@ -503,6 +507,8 @@ async function handleApiRequest(
         }
     }
 
+    // /api/copilot retains strict client-provided snapshot model (context from
+    // caller only). No ambient or server-initiated streaming per #39 guard.
     if (url.pathname === "/api/copilot") {
         if (request.method !== "POST") {
             return jsonResponse({ error: "Method not allowed" }, 405, {
