@@ -80,7 +80,7 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `--file <path>` | Replay a `tcpdump` log instead of live capture |
 | `--port <port>` | WebSocket and HTTP port (default: `3001`) |
 | `--serve` | Serve the built frontend from `dist/` |
-| `--db <path>` | SQLite database path for packet persistence (default: `tx-mon.db`) |
+| `--db <path>` | SQLite database path for packet persistence (default: `~/.tx-monitor`) |
 | `--no-db` | Disable SQLite persistence |
 
 ## Environment Variables
@@ -88,7 +88,7 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3001` | Server listen port |
-| `TXMON_DB` | `tx-mon.db` | SQLite database path when persistence is enabled |
+| `TXMON_DB` | `~/.tx-monitor` | SQLite database path when persistence is enabled |
 | `TXMON_CODEX_AUTH` | `local` | Codex SDK auth mode for copilot requests. Use `local` for your logged-in Codex/OpenAI subscription credentials, or `api-key` to pass `OPENAI_API_KEY`. |
 | `OPENAI_API_KEY` | unset | Optional key used only when `TXMON_CODEX_AUTH=api-key`. Can also be set in `.env.copilot`. |
 | `TXMON_CODEX_MODEL` | `gpt-5.3-codex` | Optional model override for Codex SDK copilot requests |
@@ -98,7 +98,7 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 
 ## Persistence
 
-Captured packets are persisted to SQLite via [Drizzle ORM](https://orm.drizzle.team) using Bun's built-in driver. Persistence is enabled by default and writes to `tx-mon.db` in the current working directory.
+Captured packets are persisted to SQLite via [Drizzle ORM](https://orm.drizzle.team) using Bun's built-in driver. Persistence is enabled by default and writes to `~/.tx-monitor`.
 
 Read persisted data over HTTP:
 

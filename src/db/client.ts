@@ -11,6 +11,57 @@ const MIGRATIONS_JOURNAL = join(MIGRATIONS_FOLDER, "meta/_journal.json");
 const INITIAL_MIGRATION_HASH =
     "e22e4f01dd3f0237dd8b9486f80128098a360d3121539a4727fbae427aae7f98";
 const INITIAL_MIGRATION_CREATED_AT = 1781459046183;
+const SESSION_METADATA_MIGRATION_HASH =
+    "b53bddff6befad22729fad5b20bb05444fe1e097e1e8a313bdbee1fcd8146622";
+const SESSION_METADATA_MIGRATION_CREATED_AT = 1781459047000;
+
+const CAPTURE_SESSION_OPTIONAL_COLUMNS = [
+    "hostname text",
+    "cmdline text",
+    "notes text",
+    "tags text",
+] as const;
+
+function tableHasColumn(
+    sqlite: Database,
+    table: string,
+    column: string,
+): boolean {
+    const columns = sqlite.query(`PRAGMA table_info(${table})`).all() as Array<{
+        name: string;
+    }>;
+    return columns.some((entry) => entry.name === column);
+}
+
+function recordMigrationIfMissing(
+    sqlite: Database,
+    hash: string,
+    createdAt: number,
+) {
+    sqlite
+        .query(`
+            INSERT INTO __drizzle_migrations ("hash", "created_at")
+            SELECT ?, ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM __drizzle_migrations WHERE hash = ?
+            )
+        `)
+        .run(hash, createdAt, hash);
+}
+
+export function upgradeLegacySchema(sqlite: Database) {
+    for (const columnDefinition of CAPTURE_SESSION_OPTIONAL_COLUMNS) {
+        const columnName = columnDefinition.split(" ")[0];
+        if (
+            columnName &&
+            !tableHasColumn(sqlite, "capture_sessions", columnName)
+        ) {
+            sqlite.exec(
+                `ALTER TABLE capture_sessions ADD COLUMN ${columnDefinition}`,
+            );
+        }
+    }
+}
 
 function initializeEmbeddedSchema(sqlite: Database) {
     sqlite.exec(`
@@ -52,19 +103,17 @@ function initializeEmbeddedSchema(sqlite: Database) {
         );
     `);
 
-    sqlite
-        .query(`
-            INSERT INTO __drizzle_migrations ("hash", "created_at")
-            SELECT ?, ?
-            WHERE NOT EXISTS (
-                SELECT 1 FROM __drizzle_migrations WHERE created_at = ?
-            )
-        `)
-        .run(
-            INITIAL_MIGRATION_HASH,
-            INITIAL_MIGRATION_CREATED_AT,
-            INITIAL_MIGRATION_CREATED_AT,
-        );
+    recordMigrationIfMissing(
+        sqlite,
+        INITIAL_MIGRATION_HASH,
+        INITIAL_MIGRATION_CREATED_AT,
+    );
+    upgradeLegacySchema(sqlite);
+    recordMigrationIfMissing(
+        sqlite,
+        SESSION_METADATA_MIGRATION_HASH,
+        SESSION_METADATA_MIGRATION_CREATED_AT,
+    );
 }
 
 export function openDatabase(dbPath: string) {
@@ -75,6 +124,7 @@ export function openDatabase(dbPath: string) {
     const db = drizzle(sqlite, { schema });
     if (existsSync(MIGRATIONS_JOURNAL)) {
         migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+        upgradeLegacySchema(sqlite);
     } else {
         initializeEmbeddedSchema(sqlite);
     }
