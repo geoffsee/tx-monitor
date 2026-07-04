@@ -9,7 +9,7 @@ on:
   pull_request:
     types: [closed]
   workflow_run:
-    workflows: [CI]
+    workflows: [Test]
     types: [completed]
   schedule:
     - cron: "17 */6 * * *"
