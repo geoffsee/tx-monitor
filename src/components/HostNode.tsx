@@ -34,7 +34,10 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
         processCount > 1
             ? `${firstProcess} +${processCount - 1}`
             : firstProcess;
-    const showResolvedDns = data.category === "public" && data.resolvedDns;
+    const showResolvedDns =
+        data.category === "public" &&
+        data.resolvedDns &&
+        data.label !== data.resolvedDns;
 
     return (
         <div

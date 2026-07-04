@@ -4,6 +4,7 @@ import {
     formatBytes,
     protoColor,
 } from "../layout";
+import { formatService } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type { HostCategory, Selection } from "../types";
 import {
@@ -38,6 +39,15 @@ function ProcessDetails(props: { command: string; pid: number; user: string }) {
             </div>
         </>
     );
+}
+
+function getDisplayHostLabel(address: string): string {
+    const dns = trafficNetwork.resolvedDns.get(address);
+    const host = trafficNetwork.hosts.get(address);
+    if (host?.category === "public" && dns) {
+        return dns;
+    }
+    return host?.label ?? address;
 }
 
 type DetailPanelProps = {
@@ -91,7 +101,9 @@ export function DetailPanel({
                 >
                     {categoryLabel(host.category as HostCategory)}
                 </div>
-                <div style={detailTitleStyle}>{host.label}</div>
+                <div style={detailTitleStyle}>
+                    {getDisplayHostLabel(host.id)}
+                </div>
                 <div style={detailSubtleStyle}>{host.address}</div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>
@@ -129,15 +141,25 @@ export function DetailPanel({
                                             fontWeight: 600,
                                             fontSize: 12,
                                         }}
+                                        title={
+                                            flow.srcHost === host.id
+                                                ? `${flow.srcHost} -> ${flow.dstHost}`
+                                                : `${flow.dstHost} -> ${flow.srcHost}`
+                                        }
                                     >
                                         {flow.srcHost === host.id ? "→" : "←"}{" "}
                                         {flow.srcHost === host.id
-                                            ? flow.dstHost
-                                            : flow.srcHost}
+                                            ? getDisplayHostLabel(flow.dstHost)
+                                            : getDisplayHostLabel(flow.srcHost)}
                                     </span>
-                                    <span style={detailSubtleStyle}>
-                                        {flow.proto}
-                                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                                    <span
+                                        style={detailSubtleStyle}
+                                        title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
+                                    >
+                                        {formatService(
+                                            flow.dstPort,
+                                            flow.proto,
+                                        )}
                                         {flow.processCommand
                                             ? ` · ${flow.processCommand}`
                                             : ""}{" "}
@@ -217,16 +239,20 @@ export function DetailPanel({
                             borderColor: `${stroke}44`,
                             background: `${stroke}1f`,
                         }}
+                        title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
                     >
-                        {flow.proto}
-                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                        {formatService(flow.dstPort, flow.proto)}
                     </div>
                     <div style={statusBadgeStyle(active)}>
                         {active ? "active" : "idle"}
                     </div>
                 </div>
-                <div style={detailTitleStyle}>
-                    {flow.srcHost} → {flow.dstHost}
+                <div
+                    style={detailTitleStyle}
+                    title={`${flow.srcHost} -> ${flow.dstHost}`}
+                >
+                    {getDisplayHostLabel(flow.srcHost)} →{" "}
+                    {getDisplayHostLabel(flow.dstHost)}
                 </div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>

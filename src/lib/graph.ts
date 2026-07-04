@@ -12,6 +12,7 @@ import type {
     HostNodeData,
     TrafficSnapshot,
 } from "../types";
+import { formatService } from "./tcpdumpParser";
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
@@ -89,23 +90,28 @@ export function createGraph(): TrafficSnapshot {
     const activeFlowIds = new Set<string>();
     const hostProcessMap = new Map<string, Set<string>>();
 
-    const nodes: Node<HostNodeData>[] = hostList.map((host) => ({
-        id: host.id,
-        type: "host",
-        position: positions.get(host.id) ?? { x: 0, y: 0 },
-        width: HOST_NODE_SIZE.width,
-        height: HOST_NODE_SIZE.height,
-        data: {
-            label: host.label,
-            address: host.address,
-            category: host.category as HostCategory,
-            packetCount: host.packetCount,
-            bytesTotal: formatBytes(host.bytesTotal),
-            processes: [],
-            processCount: 0,
-            resolvedDns: trafficNetwork.resolvedDns.get(host.id),
-        },
-    }));
+    const nodes: Node<HostNodeData>[] = hostList.map((host) => {
+        const dns = trafficNetwork.resolvedDns.get(host.id);
+        const isPublic = host.category === "public";
+        const displayLabel = isPublic && dns ? dns : host.label;
+        return {
+            id: host.id,
+            type: "host",
+            position: positions.get(host.id) ?? { x: 0, y: 0 },
+            width: HOST_NODE_SIZE.width,
+            height: HOST_NODE_SIZE.height,
+            data: {
+                label: displayLabel,
+                address: host.address,
+                category: host.category as HostCategory,
+                packetCount: host.packetCount,
+                bytesTotal: formatBytes(host.bytesTotal),
+                processes: [],
+                processCount: 0,
+                resolvedDns: dns,
+            },
+        };
+    });
 
     const flowSlice = eligibleFlows
         .filter(
@@ -151,7 +157,14 @@ export function createGraph(): TrafficSnapshot {
         .map((flow) => {
             const active = activeFlowIds.has(flow.id);
             const stroke = protoColor(flow.proto);
-            const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
+            const dstDns = trafficNetwork.resolvedDns.get(flow.dstHost);
+            const dstIsPublic =
+                trafficNetwork.hosts.get(flow.dstHost)?.category === "public";
+            const svcLabel = formatService(
+                flow.dstPort,
+                flow.proto,
+                dstIsPublic ? dstDns : undefined,
+            );
             const sourcePos = positions.get(flow.srcHost);
             const targetPos = positions.get(flow.dstHost);
             const handles =
@@ -174,7 +187,7 @@ export function createGraph(): TrafficSnapshot {
                     color: stroke,
                 },
                 data: {
-                    label: `${flow.proto}${portLabel}`,
+                    label: svcLabel,
                     labelColor: stroke,
                     stroke,
                     active,

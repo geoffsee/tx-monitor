@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
+import { formatService } from "../lib/tcpdumpParser";
 import type {
     Selection,
     SessionLoadProgress,
@@ -100,6 +101,12 @@ export function Sidebar({
         const end = Math.min(items.length, start + visibleCount);
         return { items: items.slice(start, end), start, total: items.length };
     };
+
+    // Map host IDs to display labels (resolved DNS for public hosts, etc.)
+    const hostLabel = new Map<string, string>(
+        graph.nodes.map((n) => [n.id, n.data.label]),
+    );
+    const getHostLabel = (addr: string) => hostLabel.get(addr) ?? addr;
 
     return (
         <aside
@@ -263,15 +270,20 @@ export function Sidebar({
                                                     overflow: "hidden",
                                                     textOverflow: "ellipsis",
                                                 }}
+                                                title={`${flow.srcHost} -> ${flow.dstHost}`}
                                             >
-                                                {flow.srcHost} -&gt;{" "}
-                                                {flow.dstHost}
+                                                {getHostLabel(flow.srcHost)}{" "}
+                                                -&gt;{" "}
+                                                {getHostLabel(flow.dstHost)}
                                             </div>
-                                            <div style={denseSubtleStyle}>
-                                                {flow.proto}
-                                                {flow.dstPort
-                                                    ? `:${flow.dstPort}`
-                                                    : ""}{" "}
+                                            <div
+                                                style={denseSubtleStyle}
+                                                title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
+                                            >
+                                                {formatService(
+                                                    flow.dstPort,
+                                                    flow.proto,
+                                                )}{" "}
                                                 · {flow.packetCount} pkts ·{" "}
                                                 {formatBytes(flow.bytesTotal)}
                                             </div>
@@ -364,10 +376,18 @@ export function Sidebar({
                                                     {packet.timestamp}{" "}
                                                     {packet.proto}
                                                 </strong>
-                                                <div style={denseSubtleStyle}>
-                                                    {packet.srcHost} -&gt;{" "}
-                                                    {packet.dstHost} ·{" "}
-                                                    {packet.length} B
+                                                <div
+                                                    style={denseSubtleStyle}
+                                                    title={`${packet.srcHost} -> ${packet.dstHost}`}
+                                                >
+                                                    {getHostLabel(
+                                                        packet.srcHost,
+                                                    )}{" "}
+                                                    -&gt;{" "}
+                                                    {getHostLabel(
+                                                        packet.dstHost,
+                                                    )}{" "}
+                                                    · {packet.length} B
                                                 </div>
                                                 <div style={denseSubtleStyle}>
                                                     {packet.info ||

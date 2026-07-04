@@ -1,5 +1,6 @@
 import { formatBytes } from "../layout";
 import type { Selection, TrafficSnapshot } from "../types";
+import { formatService } from "./tcpdumpParser";
 
 export type CopilotMessage = {
     id: string;
@@ -107,7 +108,23 @@ function describeSelectionContext(
             return { kind: "flow", missing: selection.id };
         }
 
-        return { kind: "flow", ...flow };
+        const hostLabel = new Map<string, string>(
+            graph.nodes.map((n) => [n.id, n.data.label]),
+        );
+        const getLabel = (addr: string) => hostLabel.get(addr) ?? addr;
+        return {
+            kind: "flow",
+            ...flow,
+            srcLabel: getLabel(flow.srcHost),
+            dstLabel: getLabel(flow.dstHost),
+            service: formatService(
+                flow.dstPort,
+                flow.proto,
+                getLabel(flow.dstHost) !== flow.dstHost
+                    ? getLabel(flow.dstHost)
+                    : undefined,
+            ),
+        };
     }
 
     const packet = graph.packets.find((item) => item.id === selection.id);
@@ -122,6 +139,11 @@ export function buildCopilotContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
 ) {
+    const hostLabel = new Map<string, string>(
+        graph.nodes.map((n) => [n.id, n.data.label]),
+    );
+    const getLabel = (addr: string) => hostLabel.get(addr) ?? addr;
+
     return {
         summary: {
             totalPackets: graph.totalPackets,
@@ -143,8 +165,17 @@ export function buildCopilotContext(
             id: flow.id,
             srcHost: flow.srcHost,
             dstHost: flow.dstHost,
+            srcLabel: getLabel(flow.srcHost),
+            dstLabel: getLabel(flow.dstHost),
             proto: flow.proto,
             dstPort: flow.dstPort,
+            service: formatService(
+                flow.dstPort,
+                flow.proto,
+                getLabel(flow.dstHost) !== flow.dstHost
+                    ? getLabel(flow.dstHost)
+                    : undefined,
+            ),
             packetCount: flow.packetCount,
             bytesTotal: flow.bytesTotal,
             bytesTotalLabel: formatBytes(flow.bytesTotal),
@@ -157,6 +188,8 @@ export function buildCopilotContext(
             proto: packet.proto,
             srcHost: packet.srcHost,
             dstHost: packet.dstHost,
+            srcLabel: getLabel(packet.srcHost),
+            dstLabel: getLabel(packet.dstHost),
             length: packet.length,
             info: packet.info,
             process: packet.process,

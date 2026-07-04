@@ -161,18 +161,28 @@ export function shortHost(address: string): string {
     return `${address.slice(0, 8)}…${address.slice(-6)}`;
 }
 
-export function formatService(port: number | null, proto: PacketProto): string {
+export function formatService(
+    port: number | null,
+    proto: PacketProto | string,
+    name?: string,
+): string {
+    const p = (proto as string).toUpperCase() as PacketProto;
     if (port === null) {
-        return proto;
+        const base = p;
+        return name ? `${base} ${name}` : base;
     }
+    let svc: string;
     if (port === 443) {
-        return "HTTPS";
+        svc = "HTTPS";
+    } else if (port === 80) {
+        svc = "HTTP";
+    } else if (port === 53) {
+        svc = "DNS";
+    } else {
+        svc = `${p}/${port}`;
     }
-    if (port === 80) {
-        return "HTTP";
+    if (name?.trim()) {
+        return `${svc} ${name.trim()}`;
     }
-    if (port === 53) {
-        return "DNS";
-    }
-    return `${proto}/${port}`;
+    return svc;
 }

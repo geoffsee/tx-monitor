@@ -84,4 +84,14 @@ describe("buildCopilotContext", () => {
             dstPort: 53,
         });
     });
+
+    test("includes service names via formatService in topFlows and selection", () => {
+        const context = buildCopilotContext(sampleGraph, {
+            kind: "flow",
+            id: "flow-1",
+        });
+        // UDP 53 -> DNS
+        expect(context.topFlows[0]?.service).toBe("DNS");
+        expect(context.selection).toMatchObject({ service: "DNS" });
+    });
 });
