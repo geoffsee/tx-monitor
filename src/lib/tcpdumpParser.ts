@@ -73,6 +73,9 @@ function isHeaderLine(line: string): boolean {
     return /^\d{2}:\d{2}:\d{2}\.\d+\s+IP6?\s+\(/.test(line);
 }
 
+// Retention (per #39 / #40): tcpdump text output is the canonical zero-dependency
+// ingestion boundary. Parser is conservative and supports only what tcpdump lines
+// provide; do not infer, widen, or add alternate parsers without explicit signal.
 export class TcpdumpParser {
     private pendingHeader: PendingHeader | null = null;
 
