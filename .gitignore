@@ -50,3 +50,4 @@ tcpdump.log
 /.env.copilot
 build
 .env.github-app
+.github/workflows/.grok-auth-test.yml
