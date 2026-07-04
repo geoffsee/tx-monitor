@@ -1,0 +1,60 @@
+name: Grok Auth Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  grok-auth-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Restore Grok OAuth credentials
+        env:
+          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
+        run: bash scripts/restore-grok-credentials.sh
+
+      - name: Verify restored auth file
+        run: |
+          set -euo pipefail
+          auth_file="${HOME}/.grok/auth.json"
+          if [ ! -f "$auth_file" ]; then
+            echo "Missing ${auth_file}" >&2
+            exit 1
+          fi
+          echo "auth.json present ($(wc -c < "$auth_file") bytes)"
+          jq -r 'to_entries[0].value | "auth_mode=\(.auth_mode) expires_at=\(.expires_at) email=\(.email)"' "$auth_file"
+
+      - name: Install Grok CLI
+        run: npm install -g "@xai-official/grok@0.2.82"
+
+      - name: Run Grok prompt
+        run: |
+          set -euo pipefail
+          grok -p "Reply with exactly: credentials ok" \
+            --always-approve \
+            --output-format json \
+            | tee grok-output.json
+          jq -e '.result // .text // .content // .' grok-output.json >/dev/null
+
+      - name: Summarize result
+        if: always()
+        run: |
+          {
+            echo "## Grok auth test"
+            echo ""
+            if [ -f grok-output.json ]; then
+              echo '```json'
+              cat grok-output.json
+              echo '```'
+            else
+              echo "No grok output captured."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
