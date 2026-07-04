@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { reverse } from "node:dns/promises";
 import { existsSync } from "node:fs";
-import { hostname as getHostname } from "node:os";
+import { hostname as getHostname, homedir } from "node:os";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { ServerWebSocket } from "bun";
@@ -27,7 +27,7 @@ import {
 } from "./lib/tcpdumpParser";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
-const DEFAULT_DB = "tx-mon.db";
+const DEFAULT_DB = join(homedir(), ".tx-monitor");
 
 function resolveTcpdumpCommand(): string[] {
     const envArgs = process.env.TXMON_TCPDUMP_ARGS?.trim();
