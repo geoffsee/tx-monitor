@@ -40,6 +40,7 @@ export function FlowEdge({
                     stroke: data?.stroke,
                     strokeWidth: selected ? 5 : data?.active ? 3.5 : 2,
                     opacity: selected ? 1 : data?.active ? 1 : 0.45,
+                    strokeDasharray: data?.inComparison ? "4 2" : undefined,
                     cursor: "pointer",
                 }}
             />

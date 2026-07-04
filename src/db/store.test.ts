@@ -141,4 +141,51 @@ describe("TrafficStore", () => {
         // hostname/cmdline unchanged
         expect(loaded?.hostname).toBe("testhost");
     });
+
+    test("stores multiple sessions with isolated packet sets", () => {
+        const store = createTestStore();
+        const s1 = store.startSession("file", "ref capture");
+        store.savePackets([
+            {
+                id: "s1-p1",
+                timestamp: "10:00:00.000000",
+                proto: "TCP",
+                srcHost: "10.0.0.1",
+                srcPort: 1234,
+                dstHost: "8.8.8.8",
+                dstPort: 53,
+                length: 64,
+                info: "s1",
+            },
+        ]);
+        store.endSession();
+
+        const s2 = store.startSession("file", "incident capture");
+        store.savePackets([
+            {
+                id: "s2-p1",
+                timestamp: "11:00:00.000000",
+                proto: "UDP",
+                srcHost: "10.0.0.2",
+                srcPort: 4321,
+                dstHost: "1.1.1.1",
+                dstPort: 53,
+                length: 128,
+                info: "s2",
+            },
+        ]);
+        store.endSession();
+
+        const all = store.listSessions(10);
+        expect(all.length).toBeGreaterThanOrEqual(2);
+
+        const p1 = store.listSessionPackets(s1.id, 0, 10);
+        const p2 = store.listSessionPackets(s2.id, 0, 10);
+        expect(p1.map((p) => p.id)).toEqual(["s1-p1"]);
+        expect(p2.map((p) => p.id)).toEqual(["s2-p1"]);
+        // Cross fetch by explicit session returns empty for wrong id
+        expect(
+            store.listRecentPackets(10, s1.id).some((p) => p.id === "s2-p1"),
+        ).toBe(false);
+    });
 });

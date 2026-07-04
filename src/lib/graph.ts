@@ -7,11 +7,13 @@ import {
     resolveEdgeHandles,
 } from "../layout";
 import type {
+    ComparisonSummary,
     FlowEdgeData,
     HostCategory,
     HostNodeData,
     TrafficSnapshot,
 } from "../types";
+import { getComparisonContext } from "./comparison";
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
@@ -89,6 +91,10 @@ export function createGraph(): TrafficSnapshot {
     const activeFlowIds = new Set<string>();
     const hostProcessMap = new Map<string, Set<string>>();
 
+    const comp = getComparisonContext();
+    const compHostSet = comp ? comp.hostIds : null;
+    const compFlowSet = comp ? comp.flowIds : null;
+
     const nodes: Node<HostNodeData>[] = hostList.map((host) => ({
         id: host.id,
         type: "host",
@@ -104,6 +110,7 @@ export function createGraph(): TrafficSnapshot {
             processes: [],
             processCount: 0,
             resolvedDns: trafficNetwork.resolvedDns.get(host.id),
+            inComparison: compHostSet ? compHostSet.has(host.id) : undefined,
         },
     }));
 
@@ -112,6 +119,19 @@ export function createGraph(): TrafficSnapshot {
             (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
         )
         .slice(0, MAX_GRAPH_FLOWS);
+
+    let commonHostCount = 0;
+    let commonFlowCount = 0;
+    if (compHostSet) {
+        for (const h of trafficNetwork.hostList) {
+            if (compHostSet.has(h.id)) commonHostCount++;
+        }
+    }
+    if (compFlowSet) {
+        for (const f of trafficNetwork.flowList) {
+            if (compFlowSet.has(f.id)) commonFlowCount++;
+        }
+    }
 
     for (const flow of flowSlice) {
         if (!useLiveStaleWindow || flow.lastSeen >= activeCutoff) {
@@ -161,6 +181,7 @@ export function createGraph(): TrafficSnapshot {
                           sourceHandle: "source-right",
                           targetHandle: "target-left",
                       };
+            const inComp = compFlowSet ? compFlowSet.has(flow.id) : undefined;
             return {
                 id: flow.id,
                 source: flow.srcHost,
@@ -178,9 +199,22 @@ export function createGraph(): TrafficSnapshot {
                     labelColor: stroke,
                     stroke,
                     active,
+                    inComparison: inComp,
                 },
             };
         });
+
+    let comparisonSummary: ComparisonSummary | undefined;
+    if (comp) {
+        comparisonSummary = {
+            sessionId: comp.sessionId,
+            label: comp.label,
+            hostCount: comp.hostIds.size,
+            flowCount: comp.flowIds.size,
+            commonHostCount,
+            commonFlowCount,
+        };
+    }
 
     return {
         nodes,
@@ -220,6 +254,9 @@ export function createGraph(): TrafficSnapshot {
                 packetCount: flow.packetCount,
                 bytesTotal: flow.bytesTotal,
                 active: activeFlowIds.has(flow.id),
+                inComparison: compFlowSet
+                    ? compFlowSet.has(flow.id)
+                    : undefined,
                 ...(flow.processCommand && flow.processPid && flow.processUser
                     ? {
                           process: {
@@ -249,5 +286,6 @@ export function createGraph(): TrafficSnapshot {
         sensitivity:
             (trafficNetwork.sensitivity as "low" | "medium" | "high") ??
             "medium",
+        comparison: comparisonSummary,
     };
 }

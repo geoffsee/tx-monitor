@@ -4,6 +4,10 @@ import {
     fetchSessionPackets,
     SESSION_PAGE_SIZE,
 } from "../lib/api";
+import {
+    clearComparisonContext,
+    setComparisonContext,
+} from "../lib/comparison";
 import { createGraph } from "../lib/graph";
 import type { ParsedPacket } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
@@ -30,6 +34,11 @@ export type TrafficFeedState = {
     refreshSessions: () => void;
     sensitivity: "low" | "medium" | "high";
     setSensitivity: (level: "low" | "medium" | "high") => void;
+    comparisonSessionId: string | null;
+    comparisonLabel: string | null;
+    comparisonLoadProgress: SessionLoadProgress | null;
+    loadComparisonSession: (sessionId: string) => Promise<void>;
+    clearComparison: () => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -44,6 +53,13 @@ export function useTrafficFeed(): TrafficFeedState {
     const hasDisplayedPacketsRef = useRef(false);
     const livePausedRef = useRef(false);
     const loadAbortRef = useRef(0);
+    const [comparisonSessionId, setComparisonSessionId] = useState<
+        string | null
+    >(null);
+    const [comparisonLabel, setComparisonLabel] = useState<string | null>(null);
+    const [comparisonLoadProgress, setComparisonLoadProgress] =
+        useState<SessionLoadProgress | null>(null);
+    const compLoadAbortRef = useRef(0);
 
     const publishGraph = useCallback(() => {
         if (graphRafRef.current !== null) {
@@ -65,10 +81,15 @@ export function useTrafficFeed(): TrafficFeedState {
 
     const returnToLive = useCallback(() => {
         loadAbortRef.current += 1;
+        compLoadAbortRef.current += 1;
         livePausedRef.current = false;
         setSessionLoadProgress(null);
         setActiveSessionId(null);
         setViewMode("live");
+        setComparisonSessionId(null);
+        setComparisonLabel(null);
+        setComparisonLoadProgress(null);
+        clearComparisonContext();
         trafficNetwork.reset();
         publishGraph();
         refreshSessions();
@@ -84,6 +105,15 @@ export function useTrafficFeed(): TrafficFeedState {
             setSessionLoadProgress({ loaded: 0, total: 0 });
             trafficNetwork.reset();
             publishGraph();
+
+            // If loading the same session that was used for comparison, clear it
+            if (comparisonSessionId === sessionId) {
+                compLoadAbortRef.current += 1;
+                setComparisonSessionId(null);
+                setComparisonLabel(null);
+                setComparisonLoadProgress(null);
+                clearComparisonContext();
+            }
 
             try {
                 const session = await fetchSession(sessionId);
@@ -163,8 +193,110 @@ export function useTrafficFeed(): TrafficFeedState {
                 publishGraph();
             }
         },
-        [publishGraph, refreshSessions],
+        [publishGraph, refreshSessions, comparisonSessionId],
     );
+
+    const loadComparisonSession = useCallback(
+        async (sessionId: string) => {
+            if (activeSessionId === sessionId) {
+                // Cannot compare a session against itself as primary
+                return;
+            }
+            const loadId = compLoadAbortRef.current + 1;
+            compLoadAbortRef.current = loadId;
+            setComparisonLoadProgress({ loaded: 0, total: 0 });
+
+            try {
+                const session = await fetchSession(sessionId);
+                if (compLoadAbortRef.current !== loadId) {
+                    return;
+                }
+
+                const headerLabel = session.hostname
+                    ? `${session.label} @ ${session.hostname}`
+                    : session.label;
+
+                const hostSet = new Set<string>();
+                const flowSet = new Set<string>();
+                const makeFlowKey = (
+                    src: string,
+                    dst: string,
+                    proto: string,
+                    dstPort: number | null,
+                ) => `${src}->${dst}:${proto}:${dstPort ?? "any"}`;
+
+                setComparisonLoadProgress({
+                    loaded: 0,
+                    total: session.totalPackets,
+                });
+                publishGraph();
+
+                let offset = 0;
+                while (offset < session.totalPackets) {
+                    if (compLoadAbortRef.current !== loadId) {
+                        return;
+                    }
+
+                    const batch = await fetchSessionPackets(
+                        sessionId,
+                        offset,
+                        SESSION_PAGE_SIZE,
+                    );
+                    if (batch.length === 0) {
+                        break;
+                    }
+
+                    for (const p of batch) {
+                        if (p.srcHost) hostSet.add(p.srcHost);
+                        if (p.dstHost) hostSet.add(p.dstHost);
+                        const fk = makeFlowKey(
+                            p.srcHost,
+                            p.dstHost,
+                            p.proto,
+                            p.dstPort,
+                        );
+                        flowSet.add(fk);
+                    }
+
+                    offset += batch.length;
+                    setComparisonLoadProgress({
+                        loaded: offset,
+                        total: session.totalPackets,
+                    });
+                    // no primary graph change yet; only on completion
+                }
+
+                if (compLoadAbortRef.current !== loadId) {
+                    return;
+                }
+
+                // Bound and install
+                setComparisonContext(sessionId, headerLabel, hostSet, flowSet);
+                setComparisonSessionId(sessionId);
+                setComparisonLabel(headerLabel);
+                setComparisonLoadProgress(null);
+                publishGraph();
+                refreshSessions();
+            } catch (_error) {
+                if (compLoadAbortRef.current !== loadId) {
+                    return;
+                }
+                setComparisonLoadProgress(null);
+                // leave prior comparison (if any) intact on failure
+                publishGraph();
+            }
+        },
+        [activeSessionId, publishGraph, refreshSessions],
+    );
+
+    const clearComparison = useCallback(() => {
+        compLoadAbortRef.current += 1;
+        setComparisonSessionId(null);
+        setComparisonLabel(null);
+        setComparisonLoadProgress(null);
+        clearComparisonContext();
+        publishGraph();
+    }, [publishGraph]);
 
     useEffect(() => {
         hasDisplayedPacketsRef.current = false;
@@ -333,5 +465,10 @@ export function useTrafficFeed(): TrafficFeedState {
         refreshSessions,
         sensitivity: graph.sensitivity,
         setSensitivity,
+        comparisonSessionId,
+        comparisonLabel,
+        comparisonLoadProgress,
+        loadComparisonSession,
+        clearComparison,
     };
 }

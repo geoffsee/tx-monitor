@@ -34,8 +34,13 @@ type SidebarProps = {
     activeSessionId: string | null;
     sessionLoadProgress: SessionLoadProgress | null;
     sessionsVersion: number;
+    comparisonSessionId: string | null;
+    comparisonLabel: string | null;
+    comparisonLoadProgress: SessionLoadProgress | null;
     onLoadSession: (sessionId: string) => void;
     onReturnToLive: () => void;
+    onLoadComparison: (sessionId: string) => void;
+    onClearComparison: () => void;
     onSelectFlow: (id: string) => void;
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
@@ -50,8 +55,13 @@ export function Sidebar({
     activeSessionId,
     sessionLoadProgress,
     sessionsVersion,
+    comparisonSessionId,
+    comparisonLabel,
+    comparisonLoadProgress,
     onLoadSession,
     onReturnToLive,
+    onLoadComparison,
+    onClearComparison,
     onSelectFlow,
     onSelectPacket,
     onNavigateToFlow,
@@ -138,7 +148,9 @@ export function Sidebar({
             <section
                 style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: graph.comparison
+                        ? "1fr 1fr 1fr"
+                        : "1fr 1fr",
                     gap: 8,
                     flexShrink: 0,
                     minWidth: 0,
@@ -154,6 +166,22 @@ export function Sidebar({
                         {formatBytes(graph.totalBytes)}
                     </div>
                 </div>
+                {graph.comparison ? (
+                    <div style={summaryCardStyle}>
+                        <div style={summaryLabelStyle}>Compare</div>
+                        <div
+                            style={{
+                                ...summaryValueStyle,
+                                fontSize: 11,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                            }}
+                            title={graph.comparison.label}
+                        >
+                            {graph.comparison.commonFlowCount} shared
+                        </div>
+                    </div>
+                ) : null}
             </section>
             {selection ? (
                 <DetailPanel
@@ -167,8 +195,13 @@ export function Sidebar({
                 activeSessionId={activeSessionId}
                 sessionLoadProgress={sessionLoadProgress}
                 sessionsVersion={sessionsVersion}
+                comparisonSessionId={comparisonSessionId}
+                comparisonLabel={comparisonLabel}
+                comparisonLoadProgress={comparisonLoadProgress}
                 onLoadSession={onLoadSession}
                 onReturnToLive={onReturnToLive}
+                onLoadComparison={onLoadComparison}
+                onClearComparison={onClearComparison}
             />
             <section style={{ flexShrink: 0, minWidth: 0 }}>
                 <div style={panelTitleStyle}>Capture Source</div>
@@ -262,10 +295,28 @@ export function Sidebar({
                                                     whiteSpace: "nowrap",
                                                     overflow: "hidden",
                                                     textOverflow: "ellipsis",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 6,
                                                 }}
                                             >
                                                 {flow.srcHost} -&gt;{" "}
                                                 {flow.dstHost}
+                                                {flow.inComparison ? (
+                                                    <span
+                                                        style={{
+                                                            fontSize: 9,
+                                                            padding: "0 4px",
+                                                            borderRadius: 3,
+                                                            border: "1px solid #66aec4",
+                                                            color: "#66aec4",
+                                                            letterSpacing:
+                                                                "0.06em",
+                                                        }}
+                                                    >
+                                                        shared
+                                                    </span>
+                                                ) : null}
                                             </div>
                                             <div style={denseSubtleStyle}>
                                                 {flow.proto}

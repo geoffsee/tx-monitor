@@ -112,6 +112,10 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
+                    outline: data.inComparison
+                        ? "1px dashed #66aec4"
+                        : undefined,
+                    outlineOffset: data.inComparison ? "-2px" : undefined,
                 }}
             >
                 <div
@@ -121,9 +125,26 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                         letterSpacing: "0.12em",
                         textTransform: "uppercase",
                         color: accent,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
                     }}
                 >
                     {categoryLabel(data.category)}
+                    {data.inComparison ? (
+                        <span
+                            style={{
+                                fontSize: 8,
+                                letterSpacing: "0.08em",
+                                padding: "0 3px",
+                                borderRadius: 3,
+                                border: "1px solid #66aec4",
+                                color: "#66aec4",
+                            }}
+                        >
+                            vs
+                        </span>
+                    ) : null}
                 </div>
                 <div
                     title={data.address}
