@@ -62,12 +62,27 @@ type WsClient = ServerWebSocket<undefined>;
 
 const MIME_TYPES: Record<string, string> = {
     ".html": "text/html",
-    ".js": "text/javascript",
+    ".js": "application/javascript",
     ".css": "text/css",
     ".map": "application/json",
     ".png": "image/png",
     ".svg": "image/svg+xml",
 };
+
+const STATIC_ASSET_EXTENSIONS = new Set([
+    ".css",
+    ".js",
+    ".map",
+    ".png",
+    ".svg",
+    ".woff",
+    ".woff2",
+]);
+
+function isStaticAssetPath(pathname: string): boolean {
+    const extension = extname(pathname.split("?")[0] ?? pathname);
+    return STATIC_ASSET_EXTENSIONS.has(extension);
+}
 
 const { values } = parseArgs({
     args: Bun.argv.slice(2),
@@ -84,7 +99,9 @@ const { values } = parseArgs({
 
 const filePath = values.file;
 const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
-const serveStatic = values.serve || existsSync(join(DIST, "index.html"));
+const runningFromSource = import.meta.url.includes("/src/server.ts");
+const serveStatic =
+    values.serve || (runningFromSource && existsSync(join(DIST, "index.html")));
 const dbPath = values["no-db"]
     ? null
     : (values.db ?? process.env.TXMON_DB ?? DEFAULT_DB);
@@ -597,12 +614,18 @@ async function serveStaticFile(pathname: string): Promise<Response> {
     const filePathOnDisk = join(DIST, relativePath);
 
     if (!existsSync(filePathOnDisk)) {
-        if (existsSync(join(DIST, "index.html"))) {
+        if (
+            !isStaticAssetPath(relativePath) &&
+            existsSync(join(DIST, "index.html"))
+        ) {
             return new Response(Bun.file(join(DIST, "index.html")), {
                 headers: { "content-type": "text/html" },
             });
         }
-        return new Response("Not found", { status: 404 });
+        return new Response("Not found", {
+            status: 404,
+            headers: { "content-type": "text/plain" },
+        });
     }
 
     const extension = extname(filePathOnDisk);
@@ -614,9 +637,13 @@ async function serveStaticFile(pathname: string): Promise<Response> {
 
 Bun.serve({
     port: listenPort,
-    routes: {
-        "/": appHtml,
-    },
+    ...(serveStatic
+        ? {}
+        : {
+              routes: {
+                  "/": appHtml,
+              },
+          }),
     async fetch(request, server) {
         const url = new URL(request.url);
         const apiResponse = await handleApiRequest(request, url);
@@ -636,6 +663,13 @@ Bun.serve({
 
         if (serveStatic) {
             return serveStaticFile(url.pathname);
+        }
+
+        if (isStaticAssetPath(url.pathname)) {
+            return new Response("Not found", {
+                status: 404,
+                headers: { "content-type": "text/plain" },
+            });
         }
 
         return new Response("Traffic monitor websocket server", {
