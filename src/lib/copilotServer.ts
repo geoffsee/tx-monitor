@@ -168,6 +168,9 @@ function parseHistory(value: unknown): CopilotChatMessage[] {
         .slice(-12);
 }
 
+// parseCopilotRequest enforces the strict client-provided snapshot: context
+// is required (no server-side snapshot assembly). Per #39 retention: no changes
+// to payload model or addition of ambient/streaming without explicit signal.
 export function parseCopilotRequest(value: unknown): CopilotRequest {
     if (!isRecord(value)) {
         throw new CopilotRequestError("Expected a JSON object.");
