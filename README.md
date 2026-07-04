@@ -83,6 +83,37 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `--db <path>` | SQLite database path for packet persistence (default: `~/.tx-monitor`) |
 | `--no-db` | Disable SQLite persistence |
 
+## Configuration File
+
+A local config file supplies safe defaults. Precedence is: config file < environment variables < CLI flags.
+
+Primary location:
+- `~/.tx-monitor/config`
+
+Additional locations (later entries override earlier for the same key):
+- `~/.tx-monitor/config.toml`
+- `.tx-monitor/config` (relative to current working directory)
+- `.tx-monitor.toml` (relative to current working directory)
+
+File format is a simple `KEY=VALUE` file (comments with `#`, basic quoting supported, similar to dotenv). Only safe, non-secret keys are accepted.
+
+Supported config keys (examples):
+
+```
+db=~/.tx-monitor
+port=3002
+file_replay_speed=1
+file_replay_sleep_cap_ms=200
+lsof_disable=0
+lsof_interval_ms=2000
+codex_timeout_ms=180000
+codex_model=gpt-5.5
+```
+
+Secrets, credentials, API keys, and `TXMON_TCPDUMP_ARGS` are not allowed in the config file and are ignored if present (with a warning for secret-like keys). Keep credentials in the environment or `.env.copilot` only.
+
+A brief effective settings line is logged at startup (port, db, replay mode). No new interactive settings UI is added.
+
 ## Environment Variables
 
 | Variable | Default | Description |
