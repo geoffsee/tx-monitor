@@ -40,16 +40,100 @@ function ProcessDetails(props: { command: string; pid: number; user: string }) {
     );
 }
 
+function MarkerEditor({
+    kind,
+    entityId,
+    onSetEntityMarker,
+}: {
+    kind: "host" | "flow";
+    entityId: string;
+    onSetEntityMarker?: (
+        k: "host" | "flow",
+        id: string,
+        patch: { pinned?: boolean; note?: string | null; tags?: string | null },
+    ) => void;
+}) {
+    const m = trafficNetwork.markers.get(entityId);
+    const pinned = !!m?.pinned;
+    return (
+        <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+            <button
+                type="button"
+                onClick={() =>
+                    onSetEntityMarker?.(kind, entityId, { pinned: !pinned })
+                }
+                style={{
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    border: "1px solid #445",
+                    background: pinned ? "#2a3a2a" : "#0d1821",
+                    color: pinned ? "#f4d35e" : "inherit",
+                    cursor: "pointer",
+                    textAlign: "left",
+                }}
+            >
+                {pinned ? "★ Pinned (click to unpin)" : "☆ Pin this entity"}
+            </button>
+            <input
+                key={`${entityId}-note`}
+                placeholder="Note (lightweight, persists with session)"
+                defaultValue={m?.note ?? ""}
+                onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (onSetEntityMarker) {
+                        onSetEntityMarker(kind, entityId, {
+                            note: v || null,
+                        });
+                    }
+                }}
+                style={{
+                    fontSize: 10,
+                    padding: "2px 4px",
+                    background: "#081118",
+                    border: "1px solid #33414a",
+                    color: "inherit",
+                }}
+            />
+            <input
+                key={`${entityId}-tags`}
+                placeholder="tags (comma,separated)"
+                defaultValue={m?.tags ?? ""}
+                onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (onSetEntityMarker) {
+                        onSetEntityMarker(kind, entityId, {
+                            tags: v || null,
+                        });
+                    }
+                }}
+                style={{
+                    fontSize: 10,
+                    padding: "2px 4px",
+                    background: "#081118",
+                    border: "1px solid #33414a",
+                    color: "inherit",
+                }}
+            />
+        </div>
+    );
+}
+
 type DetailPanelProps = {
     selection: Selection;
     onClear: () => void;
     onSelectFlow: (flowId: string) => void;
+    onSetEntityMarker?: (
+        kind: "host" | "flow",
+        id: string,
+        patch: { pinned?: boolean; note?: string | null; tags?: string | null },
+    ) => void;
 };
 
 export function DetailPanel({
     selection,
     onClear,
     onSelectFlow,
+    onSetEntityMarker,
 }: DetailPanelProps) {
     if (selection.kind === "host") {
         const host = trafficNetwork.hosts.get(selection.id);
@@ -113,6 +197,12 @@ export function DetailPanel({
                         </div>
                     </div>
                 </div>
+                <div style={detailSectionTitleStyle}>Durable Marker</div>
+                <MarkerEditor
+                    kind="host"
+                    entityId={host.id}
+                    onSetEntityMarker={onSetEntityMarker}
+                />
                 {flows.length > 0 ? (
                     <>
                         <div style={detailSectionTitleStyle}>Connections</div>
@@ -242,6 +332,12 @@ export function DetailPanel({
                         </div>
                     </div>
                 </div>
+                <div style={detailSectionTitleStyle}>Durable Marker</div>
+                <MarkerEditor
+                    kind="flow"
+                    entityId={flow.id}
+                    onSetEntityMarker={onSetEntityMarker}
+                />
                 {flow.processCommand && flow.processPid && flow.processUser ? (
                     <ProcessDetails
                         command={flow.processCommand}

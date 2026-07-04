@@ -40,6 +40,11 @@ type SidebarProps = {
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
     onClearSelection: () => void;
+    onSetEntityMarker?: (
+        kind: "host" | "flow",
+        id: string,
+        patch: { pinned?: boolean; note?: string | null; tags?: string | null },
+    ) => void;
 };
 
 export function Sidebar({
@@ -56,6 +61,7 @@ export function Sidebar({
     onSelectPacket,
     onNavigateToFlow,
     onClearSelection,
+    onSetEntityMarker,
 }: SidebarProps) {
     const feedLabel =
         viewMode === "history"
@@ -100,6 +106,8 @@ export function Sidebar({
         const end = Math.min(items.length, start + visibleCount);
         return { items: items.slice(start, end), start, total: items.length };
     };
+
+    const pinnedById = new Map((graph.markers ?? []).map((m) => [m.id, m]));
 
     return (
         <aside
@@ -160,6 +168,7 @@ export function Sidebar({
                     selection={selection}
                     onClear={onClearSelection}
                     onSelectFlow={onNavigateToFlow}
+                    onSetEntityMarker={onSetEntityMarker}
                 />
             ) : null}
             <SessionHistory
@@ -264,6 +273,9 @@ export function Sidebar({
                                                     textOverflow: "ellipsis",
                                                 }}
                                             >
+                                                {pinnedById.get(flow.id)?.pinned
+                                                    ? "★ "
+                                                    : ""}
                                                 {flow.srcHost} -&gt;{" "}
                                                 {flow.dstHost}
                                             </div>

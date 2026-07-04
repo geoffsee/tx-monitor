@@ -55,6 +55,13 @@ const AnomalyModel = types.model("Anomaly", {
     flowId: types.maybe(types.string),
 });
 
+const EntityMarkerModel = types.model("EntityMarker", {
+    kind: types.enumeration("EntityKind", ["host", "flow"]),
+    pinned: types.optional(types.boolean, false),
+    note: types.maybeNull(types.string),
+    tags: types.maybeNull(types.string),
+});
+
 const TrafficNetworkModel = types
     .model("TrafficNetwork", {
         hosts: types.map(HostModel),
@@ -62,6 +69,7 @@ const TrafficNetworkModel = types
         packets: types.array(PacketModel),
         resolvedDns: types.map(types.string),
         anomalies: types.map(AnomalyModel),
+        markers: types.map(EntityMarkerModel),
         events: types.array(types.string),
         totalPackets: types.optional(types.number, 0),
         totalBytes: types.optional(types.number, 0),
@@ -466,6 +474,7 @@ const TrafficNetworkModel = types
             self.packets.clear();
             self.resolvedDns.clear();
             self.anomalies.clear();
+            self.markers.clear();
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
@@ -482,6 +491,82 @@ const TrafficNetworkModel = types
             self.sensitivity = level;
         };
 
+        const setEntityMarker = (
+            kind: "host" | "flow",
+            entityId: string,
+            patch: {
+                pinned?: boolean;
+                note?: string | null;
+                tags?: string | null;
+            },
+        ) => {
+            const key = entityId;
+            const existing = self.markers.get(key);
+            const nextPinned =
+                patch.pinned !== undefined
+                    ? patch.pinned
+                    : (existing?.pinned ?? false);
+            const nextNote =
+                patch.note !== undefined
+                    ? patch.note
+                    : (existing?.note ?? null);
+            const nextTags =
+                patch.tags !== undefined
+                    ? patch.tags
+                    : (existing?.tags ?? null);
+
+            const hasContent =
+                nextPinned ||
+                (nextNote && nextNote.trim().length > 0) ||
+                (nextTags && nextTags.trim().length > 0);
+            if (!hasContent) {
+                self.markers.delete(key);
+                return;
+            }
+            self.markers.set(
+                key,
+                EntityMarkerModel.create({
+                    kind,
+                    pinned: nextPinned,
+                    note: nextNote,
+                    tags: nextTags,
+                }),
+            );
+        };
+
+        const replaceMarkers = (
+            list: Array<{
+                kind: "host" | "flow";
+                id: string;
+                pinned?: boolean;
+                note?: string | null;
+                tags?: string | null;
+            }>,
+        ) => {
+            self.markers.clear();
+            for (const entry of list) {
+                const pinned = !!entry.pinned;
+                const note = entry.note ?? null;
+                const tags = entry.tags ?? null;
+                const hasContent =
+                    pinned ||
+                    (note && note.trim().length > 0) ||
+                    (tags && tags.trim().length > 0);
+                if (!hasContent) {
+                    continue;
+                }
+                self.markers.set(
+                    entry.id,
+                    EntityMarkerModel.create({
+                        kind: entry.kind,
+                        pinned,
+                        note,
+                        tags,
+                    }),
+                );
+            }
+        };
+
         return {
             ingestPacket,
             ingestBatch,
@@ -492,6 +577,8 @@ const TrafficNetworkModel = types
             setSensitivity,
             reset,
             remember,
+            setEntityMarker,
+            replaceMarkers,
         };
     });
 
@@ -500,6 +587,8 @@ export const trafficNetwork = TrafficNetworkModel.create({
     resolvedDns: {},
     flows: {},
     packets: [],
+    anomalies: {},
+    markers: {},
     events: [],
 });
 
