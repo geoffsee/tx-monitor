@@ -37,8 +37,3 @@ else
     chmod 600 "$dest" 2>/dev/null || true
     echo "Restored Grok OAuth session to ${dest}." >&2
 fi
-
-# Prefer subscription OAuth over any API key present in the workflow env.
-unset XAI_API_KEY GROK_API_KEY 2>/dev/null || true
-export XAI_API_KEY=""
-export GROK_API_KEY=""

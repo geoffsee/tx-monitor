@@ -54,6 +54,11 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Restore Grok OAuth credentials
+        env:
+          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
+        run: bash scripts/restore-grok-credentials.sh
+
       - id: caretta
         uses: geoffsee/caretta-autopilot-action@main
         with:
@@ -64,7 +69,6 @@ jobs:
           enable-dispatch: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_dispatch }}
           github-token: ${{ github.token }}
         env:
-          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
