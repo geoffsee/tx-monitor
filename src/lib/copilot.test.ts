@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { TrafficSnapshot } from "../types";
-import { buildCopilotContext } from "./copilot";
+import type { Anomaly, TrafficSnapshot } from "../types";
+import {
+    buildAnomalyExport,
+    buildAnomalyPrompt,
+    buildCopilotContext,
+} from "./copilot";
 
 const emptyGraph: TrafficSnapshot = {
     nodes: [],
@@ -83,5 +87,119 @@ describe("buildCopilotContext", () => {
             proto: "UDP",
             dstPort: 53,
         });
+    });
+});
+
+const sampleAnomalyFlow: Anomaly = {
+    id: "rate-spike-flow-1",
+    timestamp: 1_700_000_000_000,
+    severity: "low",
+    type: "High Rate",
+    description: "Flow flow-1 received 8 packets in ~2s",
+    flowId: "flow-1",
+};
+
+const sampleAnomalyHost: Anomaly = {
+    id: "suspicious-8.8.8.8-445",
+    timestamp: 1_700_000_000_100,
+    severity: "high",
+    type: "Suspicious External Port",
+    description: "Host 8.8.8.8 receiving traffic on sensitive port 445",
+    hostId: "8.8.8.8",
+};
+
+const sampleAnomalyGlobal: Anomaly = {
+    id: "dns-volume",
+    timestamp: 1_700_000_000_200,
+    severity: "low",
+    type: "High DNS Volume",
+    description: "35 DNS packets observed",
+};
+
+const graphWithPackets: TrafficSnapshot = {
+    ...sampleGraph,
+    packets: [
+        {
+            id: "p1",
+            timestamp: "12:00:00.000000",
+            proto: "UDP",
+            srcHost: "10.0.0.1",
+            dstHost: "8.8.8.8",
+            length: 60,
+            info: "DNS",
+        },
+        {
+            id: "p2",
+            timestamp: "12:00:00.010000",
+            proto: "UDP",
+            srcHost: "8.8.8.8",
+            dstHost: "10.0.0.1",
+            length: 120,
+            info: "DNS resp",
+        },
+        {
+            id: "p3",
+            timestamp: "12:00:01.000000",
+            proto: "TCP",
+            srcHost: "10.0.0.1",
+            dstHost: "1.1.1.1",
+            length: 100,
+            info: "other",
+        },
+    ],
+};
+
+describe("buildAnomalyPrompt", () => {
+    test("includes type, description and flow when present", () => {
+        const prompt = buildAnomalyPrompt(sampleAnomalyFlow);
+        expect(prompt).toContain("High Rate");
+        expect(prompt).toContain("Flow flow-1");
+        expect(prompt).toContain("snapshot context");
+    });
+
+    test("includes host when present and no flow", () => {
+        const prompt = buildAnomalyPrompt(sampleAnomalyHost);
+        expect(prompt).toContain("Suspicious External Port");
+        expect(prompt).toContain("Related host: 8.8.8.8");
+    });
+
+    test("handles global anomaly without host or flow", () => {
+        const prompt = buildAnomalyPrompt(sampleAnomalyGlobal);
+        expect(prompt).toContain("High DNS Volume");
+        expect(prompt).not.toContain("Related host");
+        expect(prompt).not.toContain("Related flow");
+    });
+});
+
+describe("buildAnomalyExport", () => {
+    test("exports flow-targeted slice with matching flow and packets", () => {
+        const exp = buildAnomalyExport(sampleAnomalyFlow, graphWithPackets);
+        expect(exp.anomaly.id).toBe("rate-spike-flow-1");
+        expect(exp.related.flows.length).toBe(1);
+        expect(exp.related.flows[0]?.id).toBe("flow-1");
+        // packets between the flow endpoints (bidirectional match)
+        expect(exp.related.packets.length).toBe(2);
+        expect(exp.related.hosts.map((h) => h.id).sort()).toEqual([
+            "10.0.0.1",
+            "8.8.8.8",
+        ]);
+    });
+
+    test("exports host-targeted slice limited to that host", () => {
+        const exp = buildAnomalyExport(sampleAnomalyHost, graphWithPackets);
+        expect(exp.related.hosts.length).toBe(1);
+        expect(exp.related.hosts[0]?.id).toBe("8.8.8.8");
+        // flows involving the host
+        expect(exp.related.flows.length).toBe(1);
+        // packets involving the host (p1,p2)
+        expect(exp.related.packets.length).toBe(2);
+    });
+
+    test("exports global anomaly with empty related to avoid ambient leak", () => {
+        const exp = buildAnomalyExport(sampleAnomalyGlobal, graphWithPackets);
+        expect(exp.anomaly.type).toBe("High DNS Volume");
+        expect(exp.related.hosts.length).toBe(0);
+        expect(exp.related.flows.length).toBe(0);
+        expect(exp.related.packets.length).toBe(0);
     });
 });

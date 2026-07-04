@@ -1,5 +1,5 @@
 import { formatBytes } from "../layout";
-import type { Selection, TrafficSnapshot } from "../types";
+import type { Anomaly, Selection, TrafficSnapshot } from "../types";
 
 export type CopilotMessage = {
     id: string;
@@ -173,3 +173,75 @@ export const COPILOT_WELCOME = createMessage(
     "assistant",
     "I'm your traffic copilot. I analyze the current capture through the backend Codex SDK.\n\nSetup uses TXMON_CODEX_AUTH (local or api-key) and OPENAI_API_KEY (for api-key mode, via env or .env.copilot). Status and Validate are shown above.",
 );
+
+export function buildAnomalyPrompt(anomaly: Anomaly): string {
+    const parts: string[] = [];
+    parts.push(
+        `Explain this anomaly: ${anomaly.type} - ${anomaly.description}.`,
+    );
+    if (anomaly.flowId) {
+        parts.push(`Related flow: ${anomaly.flowId}.`);
+    }
+    if (anomaly.hostId) {
+        parts.push(`Related host: ${anomaly.hostId}.`);
+    }
+    parts.push(
+        "Analyze using the provided snapshot context, referencing any matching hosts, flows, or packets.",
+    );
+    return parts.join(" ");
+}
+
+export type AnomalyExport = {
+    exportedAt: string;
+    anomaly: Anomaly;
+    related: {
+        hosts: TrafficSnapshot["nodes"];
+        flows: TrafficSnapshot["flows"];
+        packets: TrafficSnapshot["packets"];
+    };
+};
+
+export function buildAnomalyExport(
+    anomaly: Anomaly,
+    graph: TrafficSnapshot,
+): AnomalyExport {
+    const now = new Date().toISOString();
+    let relatedHosts: TrafficSnapshot["nodes"] = [];
+    let relatedFlows: TrafficSnapshot["flows"] = [];
+    let relatedPackets: TrafficSnapshot["packets"] = [];
+
+    const flow = anomaly.flowId
+        ? graph.flows.find((f) => f.id === anomaly.flowId)
+        : undefined;
+    const hostId = anomaly.hostId;
+
+    if (flow) {
+        relatedFlows = graph.flows.filter((f) => f.id === flow.id);
+        relatedHosts = graph.nodes.filter(
+            (n) => n.id === flow.srcHost || n.id === flow.dstHost,
+        );
+        relatedPackets = graph.packets.filter(
+            (p) =>
+                (p.srcHost === flow.srcHost && p.dstHost === flow.dstHost) ||
+                (p.srcHost === flow.dstHost && p.dstHost === flow.srcHost),
+        );
+    } else if (hostId) {
+        relatedHosts = graph.nodes.filter((n) => n.id === hostId);
+        relatedFlows = graph.flows.filter(
+            (f) => f.srcHost === hostId || f.dstHost === hostId,
+        );
+        relatedPackets = graph.packets.filter(
+            (p) => p.srcHost === hostId || p.dstHost === hostId,
+        );
+    }
+
+    return {
+        exportedAt: now,
+        anomaly,
+        related: {
+            hosts: relatedHosts,
+            flows: relatedFlows,
+            packets: relatedPackets,
+        },
+    };
+}

@@ -7,6 +7,8 @@ import {
     useState,
 } from "react";
 import {
+    buildAnomalyExport,
+    buildAnomalyPrompt,
     COPILOT_SUGGESTIONS,
     COPILOT_WELCOME,
     type CopilotMessage,
@@ -21,6 +23,8 @@ import {
 } from "../lib/copilotClient";
 import type { Selection, TrafficSnapshot } from "../types";
 import {
+    anomalyActionButtonStyle,
+    anomalyActionsRowStyle,
     anomalyBadgeStyle,
     copilotBubbleAssistantStyle,
     copilotBubbleUserStyle,
@@ -39,6 +43,8 @@ type CopilotSidebarProps = {
     isCompact: boolean;
     sensitivity: "low" | "medium" | "high";
     onSetSensitivity: (level: "low" | "medium" | "high") => void;
+    onSelectHost?: (id: string) => void;
+    onSelectFlow?: (id: string) => void;
 };
 
 type Tab = "copilot" | "anomalies";
@@ -49,6 +55,8 @@ export function CopilotSidebar({
     isCompact,
     sensitivity,
     onSetSensitivity,
+    onSelectHost,
+    onSelectFlow,
 }: CopilotSidebarProps) {
     const [activeTab, setActiveTab] = useState<Tab>("copilot");
     const [messages, setMessages] = useState<CopilotMessage[]>([
@@ -177,6 +185,48 @@ export function CopilotSidebar({
             void submitPrompt(draft);
         },
         [draft, submitPrompt],
+    );
+
+    const triggerExport = useCallback(
+        (anomaly: (typeof graph.anomalies)[number]) => {
+            const payload = buildAnomalyExport(anomaly, graph);
+            const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const safeType = anomaly.type.toLowerCase().replace(/\s+/g, "-");
+            a.href = url;
+            a.download = `anomaly-${safeType}-${anomaly.id}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
+        [graph],
+    );
+
+    const handleAnomalyFilter = useCallback(
+        (anomaly: (typeof graph.anomalies)[number]) => {
+            if (anomaly.flowId && onSelectFlow) {
+                onSelectFlow(anomaly.flowId);
+            } else if (anomaly.hostId && onSelectHost) {
+                onSelectHost(anomaly.hostId);
+            }
+        },
+        [onSelectFlow, onSelectHost],
+    );
+
+    const handleAnomalyAskCopilot = useCallback(
+        (anomaly: (typeof graph.anomalies)[number]) => {
+            const prompt = buildAnomalyPrompt(anomaly);
+            setActiveTab("copilot");
+            // Defer submit to allow tab state to render the copilot panel
+            setTimeout(() => {
+                void submitPrompt(prompt);
+            }, 0);
+        },
+        [submitPrompt],
     );
 
     const tabButtonStyle = (isActive: boolean): React.CSSProperties => ({
@@ -600,6 +650,47 @@ export function CopilotSidebar({
                                                 Host: {anomaly.hostId}
                                             </div>
                                         )}
+                                        <div style={anomalyActionsRowStyle}>
+                                            {(anomaly.flowId ||
+                                                anomaly.hostId) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleAnomalyFilter(
+                                                            anomaly,
+                                                        )
+                                                    }
+                                                    style={
+                                                        anomalyActionButtonStyle
+                                                    }
+                                                    title="Filter to related host or flow"
+                                                >
+                                                    Filter
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    triggerExport(anomaly)
+                                                }
+                                                style={anomalyActionButtonStyle}
+                                                title="Export anomaly and related packet slice as JSON"
+                                            >
+                                                Export
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleAnomalyAskCopilot(
+                                                        anomaly,
+                                                    )
+                                                }
+                                                style={anomalyActionButtonStyle}
+                                                title="Prefill copilot with anomaly context"
+                                            >
+                                                Ask Copilot
+                                            </button>
+                                        </div>
                                     </div>
                                 ))
                             )}

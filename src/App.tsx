@@ -80,6 +80,8 @@ export default function App() {
                     isCompact={isCompact}
                     sensitivity={sensitivity}
                     onSetSensitivity={setSensitivity}
+                    onSelectHost={handleSelectHost}
+                    onSelectFlow={handleSelectFlow}
                 />
                 <TrafficGraph
                     graph={graph}
