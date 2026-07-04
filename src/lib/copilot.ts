@@ -13,6 +13,9 @@ export type CopilotChatMessage = {
     content: string;
 };
 
+// Retention (per #39 / #40): strict client-provided snapshot model for copilot.
+// CopilotRequest.context is always built client-side from TrafficSnapshot and sent
+// via POST /api/copilot. No ambient streaming or server-pulled data for AI analysis.
 export type CopilotRequest = {
     prompt: string;
     history: CopilotChatMessage[];
@@ -135,6 +138,9 @@ function describeSelectionContext(
     return { kind: "packet", ...packet };
 }
 
+// buildCopilotContext produces the snapshot-derived context for the strict
+// client-provided model. Changes to this or the context shape require explicit
+// demand/review per retention commitment (#39).
 export function buildCopilotContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
