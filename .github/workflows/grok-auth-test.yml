@@ -12,10 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
       - name: Restore Grok OAuth credentials
         env:
           GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
@@ -33,11 +29,12 @@ jobs:
           jq -r 'to_entries[0].value | "auth_mode=\(.auth_mode) expires_at=\(.expires_at) email=\(.email)"' "$auth_file"
 
       - name: Install Grok CLI
-        run: npm install -g "@xai-official/grok@0.2.82"
+        run: curl -fsSL https://x.ai/cli/install.sh | bash
 
       - name: Run Grok prompt
         run: |
           set -euo pipefail
+          export PATH="${HOME}/.grok/bin:${PATH}"
           grok -p "Reply with exactly: credentials ok" \
             --always-approve \
             --output-format json \
