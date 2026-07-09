@@ -62,7 +62,7 @@ jobs:
           context: ${{ inputs.context || format('Autopilot triggered by {0}', github.event_name) }}
           dry-run: ${{ inputs.dry_run || 'false' }}
           enable-dispatch: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_dispatch }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ github.token }}
         env:
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
