@@ -44,6 +44,9 @@ jobs:
           echo "GROK_CREDENTIALS restored from oz (masked; never logged)"
 
       - name: Run Grok auth verification (writes ~/.grok/auth.json + tests bundled CLI prompt)
+        env:
+          # OAuth session under test exposes grok-4.5; leave caretta.toml agent model alone.
+          GROK_VERIFY_MODEL: grok-4.5
         run: bash scripts/verify-grok-auth.sh
 
       - name: Report result

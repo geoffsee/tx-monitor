@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Fail fast when Grok OAuth or the caretta.toml model id is misconfigured for CI.
+# Fail fast when Grok OAuth is misconfigured for CI.
+# Default model comes from caretta.toml [agent_models].xai; override with GROK_VERIFY_MODEL.
 set -euo pipefail
 
 if [ -z "${GROK_CREDENTIALS:-}" ] && [ ! -f "${HOME}/.grok/auth.json" ]; then
@@ -18,21 +19,25 @@ export PATH="${HOME}/.grok/bin:${PATH}"
 
 unset XAI_API_KEY GROK_API_KEY
 
-model="$(
-    awk '
-        /^\[agent_models\]/ { in_models = 1; next }
-        /^\[/ { in_models = 0 }
-        in_models && $1 == "xai" {
-            split($0, parts, "=")
-            gsub(/[" \t]/, "", parts[2])
-            print parts[2]
-            exit
-        }
-    ' caretta.toml
-)"
-if [ -z "$model" ]; then
-    echo "caretta.toml has no [agent_models] xai entry." >&2
-    exit 1
+if [ -n "${GROK_VERIFY_MODEL:-}" ]; then
+    model="$GROK_VERIFY_MODEL"
+else
+    model="$(
+        awk '
+            /^\[agent_models\]/ { in_models = 1; next }
+            /^\[/ { in_models = 0 }
+            in_models && $1 == "xai" {
+                split($0, parts, "=")
+                gsub(/[" \t]/, "", parts[2])
+                print parts[2]
+                exit
+            }
+        ' caretta.toml
+    )"
+    if [ -z "$model" ]; then
+        echo "caretta.toml has no [agent_models] xai entry (or set GROK_VERIFY_MODEL)." >&2
+        exit 1
+    fi
 fi
 
 models_out="$(grok models 2>&1 || true)"
@@ -41,7 +46,7 @@ if ! printf '%s\n' "$models_out" | grep -Fq "$model"; then
     echo "Available models (names only):" >&2
     # Print only model id-like tokens; never dump raw auth material.
     printf '%s\n' "$models_out" | grep -Eio 'grok[-a-z0-9.]*' | sort -u >&2 || true
-    echo "Run 'grok models' locally after 'grok login' and update caretta.toml." >&2
+    echo "Set GROK_VERIFY_MODEL or run 'grok models' after 'grok login'." >&2
     exit 1
 fi
 
