@@ -67,7 +67,9 @@ jobs:
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
-          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
+          OZ_API_KEY: ${{ secrets.OZ_API_KEY }}
+          OZ_API_URL: ${{ vars.OZ_API_URL }}
+          OZ_PROJECT: ${{ vars.OZ_PROJECT }}
 
       - name: Autopilot diagnostics
         if: always()
