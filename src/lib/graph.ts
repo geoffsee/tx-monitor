@@ -13,7 +13,7 @@ import type {
     TrafficSnapshot,
 } from "../types";
 import type { TrafficHost } from "./trafficNetwork";
-import { EMPTY_EVICTION_BY_REASON, trafficNetwork } from "./trafficNetwork";
+import { trafficNetwork } from "./trafficNetwork";
 
 export const MAX_GRAPH_HOSTS = 18;
 export const MAX_GRAPH_FLOWS = 48;
@@ -306,9 +306,7 @@ export function createGraph(): TrafficSnapshot {
         hostsEvicted: trafficNetwork.hostsEvicted || 0,
         flowsEvicted: trafficNetwork.flowsEvicted || 0,
         packetsEvicted: trafficNetwork.packetsEvicted || 0,
-        evictionByReason: trafficNetwork.evictionReasonSnapshot ?? {
-            ...EMPTY_EVICTION_BY_REASON,
-        },
+        evictionByReason: trafficNetwork.evictionReasonSnapshot,
         summaryOnly: !!trafficNetwork.summaryOnly,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,

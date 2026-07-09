@@ -502,10 +502,22 @@ const TrafficNetworkModel = types
             if (packetDropped > 0) {
                 const prevTotal = self.packetsEvicted;
                 recordEviction(packetReason, packetDropped);
-                // Avoid event spam on steady single-packet drops; log first and batchy drops.
-                if (prevTotal === 0 || packetDropped > 1) {
+                const total = self.packetsEvicted;
+                // Avoid spam under steady single-packet drops: log multi-drops and
+                // power-of-10 milestones (1, 10, 100, …) so the ticker stays useful.
+                let crossedMilestone = false;
+                for (let t = 1; t <= total; t *= 10) {
+                    if (prevTotal < t && total >= t) {
+                        crossedMilestone = true;
+                        break;
+                    }
+                    if (t > Number.MAX_SAFE_INTEGER / 10) {
+                        break;
+                    }
+                }
+                if (packetDropped > 1 || crossedMilestone) {
                     remember(
-                        `Evicted ${packetDropped} packet detail(s) (reason: ${packetReason}; cap ${packetCap}; total ${self.packetsEvicted})`,
+                        `Evicted ${packetDropped} packet detail(s) (reason: ${packetReason}; cap ${packetCap}; total ${total})`,
                     );
                 }
             }

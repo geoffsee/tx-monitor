@@ -194,7 +194,7 @@ export function TrafficGraph({
                                 style={compactKpiStyle}
                                 title={
                                     graph.hostsEvicted > 0
-                                        ? `Hosts in memory (cap). Evicted ${graph.hostsEvicted} (host_cap: ${graph.evictionByReason.host_cap})`
+                                        ? `Hosts in memory (cap). Evicted ${graph.hostsEvicted} (reason: host_cap)`
                                         : "Hosts in memory"
                                 }
                             >

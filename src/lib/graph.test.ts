@@ -158,6 +158,7 @@ describe("createGraph", () => {
         expect(
             snap.evictionByReason.flow_cap + snap.evictionByReason.flow_orphan,
         ).toBe(snap.flowsEvicted);
+        expect(snap.evictionByReason.flow_orphan).toBeGreaterThan(0);
         expect(trafficNetwork.flowsEvicted).toBeGreaterThanOrEqual(0);
         // Event stream includes reason labels for operator console/ticker
         const evictionEvents = trafficNetwork.events.filter((e) =>
