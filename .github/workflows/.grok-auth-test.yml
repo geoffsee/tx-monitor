@@ -24,8 +24,16 @@ jobs:
           OZ_PROJECT: ${{ secrets.OZ_PROJECT }}
         run: |
           set -euo pipefail
-          echo "Restoring GROK_CREDENTIALS from oz using OZ_* envs..."
-          GROK_CREDENTIALS=$(oz get GROK_CREDENTIALS)
+          : "${OZ_API_KEY:?OZ_API_KEY secret is required}"
+          : "${OZ_API_URL:?OZ_API_URL secret is required}"
+          : "${OZ_PROJECT:?OZ_PROJECT secret is required}"
+          echo "Restoring GROK_CREDENTIALS from oz (project=${OZ_PROJECT})..."
+          # OZ_API_KEY / OZ_API_URL are read by the CLI; value is printed to stdout.
+          GROK_CREDENTIALS="$(oz secrets get GROK_CREDENTIALS --project "$OZ_PROJECT")"
+          if [ -z "$GROK_CREDENTIALS" ]; then
+            echo "oz returned an empty GROK_CREDENTIALS value" >&2
+            exit 1
+          fi
           echo "::add-mask::$GROK_CREDENTIALS"
           echo "GROK_CREDENTIALS=$GROK_CREDENTIALS" >> "$GITHUB_ENV"
           echo "GROK_CREDENTIALS restored from oz (masked; never logged)"
