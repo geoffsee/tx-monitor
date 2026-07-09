@@ -54,16 +54,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Restore Grok OAuth credentials
-        env:
-          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
-        run: bash scripts/restore-grok-credentials.sh
-
-      - name: Verify Grok OAuth and model
-        env:
-          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
-        run: bash scripts/verify-grok-auth.sh
-
       - id: caretta
         uses: geoffsee/caretta-autopilot-action@main
         with:
@@ -77,8 +67,9 @@ jobs:
           DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
           DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
           DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          RUST_LOG: info
+          OZ_API_KEY: ${{ secrets.OZ_API_KEY }}
+          OZ_API_URL: ${{ vars.OZ_API_URL }}
+          OZ_PROJECT: ${{ vars.OZ_PROJECT }}
 
       - name: Autopilot diagnostics
         if: always()

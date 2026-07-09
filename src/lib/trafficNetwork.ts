@@ -5,6 +5,7 @@ import { hostCategory, type ParsedPacket, shortHost } from "./tcpdumpParser";
 export const MAX_MEMORY_HOSTS = 500;
 export const MAX_MEMORY_FLOWS = 2000;
 export const MAX_MEMORY_PACKETS = 80;
+export const MAX_MEMORY_PACKETS_SUMMARY = 8;
 
 const HostModel = types.model("Host", {
     id: types.identifier,
@@ -79,6 +80,10 @@ const TrafficNetworkModel = types
         captureIface: types.optional(types.string, "any"),
         captureDirection: types.optional(types.string, "out"),
         captureBpf: types.optional(types.string, ""),
+        hostsEvicted: types.optional(types.number, 0),
+        flowsEvicted: types.optional(types.number, 0),
+        packetsEvicted: types.optional(types.number, 0),
+        summaryOnly: types.optional(types.boolean, false),
     })
     .views((self) => ({
         get hostList() {
@@ -283,11 +288,19 @@ const TrafficNetworkModel = types
                     return a.packetCount - b.packetCount;
                 return a.id.localeCompare(b.id);
             });
+            let evicted = 0;
             for (let i = 0; i < excess; i++) {
                 const victim = sorted[i];
                 if (victim) {
                     self.hosts.delete(victim.id);
+                    self.hostsEvicted += 1;
+                    evicted++;
                 }
+            }
+            if (evicted > 0) {
+                remember(
+                    `Evicted ${evicted} host(s) (cap ${MAX_MEMORY_HOSTS})`,
+                );
             }
             pruneOrphanFlows();
         };
@@ -303,11 +316,19 @@ const TrafficNetworkModel = types
                 if (a.lastSeen !== b.lastSeen) return a.lastSeen - b.lastSeen;
                 return a.id.localeCompare(b.id);
             });
+            let evicted = 0;
             for (let i = 0; i < excess; i++) {
                 const victim = sorted[i];
                 if (victim) {
                     self.flows.delete(victim.id);
+                    self.flowsEvicted += 1;
+                    evicted++;
                 }
+            }
+            if (evicted > 0) {
+                remember(
+                    `Evicted ${evicted} flow(s) (cap ${MAX_MEMORY_FLOWS})`,
+                );
             }
         };
 
@@ -414,8 +435,12 @@ const TrafficNetworkModel = types
                     : {}),
             };
             self.packets.unshift(snapshot);
-            if (self.packets.length > MAX_MEMORY_PACKETS) {
+            const packetCap = self.summaryOnly
+                ? MAX_MEMORY_PACKETS_SUMMARY
+                : MAX_MEMORY_PACKETS;
+            while (self.packets.length > packetCap) {
                 self.packets.pop();
+                self.packetsEvicted += 1;
             }
 
             self.totalPackets += 1;
@@ -480,6 +505,10 @@ const TrafficNetworkModel = types
             self.totalBytes = 0;
             self.dnsPacketCount = 0;
             self.sensitivity = "medium";
+            self.hostsEvicted = 0;
+            self.flowsEvicted = 0;
+            self.packetsEvicted = 0;
+            self.summaryOnly = false;
             flowArrivals.clear();
             dnsTargets.clear();
             self.sourceMode = "live";
@@ -494,6 +523,25 @@ const TrafficNetworkModel = types
             self.sensitivity = level;
         };
 
+        const setSummaryOnly = (enabled: boolean) => {
+            const was = self.summaryOnly;
+            self.summaryOnly = enabled;
+            if (enabled && !was) {
+                const target = MAX_MEMORY_PACKETS_SUMMARY;
+                let dropped = 0;
+                while (self.packets.length > target) {
+                    self.packets.pop();
+                    self.packetsEvicted += 1;
+                    dropped++;
+                }
+                if (dropped > 0) {
+                    remember(
+                        `Summary mode: dropped ${dropped} packet detail(s) (retaining recent window)`,
+                    );
+                }
+            }
+        };
+
         return {
             ingestPacket,
             ingestBatch,
@@ -503,6 +551,7 @@ const TrafficNetworkModel = types
             setSource,
             setCapture,
             setSensitivity,
+            setSummaryOnly,
             reset,
             remember,
         };

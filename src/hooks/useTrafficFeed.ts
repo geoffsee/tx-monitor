@@ -35,6 +35,8 @@ export type TrafficFeedState = {
         direction?: string;
         bpf?: string;
     }) => void;
+    summaryOnly: boolean;
+    setSummaryOnly: (enabled: boolean) => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -354,6 +356,14 @@ export function useTrafficFeed(): TrafficFeedState {
         [publishGraph],
     );
 
+    const setSummaryOnly = useCallback(
+        (enabled: boolean) => {
+            trafficNetwork.setSummaryOnly(enabled);
+            publishGraph();
+        },
+        [publishGraph],
+    );
+
     return {
         graph,
         viewMode,
@@ -366,5 +376,7 @@ export function useTrafficFeed(): TrafficFeedState {
         sensitivity: graph.sensitivity,
         setSensitivity,
         updateCapture,
+        summaryOnly: graph.summaryOnly,
+        setSummaryOnly,
     };
 }

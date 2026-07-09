@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ThreadOptions } from "@openai/codex-sdk";
+import { getEffectiveCodexModel, getEffectiveCodexTimeoutMs } from "./config";
 import {
     COPILOT_SYSTEM_PROMPT,
     type CopilotAuthMode,
@@ -13,14 +14,8 @@ import {
 } from "./copilot";
 import { loadClientSecrets } from "./secrets";
 
-const parsedCodexTimeoutMs = Number.parseInt(
-    process.env.TXMON_CODEX_TIMEOUT_MS ?? "120000",
-    10,
-);
-const CODEX_TIMEOUT_MS = Number.isFinite(parsedCodexTimeoutMs)
-    ? parsedCodexTimeoutMs
-    : 120000;
-const CODEX_MODEL = process.env.TXMON_CODEX_MODEL?.trim() || "gpt-5.5";
+const CODEX_TIMEOUT_MS = getEffectiveCodexTimeoutMs();
+const CODEX_MODEL = getEffectiveCodexModel();
 const CODEX_AUTH_MODE =
     process.env.TXMON_CODEX_AUTH?.trim() === "api-key" ? "api-key" : "local";
 const COPILOT_LOG_PREFIX = "[copilot]";
@@ -168,6 +163,9 @@ function parseHistory(value: unknown): CopilotChatMessage[] {
         .slice(-12);
 }
 
+// parseCopilotRequest enforces the strict client-provided snapshot: context
+// is required (no server-side snapshot assembly). Per #39 retention: no changes
+// to payload model or addition of ambient/streaming without explicit signal.
 export function parseCopilotRequest(value: unknown): CopilotRequest {
     if (!isRecord(value)) {
         throw new CopilotRequestError("Expected a JSON object.");
