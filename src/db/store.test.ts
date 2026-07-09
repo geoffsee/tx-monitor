@@ -188,4 +188,55 @@ describe("TrafficStore", () => {
             store.listRecentPackets(10, s1.id).some((p) => p.id === "s2-p1"),
         ).toBe(false);
     });
+
+    test("persists and updates entity markers for hosts and flows", () => {
+        const store = createTestStore();
+        const session = store.startSession("file", "test-session");
+
+        store.setEntityMarker(session.id, {
+            kind: "host",
+            entityId: "10.0.0.5",
+            pinned: true,
+            note: "primary host",
+            tags: "lab,important",
+        });
+        store.setEntityMarker(session.id, {
+            kind: "flow",
+            entityId: "10.0.0.5->8.8.8.8:UDP:53",
+            pinned: false,
+            note: "dns flow",
+            tags: null,
+        });
+
+        let markers = store.getEntityMarkers(session.id);
+        expect(markers.length).toBe(2);
+        const hostM = markers.find((m) => m.kind === "host");
+        expect(hostM?.id).toBe("10.0.0.5");
+        expect(hostM?.pinned).toBe(true);
+        expect(hostM?.note).toBe("primary host");
+        expect(hostM?.tags).toBe("lab,important");
+
+        // update note only, preserve pin
+        store.setEntityMarker(session.id, {
+            kind: "host",
+            entityId: "10.0.0.5",
+            note: "updated note",
+        });
+        markers = store.getEntityMarkers(session.id);
+        const updatedHost = markers.find((m) => m.kind === "host");
+        expect(updatedHost?.note).toBe("updated note");
+        expect(updatedHost?.pinned).toBe(true);
+
+        // clear by removing content
+        store.setEntityMarker(session.id, {
+            kind: "flow",
+            entityId: "10.0.0.5->8.8.8.8:UDP:53",
+            pinned: false,
+            note: null,
+            tags: null,
+        });
+        markers = store.getEntityMarkers(session.id);
+        expect(markers.find((m) => m.kind === "flow")).toBeUndefined();
+        expect(markers.length).toBe(1);
+    });
 });

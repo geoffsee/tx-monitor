@@ -14,6 +14,31 @@ export const captureSessions = sqliteTable("capture_sessions", {
     totalBytes: integer("total_bytes").notNull().default(0),
 });
 
+export const entityMarkers = sqliteTable(
+    "entity_markers",
+    {
+        id: text("id").primaryKey(),
+        sessionId: text("session_id")
+            .notNull()
+            .references(() => captureSessions.id),
+        kind: text("kind").notNull(),
+        entityId: text("entity_id").notNull(),
+        pinned: integer("pinned").notNull().default(0),
+        note: text("note"),
+        tags: text("tags"),
+    },
+    (table) => [
+        index("entity_markers_session_idx").on(
+            table.sessionId,
+            table.kind,
+            table.entityId,
+        ),
+    ],
+);
+
+export type EntityMarkerRow = typeof entityMarkers.$inferSelect;
+export type NewEntityMarkerRow = typeof entityMarkers.$inferInsert;
+
 export const packets = sqliteTable(
     "packets",
     {

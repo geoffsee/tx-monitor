@@ -12,6 +12,7 @@ export type HostNodeData = {
     processCount?: number;
     resolvedDns?: string;
     inComparison?: boolean;
+    pinned?: boolean;
 };
 
 export type FlowEdgeData = {
@@ -20,6 +21,7 @@ export type FlowEdgeData = {
     stroke: string;
     active: boolean;
     inComparison?: boolean;
+    pinned?: boolean;
 };
 
 export type Selection =
@@ -67,6 +69,14 @@ export type Anomaly = {
     flowId?: string;
 };
 
+export type EntityMarker = {
+    kind: "host" | "flow";
+    id: string;
+    pinned: boolean;
+    note: string | null;
+    tags: string | null;
+};
+
 export type ProcessSummary = {
     command: string;
     pid: number;
@@ -112,4 +122,5 @@ export type TrafficSnapshot = {
     sourceLabel: string;
     sensitivity: "low" | "medium" | "high";
     comparison?: ComparisonSummary;
+    markers: EntityMarker[];
 };
