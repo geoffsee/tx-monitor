@@ -283,6 +283,8 @@ describe("createGraph", () => {
         const pub = graph.nodes.find((n) => n.id === "203.0.113.99");
         expect(pub?.data.label).toBe("example.com");
         expect(pub?.data.address).toBe("203.0.113.99");
-        // raw address still accessible via address field
+        // name-augmentation path: formatService(port, proto, dstDns)
+        const labels = graph.edges.map((e) => e.data?.label);
+        expect(labels).toContain("HTTPS example.com");
     });
 });

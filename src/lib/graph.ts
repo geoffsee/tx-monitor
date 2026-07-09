@@ -258,6 +258,7 @@ export function createGraph(): TrafficSnapshot {
                 proto: packet.proto,
                 srcHost: packet.srcHost,
                 dstHost: packet.dstHost,
+                dstPort: packet.dstPort,
                 length: packet.length,
                 info: packet.info,
                 ...(packet.processCommand &&

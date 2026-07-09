@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
 import { formatService } from "../lib/tcpdumpParser";
+import { trafficNetwork } from "../lib/trafficNetwork";
 import type {
     Selection,
     SessionLoadProgress,
@@ -108,12 +109,24 @@ export function Sidebar({
         return { items: items.slice(start, end), start, total: items.length };
     };
 
-    // Map host IDs to display labels (resolved DNS for public hosts, etc.)
-    const hostLabel = new Map<string, string>(
-        graph.nodes.map((n) => [n.id, n.data.label]),
-    );
-    const getHostLabel = (addr: string) => hostLabel.get(addr) ?? addr;
+    // Full trafficNetwork lookup (not graph.nodes) so hosts outside MAX_GRAPH_HOSTS
+    // still resolve DNS / labels for flows, packets, and the Latest ticker.
+    const getHostLabel = (addr: string) => {
+        const dns = trafficNetwork.resolvedDns.get(addr);
+        const host = trafficNetwork.hosts.get(addr);
+        if (host?.category === "public" && dns) return dns;
+        return host?.label ?? addr;
+    };
     const pinnedById = new Map((graph.markers ?? []).map((m) => [m.id, m]));
+
+    // Packet ticker: service name + DNS labels (raw values via title).
+    const latestPacket = trafficNetwork.packets[0];
+    const latestTicker = latestPacket
+        ? `${latestPacket.timestamp} ${formatService(latestPacket.dstPort, latestPacket.proto)} ${getHostLabel(latestPacket.srcHost)} → ${getHostLabel(latestPacket.dstHost)}`
+        : (graph.events[0] ?? "Waiting for traffic");
+    const latestTickerTitle = latestPacket
+        ? `${latestPacket.srcHost} -> ${latestPacket.dstHost} · ${latestPacket.proto}${latestPacket.dstPort ? `:${latestPacket.dstPort}` : ""}`
+        : undefined;
 
     return (
         <aside
@@ -145,8 +158,9 @@ export function Sidebar({
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                     }}
+                    title={latestTickerTitle}
                 >
-                    {graph.events[0] ?? "Waiting for traffic"}
+                    {latestTicker}
                 </span>
             </div>
             <section

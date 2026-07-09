@@ -81,9 +81,31 @@ function topHosts(graph: TrafficSnapshot, limit = 8) {
         .slice(0, limit);
 }
 
+function createHostLabelLookup(graph: TrafficSnapshot) {
+    const hostLabel = new Map<string, string>(
+        graph.nodes.map((n) => [n.id, n.data.label]),
+    );
+    return (addr: string) => hostLabel.get(addr) ?? addr;
+}
+
+function serviceName(
+    dstPort: number | null | undefined,
+    proto: string,
+    dstHost: string,
+    getLabel: (addr: string) => string,
+) {
+    const dstLabel = getLabel(dstHost);
+    return formatService(
+        dstPort ?? null,
+        proto,
+        dstLabel !== dstHost ? dstLabel : undefined,
+    );
+}
+
 function describeSelectionContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
+    getLabel: (addr: string) => string,
 ) {
     if (!selection) {
         return null;
@@ -111,21 +133,16 @@ function describeSelectionContext(
             return { kind: "flow", missing: selection.id };
         }
 
-        const hostLabel = new Map<string, string>(
-            graph.nodes.map((n) => [n.id, n.data.label]),
-        );
-        const getLabel = (addr: string) => hostLabel.get(addr) ?? addr;
         return {
             kind: "flow",
             ...flow,
             srcLabel: getLabel(flow.srcHost),
             dstLabel: getLabel(flow.dstHost),
-            service: formatService(
+            service: serviceName(
                 flow.dstPort,
                 flow.proto,
-                getLabel(flow.dstHost) !== flow.dstHost
-                    ? getLabel(flow.dstHost)
-                    : undefined,
+                flow.dstHost,
+                getLabel,
             ),
         };
     }
@@ -135,7 +152,18 @@ function describeSelectionContext(
         return { kind: "packet", missing: selection.id };
     }
 
-    return { kind: "packet", ...packet };
+    return {
+        kind: "packet",
+        ...packet,
+        srcLabel: getLabel(packet.srcHost),
+        dstLabel: getLabel(packet.dstHost),
+        service: serviceName(
+            packet.dstPort,
+            packet.proto,
+            packet.dstHost,
+            getLabel,
+        ),
+    };
 }
 
 // buildCopilotContext produces the snapshot-derived context for the strict
@@ -145,10 +173,7 @@ export function buildCopilotContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
 ) {
-    const hostLabel = new Map<string, string>(
-        graph.nodes.map((n) => [n.id, n.data.label]),
-    );
-    const getLabel = (addr: string) => hostLabel.get(addr) ?? addr;
+    const getLabel = createHostLabelLookup(graph);
 
     return {
         summary: {
@@ -175,12 +200,11 @@ export function buildCopilotContext(
             dstLabel: getLabel(flow.dstHost),
             proto: flow.proto,
             dstPort: flow.dstPort,
-            service: formatService(
+            service: serviceName(
                 flow.dstPort,
                 flow.proto,
-                getLabel(flow.dstHost) !== flow.dstHost
-                    ? getLabel(flow.dstHost)
-                    : undefined,
+                flow.dstHost,
+                getLabel,
             ),
             packetCount: flow.packetCount,
             bytesTotal: flow.bytesTotal,
@@ -196,13 +220,23 @@ export function buildCopilotContext(
             dstHost: packet.dstHost,
             srcLabel: getLabel(packet.srcHost),
             dstLabel: getLabel(packet.dstHost),
+            ...(packet.dstPort != null
+                ? {
+                      service: serviceName(
+                          packet.dstPort,
+                          packet.proto,
+                          packet.dstHost,
+                          getLabel,
+                      ),
+                  }
+                : {}),
             length: packet.length,
             info: packet.info,
             process: packet.process,
         })),
         anomalies: graph.anomalies.slice(0, 10),
         recentEvents: graph.events.slice(-8),
-        selection: describeSelectionContext(graph, selection),
+        selection: describeSelectionContext(graph, selection, getLabel),
         markers: graph.markers ?? [],
     };
 }
