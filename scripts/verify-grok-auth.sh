@@ -35,14 +35,22 @@ if [ -z "$model" ]; then
     exit 1
 fi
 
-if ! grok models 2>&1 | grep -Fq "$model"; then
+models_out="$(grok models 2>&1 || true)"
+if ! printf '%s\n' "$models_out" | grep -Fq "$model"; then
     echo "Configured model '$model' is not available for this Grok session." >&2
+    echo "Available models (names only):" >&2
+    # Print only model id-like tokens; never dump raw auth material.
+    printf '%s\n' "$models_out" | grep -Eio 'grok[-a-z0-9.]*' | sort -u >&2 || true
     echo "Run 'grok models' locally after 'grok login' and update caretta.toml." >&2
     exit 1
 fi
 
-grok -m "$model" -p "Reply with exactly: credentials ok" \
+# Stream response through grep only; do not echo model output (may include prompts/context).
+if ! grok -m "$model" -p "Reply with exactly: credentials ok" \
     --always-approve --output-format json \
-    | grep -Fq "credentials ok"
+    | grep -Fq "credentials ok"; then
+    echo "Grok prompt verification failed for model ${model}." >&2
+    exit 1
+fi
 
 echo "Grok OAuth verified for model ${model}." >&2
