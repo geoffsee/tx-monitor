@@ -464,19 +464,13 @@ export function DetailPanel({
             <div style={detailSectionTitleStyle}>Endpoints</div>
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Source</div>
-                <div
-                    style={detailSubtleStyle}
-                    title={packet.srcHost}
-                >
+                <div style={detailSubtleStyle} title={packet.srcHost}>
                     {getDisplayHostLabel(packet.srcHost)}
                 </div>
             </div>
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Destination</div>
-                <div
-                    style={detailSubtleStyle}
-                    title={packet.dstHost}
-                >
+                <div style={detailSubtleStyle} title={packet.dstHost}>
                     {getDisplayHostLabel(packet.dstHost)}
                 </div>
             </div>
