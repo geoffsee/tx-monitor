@@ -38,7 +38,13 @@ export function FlowEdge({
                 markerEnd={markerEnd}
                 style={{
                     stroke: data?.stroke,
-                    strokeWidth: selected ? 5 : data?.active ? 3.5 : 2,
+                    strokeWidth: selected
+                        ? 5
+                        : data?.pinned
+                          ? 4
+                          : data?.active
+                            ? 3.5
+                            : 2,
                     opacity: selected ? 1 : data?.active ? 1 : 0.45,
                     cursor: "pointer",
                 }}

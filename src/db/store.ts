@@ -4,6 +4,8 @@ import type { DatabaseClient } from "./client";
 import {
     type CaptureSession,
     captureSessions,
+    type EntityMarkerRow,
+    entityMarkers,
     type PacketRow,
     packets,
 } from "./schema";
@@ -189,5 +191,112 @@ export class TrafficStore {
             .limit(limit)
             .offset(offset)
             .all();
+    }
+
+    private entityMarkerRowId(
+        sessionId: string,
+        kind: string,
+        entityId: string,
+    ): string {
+        return `${sessionId}:${kind}:${entityId}`;
+    }
+
+    setEntityMarker(
+        sessionId: string,
+        input: {
+            kind: "host" | "flow";
+            entityId: string;
+            pinned?: boolean;
+            note?: string | null;
+            tags?: string | null;
+        },
+    ): void {
+        if (!sessionId || !input.entityId) {
+            return;
+        }
+        const id = this.entityMarkerRowId(
+            sessionId,
+            input.kind,
+            input.entityId,
+        );
+        const existing = this.db
+            .select()
+            .from(entityMarkers)
+            .where(eq(entityMarkers.id, id))
+            .get();
+
+        const nextPinned =
+            input.pinned !== undefined
+                ? input.pinned
+                    ? 1
+                    : 0
+                : (existing?.pinned ?? 0);
+        const nextNote =
+            input.note !== undefined ? input.note : (existing?.note ?? null);
+        const nextTags =
+            input.tags !== undefined ? input.tags : (existing?.tags ?? null);
+
+        const hasContent =
+            nextPinned === 1 ||
+            (nextNote && nextNote.trim().length > 0) ||
+            (nextTags && nextTags.trim().length > 0);
+
+        if (!hasContent) {
+            if (existing) {
+                this.db
+                    .delete(entityMarkers)
+                    .where(eq(entityMarkers.id, id))
+                    .run();
+            }
+            return;
+        }
+
+        const row = {
+            id,
+            sessionId,
+            kind: input.kind,
+            entityId: input.entityId,
+            pinned: nextPinned,
+            note: nextNote,
+            tags: nextTags,
+        };
+
+        if (existing) {
+            this.db
+                .update(entityMarkers)
+                .set({
+                    pinned: nextPinned,
+                    note: nextNote,
+                    tags: nextTags,
+                })
+                .where(eq(entityMarkers.id, id))
+                .run();
+        } else {
+            this.db.insert(entityMarkers).values(row).run();
+        }
+    }
+
+    getEntityMarkers(sessionId: string): Array<{
+        kind: "host" | "flow";
+        id: string;
+        pinned: boolean;
+        note: string | null;
+        tags: string | null;
+    }> {
+        if (!sessionId) {
+            return [];
+        }
+        const rows = this.db
+            .select()
+            .from(entityMarkers)
+            .where(eq(entityMarkers.sessionId, sessionId))
+            .all();
+        return rows.map((row: EntityMarkerRow) => ({
+            kind: row.kind as "host" | "flow",
+            id: row.entityId,
+            pinned: !!row.pinned,
+            note: row.note,
+            tags: row.tags,
+        }));
     }
 }
