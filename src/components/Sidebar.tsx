@@ -300,7 +300,9 @@ export function Sidebar({
                                 alignSelf: "start",
                             }}
                         >
-                            Apply (restart live capture)
+                            {graph.sourceLabel.startsWith("file ")
+                                ? "Apply BPF filter"
+                                : "Apply (restart live capture)"}
                         </button>
                     </div>
                 ) : null}

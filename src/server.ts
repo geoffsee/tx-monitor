@@ -214,12 +214,18 @@ export function buildLiveCommand(
 
 function isLoopbackAddress(address: string | null | undefined): boolean {
     if (!address) return false;
-    return (
+    if (
         address === "127.0.0.1" ||
         address === "::1" ||
-        address === "0:0:0:0:0:0:0:1" ||
-        address.startsWith(":ffff:127.")
-    );
+        address === "0:0:0:0:0:0:0:1"
+    ) {
+        return true;
+    }
+    // IPv4-mapped IPv6 (Bun dual-stack requestIP for 127.0.0.1 clients)
+    if (address.startsWith("::ffff:127.") || address.startsWith(":ffff:127.")) {
+        return true;
+    }
+    return false;
 }
 
 const cliIface =

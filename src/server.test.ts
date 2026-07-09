@@ -67,6 +67,9 @@ describe("capture control surface", () => {
     test("loopback address helper", () => {
         expect(testIsLoopbackAddress("127.0.0.1")).toBe(true);
         expect(testIsLoopbackAddress("::1")).toBe(true);
+        // Bun dual-stack requestIP form for IPv4 loopback clients
+        expect(testIsLoopbackAddress("::ffff:127.0.0.1")).toBe(true);
+        expect(testIsLoopbackAddress("::ffff:10.0.0.1")).toBe(false);
         expect(testIsLoopbackAddress("192.168.1.5")).toBe(false);
         expect(testIsLoopbackAddress(null)).toBe(false);
     });
