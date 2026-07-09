@@ -1,4 +1,6 @@
-const MAX_COMPARISON_ENTRIES = 2000;
+/** Max hosts/flows retained in a comparison overlay. Callers should
+ *  pre-bound while accumulating; this module also caps on install. */
+export const MAX_COMPARISON_ENTRIES = 2000;
 
 let comparisonSessionId: string | null = null;
 let comparisonLabel: string | null = null;
@@ -12,6 +14,11 @@ export type ComparisonContext = {
     flowIds: Set<string>;
 };
 
+/**
+ * Install comparison host/flow sets. Iterables are truncated to
+ * {@link MAX_COMPARISON_ENTRIES} (first N non-empty values). Prefer
+ * pre-bounding in the loader so large sessions never fully materialize.
+ */
 export function setComparisonContext(
     sessionId: string,
     label: string,
