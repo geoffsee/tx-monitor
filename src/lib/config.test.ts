@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+    expandHomePath,
+    formatEffectiveSettings,
     getDb,
+    getEffectiveCodexModel,
+    getEffectiveLsofDisabled,
     getPort,
     loadAppConfig,
     parseConfigContent,
@@ -15,11 +19,19 @@ import {
 const TEST_DIR = join(process.cwd(), ".tmp-config-test");
 const LOCAL_CONFIG_DIR = join(TEST_DIR, ".tx-monitor");
 const LOCAL_CONFIG = join(LOCAL_CONFIG_DIR, "config");
+const FAKE_HOME = join(TEST_DIR, "home");
+const HOME_CONFIG_DIR = join(FAKE_HOME, ".tx-monitor");
+const HOME_CONFIG = join(HOME_CONFIG_DIR, "config");
 
 function setupLocalConfig(content: string) {
     rmSync(TEST_DIR, { recursive: true, force: true });
     mkdirSync(LOCAL_CONFIG_DIR, { recursive: true });
     writeFileSync(LOCAL_CONFIG, content, "utf8");
+}
+
+function setupHomeConfig(content: string) {
+    mkdirSync(HOME_CONFIG_DIR, { recursive: true });
+    writeFileSync(HOME_CONFIG, content, "utf8");
 }
 
 function cleanup() {
@@ -37,19 +49,29 @@ afterEach(() => {
 
 describe("parseConfigContent", () => {
     test("parses allowed safe keys with normalization", () => {
-        const cfg = parseConfigContent(`
+        const cfg = parseConfigContent(
+            `
 # comment
 db=/home/user/.tx-monitor
 PORT=3002
 file_replay_speed=1.5
 TXMON_LSOF_DISABLE=1
 codex_model = gpt-test
-`);
+`,
+            { home: "/home/user" },
+        );
         expect(cfg.db).toBe("/home/user/.tx-monitor");
         expect(cfg.port).toBe("3002");
         expect(cfg.file_replay_speed).toBe("1.5");
         expect(cfg.lsof_disable).toBe("1");
         expect(cfg.codex_model).toBe("gpt-test");
+    });
+
+    test("expands ~ in db path", () => {
+        const cfg = parseConfigContent("db=~/.tx-monitor", {
+            home: "/home/alice",
+        });
+        expect(cfg.db).toBe(join("/home/alice", ".tx-monitor"));
     });
 
     test("ignores unknown keys", () => {
@@ -70,11 +92,31 @@ TXMON_CODEX_AUTH=api-key
         expect(cfg.TXMON_CODEX_AUTH).toBeUndefined();
     });
 
+    test("blocks TXMON_TCPDUMP_ARGS from config", () => {
+        const cfg = parseConfigContent(`
+TXMON_TCPDUMP_ARGS=tcpdump -i eth0
+db=/tmp/ok
+`);
+        expect(cfg.db).toBe("/tmp/ok");
+        expect(cfg.TXMON_TCPDUMP_ARGS).toBeUndefined();
+        expect(Object.keys(cfg)).toEqual(["db"]);
+    });
+
     test("ignores credential-like values even on allowed-looking keys", () => {
         const cfg = parseConfigContent(`db=sk-1234567890abcdef`);
-        // 'db' key is allowed, but value looks like secret; our isSecretKey checks value for sk-
-        // current impl skips whole entry if value matches secret pattern
+        // 'db' key is allowed, but value looks like secret; isSecretKey checks value for sk-
         expect(cfg.db).toBeUndefined();
+    });
+});
+
+describe("expandHomePath", () => {
+    test("expands tilde forms", () => {
+        expect(expandHomePath("~", "/home/u")).toBe("/home/u");
+        expect(expandHomePath("~/data", "/home/u")).toBe(
+            join("/home/u", "data"),
+        );
+        expect(expandHomePath("/abs/path", "/home/u")).toBe("/abs/path");
+        expect(expandHomePath("relative", "/home/u")).toBe("relative");
     });
 });
 
@@ -105,6 +147,31 @@ describe("resolve helpers (config < env < cli)", () => {
     });
 });
 
+describe("formatEffectiveSettings", () => {
+    test("formats without secrets", () => {
+        expect(
+            formatEffectiveSettings({
+                port: 3001,
+                dbPath: "/home/u/.tx-monitor",
+                fileReplaySpeed: 0,
+                filePath: "tcpdump.log",
+            }),
+        ).toBe(
+            "Effective settings: port=3001 db=/home/u/.tx-monitor replay=fast mode=file",
+        );
+        expect(
+            formatEffectiveSettings({
+                port: 4000,
+                dbPath: null,
+                fileReplaySpeed: 2,
+                filePath: null,
+            }),
+        ).toBe(
+            "Effective settings: port=4000 db=disabled replay=speed=2 mode=live",
+        );
+    });
+});
+
 describe("loadAppConfig + local file", () => {
     test("loads from local .tx-monitor/config when present", () => {
         setupLocalConfig(`
@@ -112,15 +179,32 @@ db=/tmp/testdb
 port=9876
 file_replay_speed=2
 `);
-        // Force cwd to the temp dir so loader finds the local config
         const prev = process.cwd();
         try {
             process.chdir(TEST_DIR);
             resetConfigCache();
-            const cfg = loadAppConfig(process.cwd());
+            const cfg = loadAppConfig(process.cwd(), { home: FAKE_HOME });
             expect(getDb(cfg)).toBe("/tmp/testdb");
             expect(getPort(cfg)).toBe(9876);
             expect(cfg.file_replay_speed).toBe("2");
+        } finally {
+            process.chdir(prev);
+            resetConfigCache();
+        }
+    });
+
+    test("cwd config overrides home config for same key", () => {
+        rmSync(TEST_DIR, { recursive: true, force: true });
+        setupHomeConfig("port=1111\ndb=/from-home");
+        mkdirSync(LOCAL_CONFIG_DIR, { recursive: true });
+        writeFileSync(LOCAL_CONFIG, "port=2222", "utf8");
+        const prev = process.cwd();
+        try {
+            process.chdir(TEST_DIR);
+            resetConfigCache();
+            const cfg = loadAppConfig(process.cwd(), { home: FAKE_HOME });
+            expect(getPort(cfg)).toBe(2222);
+            expect(getDb(cfg)).toBe("/from-home");
         } finally {
             process.chdir(prev);
             resetConfigCache();
@@ -133,10 +217,68 @@ file_replay_speed=2
         try {
             process.chdir(TEST_DIR);
             resetConfigCache();
-            const cfg = loadAppConfig(process.cwd());
-            // config surface
+            const cfg = loadAppConfig(process.cwd(), { home: FAKE_HOME });
             expect(getPort(cfg)).toBe(2222);
         } finally {
+            process.chdir(prev);
+            resetConfigCache();
+        }
+    });
+});
+
+describe("effective getters (config < env)", () => {
+    test("getEffectiveLsofDisabled: env overrides config", () => {
+        setupLocalConfig("lsof_disable=1");
+        const prev = process.cwd();
+        const prevEnv = process.env.TXMON_LSOF_DISABLE;
+        try {
+            process.chdir(TEST_DIR);
+            resetConfigCache();
+            delete process.env.TXMON_LSOF_DISABLE;
+            // load so cache has config; effective uses loadAppConfig()
+            loadAppConfig(process.cwd(), { home: FAKE_HOME });
+            // Without env, config applies — but loadAppConfig in getter uses real cwd.
+            // Re-load with real process.cwd after chdir:
+            resetConfigCache();
+            expect(getEffectiveLsofDisabled()).toBe(true);
+
+            process.env.TXMON_LSOF_DISABLE = "0";
+            resetConfigCache();
+            expect(getEffectiveLsofDisabled()).toBe(false);
+
+            process.env.TXMON_LSOF_DISABLE = "1";
+            resetConfigCache();
+            expect(getEffectiveLsofDisabled()).toBe(true);
+        } finally {
+            if (prevEnv === undefined) {
+                delete process.env.TXMON_LSOF_DISABLE;
+            } else {
+                process.env.TXMON_LSOF_DISABLE = prevEnv;
+            }
+            process.chdir(prev);
+            resetConfigCache();
+        }
+    });
+
+    test("getEffectiveCodexModel: env overrides config", () => {
+        setupLocalConfig("codex_model=from-config");
+        const prev = process.cwd();
+        const prevEnv = process.env.TXMON_CODEX_MODEL;
+        try {
+            process.chdir(TEST_DIR);
+            delete process.env.TXMON_CODEX_MODEL;
+            resetConfigCache();
+            expect(getEffectiveCodexModel()).toBe("from-config");
+
+            process.env.TXMON_CODEX_MODEL = "from-env";
+            resetConfigCache();
+            expect(getEffectiveCodexModel()).toBe("from-env");
+        } finally {
+            if (prevEnv === undefined) {
+                delete process.env.TXMON_CODEX_MODEL;
+            } else {
+                process.env.TXMON_CODEX_MODEL = prevEnv;
+            }
             process.chdir(prev);
             resetConfigCache();
         }
