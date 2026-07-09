@@ -38,6 +38,7 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
         data.category === "public" &&
         data.resolvedDns &&
         data.label !== data.resolvedDns;
+    const isPinned = !!data.pinned;
 
     return (
         <div
@@ -104,12 +105,14 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: 10,
-                    border: `1px solid ${selected ? accent : `${accent}33`}`,
+                    border: `1px solid ${selected ? accent : isPinned ? "#f4d35e" : `${accent}33`}`,
                     background: "#0d1821",
                     color: "#d9e6ec",
                     boxShadow: selected
                         ? `0 0 0 2px ${accent}55`
-                        : "0 4px 14px rgba(0, 0, 0, 0.24)",
+                        : isPinned
+                          ? `0 0 0 2px #f4d35e33`
+                          : "0 4px 14px rgba(0, 0, 0, 0.24)",
                     fontFamily: '"IBM Plex Sans", "Avenir Next", sans-serif',
                     cursor: "pointer",
                     display: "flex",
@@ -127,6 +130,7 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                     }}
                 >
                     {categoryLabel(data.category)}
+                    {isPinned ? " ★" : ""}
                 </div>
                 <div
                     title={data.address}

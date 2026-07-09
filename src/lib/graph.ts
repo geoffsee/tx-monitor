@@ -26,21 +26,29 @@ export const FLOW_STALE_WINDOW_MS = 12000;
 function selectGraphHosts(
     hosts: TrafficHost[],
     eligibleFlows = trafficNetwork.flowList,
+    pinnedHostSet = new Set<string>(),
 ): TrafficHost[] {
     const hostById = new Map(hosts.map((host) => [host.id, host]));
     const selectedIds = new Set<string>();
+
+    // Always keep pinned hosts (survive filters / keep)
+    for (const host of hosts) {
+        if (pinnedHostSet.has(host.id)) {
+            selectedIds.add(host.id);
+        }
+    }
 
     for (const flow of eligibleFlows.slice(0, MAX_GRAPH_FLOWS)) {
         if (selectedIds.size >= MAX_GRAPH_HOSTS) {
             break;
         }
-        if (hostById.has(flow.srcHost)) {
+        if (hostById.has(flow.srcHost) && !selectedIds.has(flow.srcHost)) {
             selectedIds.add(flow.srcHost);
         }
         if (selectedIds.size >= MAX_GRAPH_HOSTS) {
             break;
         }
-        if (hostById.has(flow.dstHost)) {
+        if (hostById.has(flow.dstHost) && !selectedIds.has(flow.dstHost)) {
             selectedIds.add(flow.dstHost);
         }
     }
@@ -49,7 +57,9 @@ function selectGraphHosts(
         if (selectedIds.size >= MAX_GRAPH_HOSTS) {
             break;
         }
-        selectedIds.add(host.id);
+        if (!selectedIds.has(host.id)) {
+            selectedIds.add(host.id);
+        }
     }
 
     return hosts.filter((host) => selectedIds.has(host.id));
@@ -76,19 +86,54 @@ function resolveLayout(hostList: TrafficHost[]) {
     return cachedLayout;
 }
 
+function getPinnedSets(): {
+    pinnedHosts: Set<string>;
+    pinnedFlows: Set<string>;
+} {
+    const pinnedHosts = new Set<string>();
+    const pinnedFlows = new Set<string>();
+    for (const [entityId, m] of trafficNetwork.markers.entries()) {
+        if (m.pinned) {
+            if (m.kind === "host") {
+                pinnedHosts.add(entityId);
+            } else {
+                pinnedFlows.add(entityId);
+            }
+        }
+    }
+    return { pinnedHosts, pinnedFlows };
+}
+
 export function createGraph(): TrafficSnapshot {
     const now = Date.now();
     const useLiveStaleWindow = trafficNetwork.sourceMode !== "history";
     const staleCutoff = now - FLOW_STALE_WINDOW_MS;
     const activeCutoff = now - FLOW_ACTIVE_WINDOW_MS;
+    const { pinnedHosts, pinnedFlows } = getPinnedSets();
     const eligibleFlows = useLiveStaleWindow
         ? trafficNetwork.flowList.filter((flow) => flow.lastSeen >= staleCutoff)
         : trafficNetwork.flowList;
-    const hostList = selectGraphHosts(trafficNetwork.hostList, eligibleFlows);
+    const hostList = selectGraphHosts(
+        trafficNetwork.hostList,
+        eligibleFlows,
+        pinnedHosts,
+    );
     const hostIds = new Set(hostList.map((host) => host.id));
     const positions = resolveLayout(hostList);
     const activeFlowIds = new Set<string>();
     const hostProcessMap = new Map<string, Set<string>>();
+
+    const markerById = new Map<
+        string,
+        { pinned: boolean; note: string | null; tags: string | null }
+    >();
+    for (const [eid, m] of trafficNetwork.markers.entries()) {
+        markerById.set(eid, {
+            pinned: m.pinned,
+            note: m.note,
+            tags: m.tags,
+        });
+    }
 
     const nodes: Node<HostNodeData>[] = hostList.map((host) => {
         const dns = trafficNetwork.resolvedDns.get(host.id);
@@ -109,15 +154,21 @@ export function createGraph(): TrafficSnapshot {
                 processes: [],
                 processCount: 0,
                 resolvedDns: dns,
+                pinned: markerById.get(host.id)?.pinned ?? false,
             },
         };
     });
 
-    const flowSlice = eligibleFlows
-        .filter(
-            (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
-        )
-        .slice(0, MAX_GRAPH_FLOWS);
+    let flowCandidates = eligibleFlows.filter(
+        (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
+    );
+    flowCandidates = [...flowCandidates].sort((a, b) => {
+        const ap = pinnedFlows.has(a.id) ? 1 : 0;
+        const bp = pinnedFlows.has(b.id) ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        return b.lastSeen - a.lastSeen;
+    });
+    const flowSlice = flowCandidates.slice(0, MAX_GRAPH_FLOWS);
 
     for (const flow of flowSlice) {
         if (!useLiveStaleWindow || flow.lastSeen >= activeCutoff) {
@@ -191,6 +242,7 @@ export function createGraph(): TrafficSnapshot {
                     labelColor: stroke,
                     stroke,
                     active,
+                    pinned: markerById.get(flow.id)?.pinned ?? false,
                 },
             };
         });
@@ -222,7 +274,14 @@ export function createGraph(): TrafficSnapshot {
             })),
         // Provide a larger window of recent flows for sidebar lists (virtualized
         // to keep DOM bounded even when many flows present under the model cap).
-        flows: trafficNetwork.flowList
+        // Pinned flows prioritized to survive filters.
+        flows: [...trafficNetwork.flowList]
+            .sort((a, b) => {
+                const ap = pinnedFlows.has(a.id) ? 1 : 0;
+                const bp = pinnedFlows.has(b.id) ? 1 : 0;
+                if (ap !== bp) return bp - ap;
+                return b.lastSeen - a.lastSeen;
+            })
             .slice(0, MAX_SNAPSHOT_FLOWS)
             .map((flow) => ({
                 id: flow.id,
@@ -266,5 +325,14 @@ export function createGraph(): TrafficSnapshot {
         sensitivity:
             (trafficNetwork.sensitivity as "low" | "medium" | "high") ??
             "medium",
+        markers: Array.from(trafficNetwork.markers.entries()).map(
+            ([entityId, m]) => ({
+                kind: m.kind as "host" | "flow",
+                id: entityId,
+                pinned: m.pinned,
+                note: m.note,
+                tags: m.tags,
+            }),
+        ),
     };
 }

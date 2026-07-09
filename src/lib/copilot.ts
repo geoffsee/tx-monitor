@@ -203,6 +203,7 @@ export function buildCopilotContext(
         anomalies: graph.anomalies.slice(0, 10),
         recentEvents: graph.events.slice(-8),
         selection: describeSelectionContext(graph, selection),
+        markers: graph.markers ?? [],
     };
 }
 
