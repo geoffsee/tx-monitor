@@ -84,9 +84,11 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `--no-db` | Disable SQLite persistence |
 | `--iface <name>` | Live capture interface (default: `any`) |
 | `--direction <dir>` | Live capture direction: `in`, `out`, or `inout` (default: `out`) |
-| `--bpf <expr>` | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53` |
+| `--bpf <expr>` | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53`. Tokens starting with `-` are rejected. Live BPF is a single argv after `--`. |
 
 Capture params (iface, direction, effective command, BPF) are surfaced in UI "Capture Source", status updates, and server logs. Controls in the sidebar let you change them at runtime for live capture (restarts subprocess cleanly) and apply basic BPF to file replays without full server restart. Session continuity preserved on live param changes.
+
+**Security:** Runtime `set-capture` over WebSocket is an unauthenticated admin control (restarts `sudo tcpdump`). By default it is accepted only from loopback clients. Do not expose the server on untrusted networks. Set `TXMON_ALLOW_REMOTE_CAPTURE=1` only if you intentionally allow remote capture control.
 
 ## Environment Variables
 
@@ -104,6 +106,7 @@ Capture params (iface, direction, effective command, BPF) are surfaced in UI "Ca
 | `TXMON_DIRECTION` | `out` | Default live capture direction |
 | `TXMON_BPF` | (none) | Default BPF filter expression |
 | `TXMON_TCPDUMP_ARGS` | (none) | Full custom tcpdump command (initial only; e.g. "tcpdump -i eth0 ...") |
+| `TXMON_ALLOW_REMOTE_CAPTURE` | unset | When `1`/`true`, allow `set-capture` from non-loopback WebSocket clients (default: localhost only) |
 
 ## Persistence
 

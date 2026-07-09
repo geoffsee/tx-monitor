@@ -77,21 +77,25 @@ export function Sidebar({
     const packetsContainerRef = useRef<HTMLUListElement>(null);
     const [packetsScrollTop, setPacketsScrollTop] = useState(0);
 
-    // Pending capture control drafts (synced from live graph.capture)
+    // Pending capture control drafts (synced from live graph.capture primitives only;
+    // object identity of graph.capture changes every publishGraph and must not reset drafts)
     const [pendingIface, setPendingIface] = useState("any");
     const [pendingDirection, setPendingDirection] = useState<
         "in" | "out" | "inout"
     >("out");
     const [pendingBpf, setPendingBpf] = useState("");
+    const [captureDirty, setCaptureDirty] = useState(false);
+    const serverIface = graph.capture?.iface;
+    const serverDirection = graph.capture?.direction;
+    const serverBpf = graph.capture?.bpf;
     useEffect(() => {
-        if (graph.capture) {
-            setPendingIface(graph.capture.iface || "any");
-            const d = graph.capture.direction as "in" | "out" | "inout";
-            if (d === "in" || d === "out" || d === "inout")
-                setPendingDirection(d);
-            setPendingBpf(graph.capture.bpf ?? "");
-        }
-    }, [graph.capture]);
+        if (captureDirty) return;
+        if (serverIface === undefined) return;
+        setPendingIface(serverIface || "any");
+        const d = serverDirection as "in" | "out" | "inout" | undefined;
+        if (d === "in" || d === "out" || d === "inout") setPendingDirection(d);
+        setPendingBpf(serverBpf ?? "");
+    }, [serverIface, serverDirection, serverBpf, captureDirty]);
 
     const FLOW_ITEM_HEIGHT = 58;
     const PACKET_ITEM_HEIGHT = 58;
@@ -216,9 +220,10 @@ export function Sidebar({
                             <span>iface</span>
                             <input
                                 value={pendingIface}
-                                onChange={(e) =>
-                                    setPendingIface(e.target.value)
-                                }
+                                onChange={(e) => {
+                                    setCaptureDirty(true);
+                                    setPendingIface(e.target.value);
+                                }}
                                 style={{
                                     flex: 1,
                                     fontSize: 11,
@@ -230,14 +235,15 @@ export function Sidebar({
                             <span>dir</span>
                             <select
                                 value={pendingDirection}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    setCaptureDirty(true);
                                     setPendingDirection(
                                         e.target.value as
                                             | "in"
                                             | "out"
                                             | "inout",
-                                    )
-                                }
+                                    );
+                                }}
                                 style={{ fontSize: 11 }}
                             >
                                 <option value="out">out</option>
@@ -255,7 +261,10 @@ export function Sidebar({
                             <span>bpf</span>
                             <input
                                 value={pendingBpf}
-                                onChange={(e) => setPendingBpf(e.target.value)}
+                                onChange={(e) => {
+                                    setCaptureDirty(true);
+                                    setPendingBpf(e.target.value);
+                                }}
                                 style={{
                                     flex: 1,
                                     fontSize: 11,
@@ -267,13 +276,14 @@ export function Sidebar({
                         </div>
                         <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                                setCaptureDirty(false);
                                 onUpdateCapture?.({
                                     iface: pendingIface || "any",
                                     direction: pendingDirection,
                                     bpf: pendingBpf,
-                                })
-                            }
+                                });
+                            }}
                             style={{
                                 fontSize: 11,
                                 padding: "1px 4px",

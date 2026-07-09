@@ -43,7 +43,8 @@ const FILE_REPLAY_SLEEP_CAP_MS = Number.parseFloat(
 
 const HOSTNAME = getHostname();
 
-type WsClient = ServerWebSocket<undefined>;
+type WsData = { remoteAddress: string | null };
+type WsClient = ServerWebSocket<WsData>;
 
 const MIME_TYPES: Record<string, string> = {
     ".html": "text/html",
@@ -99,7 +100,10 @@ if (values.help) {
             "  --direction <d>   Capture direction in|out|inout (default out)\n" +
             "  --bpf <expr>      BPF filter (e.g. 'host 1.2.3.4 or port 53')\n" +
             "  --help            Show help\n\n" +
-            "Env: TXMON_IFACE, TXMON_DIRECTION, TXMON_BPF, TXMON_TCPDUMP_ARGS (full override)",
+            "Env: TXMON_IFACE, TXMON_DIRECTION, TXMON_BPF, TXMON_TCPDUMP_ARGS (full override),\n" +
+            "     TXMON_ALLOW_REMOTE_CAPTURE=1 to allow set-capture from non-loopback clients.\n" +
+            "Runtime capture control (set-capture) is unauthenticated admin; keep the server\n" +
+            "off untrusted networks or restrict to localhost clients (default).",
     );
     process.exit(0);
 }
@@ -123,30 +127,113 @@ const clients = new Set<WsClient>();
 let captureStarted = false;
 
 // Capture control state (iface, direction, BPF) with CLI/env init + runtime updates
+const IFACE_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/;
+const ALLOW_REMOTE_CAPTURE =
+    process.env.TXMON_ALLOW_REMOTE_CAPTURE === "1" ||
+    process.env.TXMON_ALLOW_REMOTE_CAPTURE === "true";
+
+/** Validate live capture interface name (tight charset). */
+export function isValidIface(iface: string): boolean {
+    return IFACE_RE.test(iface);
+}
+
+/**
+ * Reject option-like BPF tokens that could inject tcpdump flags when argv-expanded.
+ * Returns trimmed expression, or null if invalid.
+ */
+export function sanitizeBpf(expr: string): string | null {
+    const b = expr.trim();
+    if (!b) return "";
+    if (b.split(/\s+/).some((t) => t.startsWith("-"))) {
+        return null;
+    }
+    return b;
+}
+
+/**
+ * Build tcpdump argv for live capture. Pure helper used by production path and tests.
+ * BPF is passed as a single expression after `--` so tokens cannot be parsed as options.
+ */
+export function buildLiveCommand(
+    iface: string,
+    direction: string,
+    bpf: string,
+    uid: number | null = process.getuid?.() ?? null,
+): string[] {
+    const safeIface = isValidIface(iface) ? iface : "any";
+    const safeDir = ["in", "out", "inout"].includes(direction)
+        ? direction
+        : "out";
+    const base = [
+        "tcpdump",
+        "-i",
+        safeIface,
+        "-Q",
+        safeDir,
+        "-nn",
+        "-vv",
+        "-l",
+        "--",
+    ];
+    const b = bpf.trim();
+    if (b) {
+        if (b.split(/\s+/).some((t) => t.startsWith("-"))) {
+            throw new Error("BPF must not contain option-like tokens");
+        }
+        base.push(b);
+    }
+    return uid === 0 ? base : ["sudo", ...base];
+}
+
+function isLoopbackAddress(address: string | null | undefined): boolean {
+    if (!address) return false;
+    return (
+        address === "127.0.0.1" ||
+        address === "::1" ||
+        address === "0:0:0:0:0:0:0:1" ||
+        address.startsWith(":ffff:127.")
+    );
+}
+
 const cliIface =
     (values.iface as string | undefined) ?? process.env.TXMON_IFACE;
 const cliDirection =
     (values.direction as string | undefined) ?? process.env.TXMON_DIRECTION;
 const cliBpf = (values.bpf as string | undefined) ?? process.env.TXMON_BPF;
-let captureIface = cliIface ?? "any";
-let captureDirection = cliDirection ?? "out";
-let captureBpf = cliBpf ?? "";
+let captureIface =
+    cliIface && isValidIface(cliIface.trim() || "any")
+        ? cliIface.trim() || "any"
+        : "any";
+let captureDirection =
+    cliDirection && ["in", "out", "inout"].includes(cliDirection)
+        ? cliDirection
+        : "out";
+const sanitizedCliBpf = sanitizeBpf(cliBpf ?? "");
+let captureBpf = sanitizedCliBpf ?? "";
+if (cliBpf && sanitizedCliBpf === null) {
+    console.error(
+        "Ignoring invalid --bpf / TXMON_BPF (option-like tokens not allowed)",
+    );
+}
 const activeFilePath: string | null = filePath ?? null;
 let useFullOverride = false;
 const tcpdumpFullOverride = process.env.TXMON_TCPDUMP_ARGS?.trim() ?? null;
 if (tcpdumpFullOverride) {
     useFullOverride = true;
     const iM = tcpdumpFullOverride.match(/-i\s+(\S+)/);
-    if (iM?.[1]) captureIface = iM[1];
+    if (iM?.[1] && isValidIface(iM[1])) captureIface = iM[1];
     const qM = tcpdumpFullOverride.match(/-Q\s+(\S+)/);
-    if (qM?.[1]) captureDirection = qM[1];
+    if (qM?.[1] && ["in", "out", "inout"].includes(qM[1])) {
+        captureDirection = qM[1];
+    }
     // crude tail for bpf after standard flags
     const tail = tcpdumpFullOverride
         .replace(/^(\s*sudo\s+)?\s*tcpdump\s+/, "")
         .replace(/\s*(-i\s+\S+|-Q\s+\S+|-nn|-vv|-l)\s*/g, " ")
         .trim();
-    if (tail && !tail.startsWith("-")) {
-        captureBpf = tail;
+    if (tail) {
+        const s = sanitizeBpf(tail);
+        if (s !== null) captureBpf = s;
     }
 }
 
@@ -160,63 +247,104 @@ function getLiveCommand(): string[] {
             ? parts
             : ["sudo", ...parts];
     }
-    const base = [
-        "tcpdump",
-        "-i",
-        captureIface,
-        "-Q",
-        captureDirection,
-        "-nn",
-        "-vv",
-        "-l",
-    ];
-    const b = captureBpf.trim();
-    if (b) {
-        base.push(...b.split(/\s+/));
-    }
-    return process.getuid?.() === 0 ? base : ["sudo", ...base];
+    return buildLiveCommand(captureIface, captureDirection, captureBpf);
 }
 
 function getLiveLabel(): string {
     return getLiveCommand().join(" ");
 }
 
-function packetMatchesBpf(p: ParsedPacket, expr: string): boolean {
-    const filter = expr.trim();
-    if (!filter) return true;
-    const f = filter.toLowerCase();
+/** Match a single host/port atomic clause (no top-level and/or). */
+function matchAtomicBpfClause(p: ParsedPacket, clause: string): boolean {
+    const c = clause.replace(/[()]/g, " ").trim().toLowerCase();
+    if (!c) return true;
     const sh = p.srcHost.toLowerCase();
     const dh = p.dstHost.toLowerCase();
     const sp = p.srcPort != null ? String(p.srcPort) : "";
     const dp = p.dstPort != null ? String(p.dstPort) : "";
+
+    const hostM = c.match(/^(?:(src|dst)\s+)?host\s+(\S+)$/);
+    if (hostM?.[2]) {
+        const h = hostM[2];
+        if (hostM[1] === "src") return sh === h;
+        if (hostM[1] === "dst") return dh === h;
+        return sh === h || dh === h;
+    }
+    const portM = c.match(/^(?:(src|dst)\s+)?port\s+(\S+)$/);
+    if (portM?.[2]) {
+        const pt = portM[2];
+        if (portM[1] === "src") return sp === pt;
+        if (portM[1] === "dst") return dp === pt;
+        return sp === pt || dp === pt;
+    }
+
+    // Fallback token heuristic for bare host/port-ish tokens
     const hosts: string[] = [];
     const ports: string[] = [];
-    const hostRe = /(?:^|[\s(])(?:(src|dst)\s+)?host\s+([^\s)&|]+)/g;
-    for (let m = hostRe.exec(f); m !== null; m = hostRe.exec(f)) {
-        if (m[2]) hosts.push(m[2]);
-    }
-    const portRe = /(?:^|[\s(])(?:(src|dst)\s+)?port\s+([^\s)&|]+)/g;
-    for (let m = portRe.exec(f); m !== null; m = portRe.exec(f)) {
-        if (m[2]) ports.push(m[2]);
+    const tokens = c
+        .split(/[\s|&]+/)
+        .filter((t) => t && !["and", "or"].includes(t));
+    for (const t of tokens) {
+        if (t.startsWith("-")) continue;
+        if (/[.:]/.test(t) || /^[0-9a-f]{3,}$/.test(t)) {
+            hosts.push(t);
+        } else if (/^\d+$/.test(t)) {
+            ports.push(t);
+        }
     }
     if (hosts.length === 0 && ports.length === 0) {
-        const tokens = f
-            .split(/[\s|&()]+/)
-            .filter((t) => t && !["and", "or"].includes(t));
-        for (const t of tokens) {
-            if (t.startsWith("-")) continue;
-            if (/[.:]/.test(t) || /^[0-9a-f]{3,}$/.test(t)) {
-                hosts.push(t);
-            } else if (/^\d+$/.test(t)) {
-                ports.push(t);
-            }
-        }
+        // Unrecognized clause (e.g. net/tcp): pass so we don't over-drop
+        return true;
     }
     const hostOk =
         hosts.length === 0 || hosts.some((h) => sh === h || dh === h);
     const portOk =
         ports.length === 0 || ports.some((pt) => sp === pt || dp === pt);
     return hostOk && portOk;
+}
+
+/**
+ * Basic post-filter for file replay only. Supports host/port clauses combined
+ * with top-level `and` / `or` (and binds tighter than or, matching common BPF use).
+ */
+function packetMatchesBpf(p: ParsedPacket, expr: string): boolean {
+    const filter = expr.trim();
+    if (!filter) return true;
+    const f = filter.toLowerCase();
+    // Split on top-level " or " (outside parentheses)
+    const orClauses: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < f.length; i++) {
+        const ch = f[i];
+        if (ch === "(") depth++;
+        else if (ch === ")") depth = Math.max(0, depth - 1);
+        else if (depth === 0 && f.slice(i, i + 4) === " or ") {
+            orClauses.push(f.slice(start, i));
+            start = i + 4;
+            i += 3;
+        }
+    }
+    orClauses.push(f.slice(start));
+
+    return orClauses.some((orClause) => {
+        const andParts: string[] = [];
+        depth = 0;
+        start = 0;
+        const clause = orClause;
+        for (let i = 0; i < clause.length; i++) {
+            const ch = clause[i];
+            if (ch === "(") depth++;
+            else if (ch === ")") depth = Math.max(0, depth - 1);
+            else if (depth === 0 && clause.slice(i, i + 5) === " and ") {
+                andParts.push(clause.slice(start, i));
+                start = i + 5;
+                i += 4;
+            }
+        }
+        andParts.push(clause.slice(start));
+        return andParts.every((part) => matchAtomicBpfClause(p, part));
+    });
 }
 
 function shouldIncludePacket(p: ParsedPacket): boolean {
@@ -227,30 +355,47 @@ function applyCaptureUpdate(updates: {
     iface?: string;
     direction?: string;
     bpf?: string;
-}) {
-    let changed = false;
+}): string | null {
+    // Validate all fields first so a bad bpf never partially applies iface/dir
+    let nextIface: string | undefined;
+    let nextDirection: string | undefined;
+    let nextBpf: string | undefined;
     if (updates.iface !== undefined) {
         const v = updates.iface.trim() || "any";
-        if (v !== captureIface) {
-            captureIface = v;
-            changed = true;
+        if (!isValidIface(v)) {
+            return `Invalid iface "${v}" (allowed: A-Za-z0-9_.:-)`;
         }
+        nextIface = v;
     }
     if (updates.direction !== undefined) {
         const v = updates.direction;
-        if (["in", "out", "inout"].includes(v) && v !== captureDirection) {
-            captureDirection = v;
-            changed = true;
+        if (!["in", "out", "inout"].includes(v)) {
+            return `Invalid direction "${v}" (use in|out|inout)`;
         }
+        nextDirection = v;
     }
     if (updates.bpf !== undefined) {
-        const v = updates.bpf;
-        if (v !== captureBpf) {
-            captureBpf = v;
-            changed = true;
+        const sanitized = sanitizeBpf(updates.bpf);
+        if (sanitized === null) {
+            return "BPF must not contain option-like tokens";
         }
+        nextBpf = sanitized;
     }
-    if (!changed) return;
+
+    let changed = false;
+    if (nextIface !== undefined && nextIface !== captureIface) {
+        captureIface = nextIface;
+        changed = true;
+    }
+    if (nextDirection !== undefined && nextDirection !== captureDirection) {
+        captureDirection = nextDirection;
+        changed = true;
+    }
+    if (nextBpf !== undefined && nextBpf !== captureBpf) {
+        captureBpf = nextBpf;
+        changed = true;
+    }
+    if (!changed) return null;
     useFullOverride = false;
     const newLabel = activeFilePath ? `file ${activeFilePath}` : getLiveLabel();
     console.log(
@@ -272,6 +417,7 @@ function applyCaptureUpdate(updates: {
     }
     // file mode: BPF filter applies to subsequent parsed packets without restart
     emitStatus(activeFilePath ? "file" : "live", newLabel);
+    return null;
 }
 
 const PACKET_BATCH_INTERVAL_MS = 50;
@@ -580,7 +726,8 @@ async function streamLiveTcpdump(expectedGen = captureGeneration) {
                     break;
                 }
                 const packet = parser.parseLine(line);
-                if (packet && shouldIncludePacket(packet)) {
+                // Live path: tcpdump already applied BPF; do not double-filter
+                if (packet) {
                     emitPacket(packet);
                 }
             }
@@ -841,21 +988,23 @@ async function serveStaticFile(pathname: string): Promise<Response> {
     });
 }
 
-// Test helpers for exercising capture path (CLI variations, BPF filtering, no regression on file replay)
+// Test helpers: thin wrappers around production pure functions (no reimplementation)
 export function testBuildLiveCommand(
     iface: string,
     direction: string,
     bpf: string,
 ) {
-    const base = ["tcpdump", "-i", iface, "-Q", direction, "-nn", "-vv", "-l"];
-    const b = bpf.trim();
-    if (b) base.push(...b.split(/\s+/));
-    return process.getuid?.() === 0 ? base : ["sudo", ...base];
+    return buildLiveCommand(iface, direction, bpf);
 }
-export { packetMatchesBpf as testPacketMatchesBpf };
+export {
+    isLoopbackAddress as testIsLoopbackAddress,
+    isValidIface as testIsValidIface,
+    packetMatchesBpf as testPacketMatchesBpf,
+    sanitizeBpf as testSanitizeBpf,
+};
 
 if (import.meta.main) {
-    Bun.serve({
+    Bun.serve<WsData>({
         port: listenPort,
         ...(serveStatic
             ? {}
@@ -872,7 +1021,12 @@ if (import.meta.main) {
             }
 
             if (url.pathname === WS_PATH) {
-                const upgraded = server.upgrade(request);
+                const ip = server.requestIP(request);
+                const upgraded = server.upgrade(request, {
+                    data: {
+                        remoteAddress: ip?.address ?? null,
+                    } satisfies WsData,
+                });
                 if (!upgraded) {
                     return new Response("WebSocket upgrade failed", {
                         status: 400,
@@ -910,14 +1064,28 @@ if (import.meta.main) {
             close(ws) {
                 clients.delete(ws);
             },
-            message(_ws, message) {
+            message(ws, message) {
                 try {
                     const data = JSON.parse(String(message)) as {
                         type?: string;
                         [k: string]: unknown;
                     };
                     if (data.type === "set-capture") {
-                        applyCaptureUpdate({
+                        // Privileged control plane: loopback clients only unless opted in
+                        if (
+                            !ALLOW_REMOTE_CAPTURE &&
+                            !isLoopbackAddress(ws.data.remoteAddress)
+                        ) {
+                            ws.send(
+                                JSON.stringify({
+                                    type: "error",
+                                    message:
+                                        "set-capture allowed from localhost only (set TXMON_ALLOW_REMOTE_CAPTURE=1 to override)",
+                                }),
+                            );
+                            return;
+                        }
+                        const err = applyCaptureUpdate({
                             iface:
                                 typeof data.iface === "string"
                                     ? data.iface
@@ -931,6 +1099,14 @@ if (import.meta.main) {
                                     ? data.bpf
                                     : undefined,
                         });
+                        if (err) {
+                            ws.send(
+                                JSON.stringify({
+                                    type: "error",
+                                    message: err,
+                                }),
+                            );
+                        }
                     }
                 } catch {
                     // ignore malformed control messages
@@ -942,6 +1118,11 @@ if (import.meta.main) {
     console.log(
         `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
     );
+    if (!ALLOW_REMOTE_CAPTURE) {
+        console.log(
+            "Capture control (set-capture) restricted to localhost clients; set TXMON_ALLOW_REMOTE_CAPTURE=1 to allow remote",
+        );
+    }
     if (store && dbPath) {
         console.log(`Persisting traffic to ${dbPath}`);
     }
