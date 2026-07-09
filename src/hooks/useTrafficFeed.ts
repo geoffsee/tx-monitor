@@ -40,6 +40,8 @@ export type TrafficFeedState = {
     comparisonLoadProgress: SessionLoadProgress | null;
     loadComparisonSession: (sessionId: string) => Promise<void>;
     clearComparison: () => void;
+    summaryOnly: boolean;
+    setSummaryOnly: (enabled: boolean) => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -506,6 +508,14 @@ export function useTrafficFeed(): TrafficFeedState {
         [publishGraph],
     );
 
+    const setSummaryOnly = useCallback(
+        (enabled: boolean) => {
+            trafficNetwork.setSummaryOnly(enabled);
+            publishGraph();
+        },
+        [publishGraph],
+    );
+
     return {
         graph,
         viewMode,
@@ -522,5 +532,7 @@ export function useTrafficFeed(): TrafficFeedState {
         comparisonLoadProgress,
         loadComparisonSession,
         clearComparison,
+        summaryOnly: graph.summaryOnly,
+        setSummaryOnly,
     };
 }

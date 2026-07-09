@@ -9,6 +9,15 @@ import appHtml from "../index.html";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
+    getDb,
+    getFileReplaySleepCapMs,
+    getFileReplaySpeed,
+    getPort,
+    loadAppConfig,
+    resolveDb,
+    resolvePortNumber,
+} from "./lib/config";
+import {
     askCopilotWithCodex,
     CopilotRequestError,
     getCopilotStatus,
@@ -48,12 +57,20 @@ const TCPDUMP_COMMAND = resolveTcpdumpCommand();
 const TCPDUMP_LABEL = TCPDUMP_COMMAND.join(" ");
 const WS_PATH = "/ws";
 const DIST = join(PACKAGE_ROOT, "dist");
-const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
+
+// Load config (config file values). Precedence: config < env < CLI
+const __appConfig = loadAppConfig();
+const FILE_REPLAY_SPEED_BASE = getFileReplaySpeed(__appConfig) ?? 0;
+const FILE_REPLAY_SLEEP_CAP_MS_BASE =
+    getFileReplaySleepCapMs(__appConfig) ?? 120;
+
+// Env-resolved bases (env overrides config) for replay speeds (no CLI flag for these)
 const FILE_REPLAY_SPEED = Number.parseFloat(
-    process.env.FILE_REPLAY_SPEED ?? "0",
+    process.env.FILE_REPLAY_SPEED ?? String(FILE_REPLAY_SPEED_BASE),
 );
 const FILE_REPLAY_SLEEP_CAP_MS = Number.parseFloat(
-    process.env.FILE_REPLAY_SLEEP_CAP_MS ?? "120",
+    process.env.FILE_REPLAY_SLEEP_CAP_MS ??
+        String(FILE_REPLAY_SLEEP_CAP_MS_BASE),
 );
 
 const HOSTNAME = getHostname();
@@ -98,13 +115,23 @@ const { values } = parseArgs({
 });
 
 const filePath = values.file;
-const listenPort = values.port ? Number.parseInt(values.port, 10) : PORT;
+const listenPort = resolvePortNumber(
+    values.port ? Number.parseInt(values.port, 10) : undefined,
+    process.env.PORT,
+    getPort(__appConfig),
+    3001,
+);
 const runningFromSource = import.meta.url.includes("/src/server.ts");
 const serveStatic =
     values.serve || (runningFromSource && existsSync(join(DIST, "index.html")));
 const dbPath = values["no-db"]
     ? null
-    : (values.db ?? process.env.TXMON_DB ?? DEFAULT_DB);
+    : resolveDb(
+          values.db,
+          process.env.TXMON_DB,
+          getDb(__appConfig),
+          DEFAULT_DB,
+      );
 const store = dbPath
     ? new TrafficStore(
           openDatabase(
@@ -701,6 +728,13 @@ Bun.serve({
 
 console.log(
     `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
+);
+// Minimal effective settings exposure (no secrets)
+const effectiveDb = dbPath ?? "disabled";
+const effectiveReplay =
+    FILE_REPLAY_SPEED > 0 ? `speed=${FILE_REPLAY_SPEED}` : "fast";
+console.log(
+    `Effective settings: port=${listenPort} db=${effectiveDb} replay=${effectiveReplay}`,
 );
 if (store && dbPath) {
     console.log(`Persisting traffic to ${dbPath}`);

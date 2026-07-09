@@ -281,6 +281,10 @@ export function createGraph(): TrafficSnapshot {
         totalBytes: trafficNetwork.totalBytes,
         hostCount: trafficNetwork.hosts.size,
         flowCount: trafficNetwork.flows.size,
+        hostsEvicted: trafficNetwork.hostsEvicted || 0,
+        flowsEvicted: trafficNetwork.flowsEvicted || 0,
+        packetsEvicted: trafficNetwork.packetsEvicted || 0,
+        summaryOnly: !!trafficNetwork.summaryOnly,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,
         sensitivity:

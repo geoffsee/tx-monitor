@@ -5,6 +5,7 @@ import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
     MAX_MEMORY_FLOWS,
     MAX_MEMORY_HOSTS,
+    MAX_MEMORY_PACKETS_SUMMARY,
     trafficNetwork,
 } from "./trafficNetwork";
 
@@ -88,12 +89,12 @@ describe("createGraph", () => {
             "10.0.0.1->203.0.113.1:TCP:443",
             "10.0.0.2->203.0.113.2:TCP:443",
         ];
-        for (let i = 0; i < 1050; i++) {
+        for (let i = 0; i < 6500; i++) {
             // High volume: repeat popular ones often with consistent flow key
             const isHigh = i % 3 !== 0;
             const src = isHigh
                 ? (highVolumeHosts[i % highVolumeHosts.length] as string)
-                : `10.1.${Math.floor(i / 50) % 200}.${(i % 50) + 1}`;
+                : `10.1.${Math.floor(i / 30) % 250}.${(i % 60) + 1}`;
             let dst: string;
             let dstPort: number;
             let proto: PacketProto;
@@ -102,7 +103,7 @@ describe("createGraph", () => {
                 dstPort = 443;
                 proto = "TCP";
             } else {
-                dst = `203.0.113.${100 + (i % 149)}`;
+                dst = `203.0.113.${100 + (i % 220)}`;
                 dstPort = 12345 + (i % 1000);
                 proto = i % 3 === 0 ? "UDP" : "TCP";
             }
@@ -137,7 +138,15 @@ describe("createGraph", () => {
         const snap = createGraph();
         expect(snap.hostCount).toBeLessThanOrEqual(MAX_MEMORY_HOSTS);
         expect(snap.flowCount).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
-        expect(snap.totalPackets).toBe(1050);
+        expect(snap.totalPackets).toBe(6500);
+
+        // Eviction telemetry present under sustained load (hosts + packets; flows may evict via orphan on host cap)
+        expect(trafficNetwork.hostsEvicted).toBeGreaterThan(0);
+        expect(trafficNetwork.packetsEvicted).toBeGreaterThan(0);
+        expect(snap.hostsEvicted).toBeGreaterThan(0);
+        expect(snap.packetsEvicted).toBeGreaterThan(0);
+        // flows under cap (explicit flow eviction verified in history test)
+        expect(trafficNetwork.flowsEvicted).toBeGreaterThanOrEqual(0);
     }, 20000);
 
     test("history ingest respects caps and uses progressive page-style batching", () => {
@@ -150,9 +159,9 @@ describe("createGraph", () => {
                 id: `hp-${i}`,
                 timestamp: `12:00:${String(i % 60).padStart(2, "0")}.000000`,
                 proto: "TCP",
-                srcHost: `192.168.0.${(i % 180) + 1}`,
+                srcHost: `192.168.0.${(i % 50) + 1}`,
                 srcPort: 40000,
-                dstHost: `10.0.0.${(i % 50) + 1}`,
+                dstHost: `10.0.0.${(Math.floor(i / 50) % 60) + 1}`,
                 dstPort: 443,
                 length: 100,
                 info: "hist",
@@ -172,6 +181,10 @@ describe("createGraph", () => {
         expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
         // totals from all ingested even though hosts/flows capped
         expect(trafficNetwork.totalPackets).toBe(2500);
+        // flow eviction via explicit pruneFlows (hosts < cap, many src*dst flows)
+        expect(trafficNetwork.flowsEvicted).toBeGreaterThan(0);
+        const snap2 = createGraph();
+        expect(snap2.flowsEvicted).toBeGreaterThan(0);
     }, 20000);
 
     test("annotates nodes, flows and edges with inComparison when comparison context is set", () => {
@@ -221,4 +234,61 @@ describe("createGraph", () => {
 
         clearComparisonContext();
     });
+
+    test("summary-only mode drops fine-grained packets after threshold while retaining aggregates, recent window, and caps", () => {
+        trafficNetwork.reset();
+        trafficNetwork.setSummaryOnly(true);
+        expect(trafficNetwork.summaryOnly).toBe(true);
+
+        const baseTime = Date.now();
+        const numPackets = 300;
+        for (let i = 0; i < numPackets; i++) {
+            const p: ParsedPacket = {
+                id: `sm-${i}`,
+                timestamp: "12:00:00.000000",
+                proto: "TCP",
+                srcHost: `10.0.0.${(i % 20) + 1}`,
+                srcPort: 50000,
+                dstHost: `203.0.113.${(i % 10) + 1}`,
+                dstPort: 443,
+                length: 60,
+                info: "summary-mode test",
+            };
+            trafficNetwork.ingestPacket(p, true, baseTime + i);
+        }
+
+        // Packet details capped to summary window
+        expect(trafficNetwork.packets.length).toBeLessThanOrEqual(
+            MAX_MEMORY_PACKETS_SUMMARY,
+        );
+        expect(trafficNetwork.packetsEvicted).toBeGreaterThanOrEqual(
+            numPackets - MAX_MEMORY_PACKETS_SUMMARY,
+        );
+
+        // Aggregates and high-level caps retained
+        expect(trafficNetwork.totalPackets).toBe(numPackets);
+        expect(trafficNetwork.hosts.size).toBeLessThanOrEqual(MAX_MEMORY_HOSTS);
+        expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
+        // only packets evicted in this low-host variety run
+        expect(trafficNetwork.hostsEvicted).toBe(0);
+        expect(trafficNetwork.flowsEvicted).toBe(0);
+
+        const snap = createGraph();
+        expect(snap.summaryOnly).toBe(true);
+        expect(snap.packets.length).toBeLessThanOrEqual(
+            MAX_MEMORY_PACKETS_SUMMARY,
+        );
+        expect(snap.totalPackets).toBe(numPackets);
+        expect(snap.packetsEvicted).toBeGreaterThanOrEqual(0);
+
+        // Toggle back to full retains behavior
+        trafficNetwork.setSummaryOnly(false);
+        expect(trafficNetwork.summaryOnly).toBe(false);
+        // Next ingest can grow packet window back toward full cap
+        trafficNetwork.ingestPacket(
+            packet("post", "10.0.0.99", "203.0.113.99", 443),
+            true,
+        );
+        expect(trafficNetwork.packets.length).toBeGreaterThan(0);
+    }, 10000);
 });

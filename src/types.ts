@@ -104,6 +104,10 @@ export type TrafficSnapshot = {
     totalBytes: number;
     hostCount: number;
     flowCount: number;
+    hostsEvicted: number;
+    flowsEvicted: number;
+    packetsEvicted: number;
+    summaryOnly: boolean;
     connected: boolean;
     sourceLabel: string;
     sensitivity: "low" | "medium" | "high";
