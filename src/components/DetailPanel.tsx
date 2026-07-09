@@ -55,6 +55,10 @@ function MarkerEditor({
 }) {
     const m = trafficNetwork.markers.get(entityId);
     const pinned = !!m?.pinned;
+    const note = m?.note ?? "";
+    const tags = m?.tags ?? "";
+    // Remount inputs when async session markers load so defaults stay in sync.
+    const markerEpoch = `${pinned ? 1 : 0}:${note}:${tags}`;
     return (
         <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
             <button
@@ -75,9 +79,9 @@ function MarkerEditor({
                 {pinned ? "★ Pinned (click to unpin)" : "☆ Pin this entity"}
             </button>
             <input
-                key={`${entityId}-note`}
+                key={`${entityId}-note-${markerEpoch}`}
                 placeholder="Note (lightweight, persists with session)"
-                defaultValue={m?.note ?? ""}
+                defaultValue={note}
                 onBlur={(e) => {
                     const v = e.target.value.trim();
                     if (onSetEntityMarker) {
@@ -95,9 +99,9 @@ function MarkerEditor({
                 }}
             />
             <input
-                key={`${entityId}-tags`}
+                key={`${entityId}-tags-${markerEpoch}`}
                 placeholder="tags (comma,separated)"
-                defaultValue={m?.tags ?? ""}
+                defaultValue={tags}
                 onBlur={(e) => {
                     const v = e.target.value.trim();
                     if (onSetEntityMarker) {

@@ -286,6 +286,23 @@ export function Sidebar({
                                                     : ""}{" "}
                                                 · {flow.packetCount} pkts ·{" "}
                                                 {formatBytes(flow.bytesTotal)}
+                                                {(() => {
+                                                    const marker =
+                                                        pinnedById.get(flow.id);
+                                                    if (!marker) return null;
+                                                    const bits: string[] = [];
+                                                    if (marker.note?.trim())
+                                                        bits.push(
+                                                            marker.note.trim(),
+                                                        );
+                                                    if (marker.tags?.trim())
+                                                        bits.push(
+                                                            marker.tags.trim(),
+                                                        );
+                                                    return bits.length > 0
+                                                        ? ` · ${bits.join(" · ")}`
+                                                        : null;
+                                                })()}
                                             </div>
                                         </div>
                                         <div

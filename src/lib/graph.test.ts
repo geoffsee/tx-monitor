@@ -186,6 +186,78 @@ describe("createGraph", () => {
         expect(snap2.flowsEvicted).toBeGreaterThan(0);
     }, 20000);
 
+    test("pinned hosts and flows survive display filters and surface marker flags", () => {
+        trafficNetwork.reset();
+        const staleFlowId = "10.0.0.1->203.0.113.50:TCP:443";
+        const freshFlowId = "10.0.0.2->203.0.113.51:TCP:443";
+
+        trafficNetwork.ingestPacket(
+            packet("stale-pin", "10.0.0.1", "203.0.113.50", 443),
+            true,
+            Date.now() - FLOW_STALE_WINDOW_MS - 1_000,
+        );
+        trafficNetwork.ingestPacket(
+            packet("fresh", "10.0.0.2", "203.0.113.51", 443),
+            true,
+            Date.now(),
+        );
+
+        // Without pin, stale flow is hidden in live mode.
+        expect(createGraph().edges.map((e) => e.id)).not.toContain(staleFlowId);
+
+        trafficNetwork.setEntityMarker("flow", staleFlowId, {
+            pinned: true,
+            note: "watch this",
+            tags: "lab",
+        });
+        trafficNetwork.setEntityMarker("host", "10.0.0.1", {
+            pinned: true,
+            note: "important host",
+        });
+
+        const graph = createGraph();
+        expect(graph.edges.map((e) => e.id)).toContain(staleFlowId);
+        expect(graph.edges.map((e) => e.id)).toContain(freshFlowId);
+        expect(graph.nodes.map((n) => n.id)).toContain("10.0.0.1");
+        expect(graph.nodes.find((n) => n.id === "10.0.0.1")?.data.pinned).toBe(
+            true,
+        );
+        expect(
+            graph.edges.find((e) => e.id === staleFlowId)?.data?.pinned,
+        ).toBe(true);
+        // Pinned flows are prioritized in list snapshot
+        expect(graph.flows[0]?.id).toBe(staleFlowId);
+        expect(graph.markers).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    kind: "flow",
+                    id: staleFlowId,
+                    pinned: true,
+                    note: "watch this",
+                    tags: "lab",
+                }),
+                expect.objectContaining({
+                    kind: "host",
+                    id: "10.0.0.1",
+                    pinned: true,
+                    note: "important host",
+                }),
+            ]),
+        );
+
+        // Clear pin: stale flow hides again; marker row removed when empty.
+        trafficNetwork.setEntityMarker("flow", staleFlowId, {
+            pinned: false,
+            note: null,
+            tags: null,
+        });
+        const cleared = createGraph();
+        expect(cleared.edges.map((e) => e.id)).not.toContain(staleFlowId);
+        expect(
+            cleared.markers.find((m) => m.id === staleFlowId),
+        ).toBeUndefined();
+    });
+
     test("summary-only mode drops fine-grained packets after threshold while retaining aggregates, recent window, and caps", () => {
         trafficNetwork.reset();
         trafficNetwork.setSummaryOnly(true);
