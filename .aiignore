@@ -1,0 +1,50 @@
+# Dependencies and build outputs
+node_modules/
+dist/
+build/
+out/
+coverage/
+*.lcov
+*.tsbuildinfo
+*.tgz
+
+# Tooling caches
+.cache/
+.eslintcache
+.playwright-mcp/
+
+# Logs and local debug output
+logs/
+*.log
+report.*.*.*.*.json
+
+# Local capture and database artifacts
+tcpdump.log
+.test-tx-mon.db
+.test-tx-mon.db-shm
+.test-tx-mon.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Local secrets and environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.copilot
+.env.github-app
+
+# Generated migration metadata and local binaries
+drizzle/meta/0000_snapshot.json
+drizzle/meta/_journal.json
+bin/tx-monitor.js
+
+# AI metadata and session artifacts
+.caretta/
+.agents/
+
+# Editor and OS noise
+.idea/
+.DS_Store
