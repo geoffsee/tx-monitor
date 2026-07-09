@@ -229,8 +229,9 @@ export function buildAnomalyExport(
         );
         relatedPackets = graph.packets.filter(
             (p) =>
-                (p.srcHost === flow.srcHost && p.dstHost === flow.dstHost) ||
-                (p.srcHost === flow.dstHost && p.dstHost === flow.srcHost),
+                p.proto === flow.proto &&
+                p.srcHost === flow.srcHost &&
+                p.dstHost === flow.dstHost,
         );
     } else if (hostId) {
         relatedHosts = graph.nodes.filter((n) => n.id === hostId);

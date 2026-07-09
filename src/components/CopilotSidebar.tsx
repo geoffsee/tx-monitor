@@ -105,11 +105,14 @@ export function CopilotSidebar({
     }, []);
 
     const submitPrompt = useCallback(
-        async (prompt: string) => {
+        async (prompt: string, selectionOverride?: Selection | null) => {
             const trimmed = prompt.trim();
             if (!trimmed || isLoading) {
                 return;
             }
+
+            const effectiveSelection =
+                selectionOverride !== undefined ? selectionOverride : selection;
 
             const userMessage = createMessage("user", trimmed);
             const history = messages
@@ -128,7 +131,7 @@ export function CopilotSidebar({
                     prompt: trimmed,
                     history,
                     graph,
-                    selection,
+                    selection: effectiveSelection,
                 });
                 setMessages((current) => [
                     ...current,
@@ -200,8 +203,9 @@ export function CopilotSidebar({
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             const safeType = anomaly.type.toLowerCase().replace(/\s+/g, "-");
+            const safeId = anomaly.id.replace(/[^a-zA-Z0-9._-]+/g, "_");
             a.href = url;
-            a.download = `anomaly-${safeType}-${anomaly.id}.json`;
+            a.download = `anomaly-${safeType}-${safeId}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -223,14 +227,22 @@ export function CopilotSidebar({
 
     const handleAnomalyAskCopilot = useCallback(
         (anomaly: (typeof graph.anomalies)[number]) => {
+            if (isLoading) {
+                return;
+            }
             const prompt = buildAnomalyPrompt(anomaly);
+            let selectionOverride: Selection | null | undefined;
+            if (anomaly.flowId) {
+                onSelectFlow?.(anomaly.flowId);
+                selectionOverride = { kind: "flow", id: anomaly.flowId };
+            } else if (anomaly.hostId) {
+                onSelectHost?.(anomaly.hostId);
+                selectionOverride = { kind: "host", id: anomaly.hostId };
+            }
             setActiveTab("copilot");
-            // Defer submit to allow tab state to render the copilot panel
-            setTimeout(() => {
-                void submitPrompt(prompt);
-            }, 0);
+            void submitPrompt(prompt, selectionOverride);
         },
-        [submitPrompt],
+        [isLoading, onSelectFlow, onSelectHost, submitPrompt],
     );
 
     const tabButtonStyle = (isActive: boolean): React.CSSProperties => ({
@@ -750,7 +762,16 @@ export function CopilotSidebar({
                                                         anomaly,
                                                     )
                                                 }
-                                                style={anomalyActionButtonStyle}
+                                                style={{
+                                                    ...anomalyActionButtonStyle,
+                                                    ...(isLoading
+                                                        ? {
+                                                              opacity: 0.5,
+                                                              cursor: "not-allowed",
+                                                          }
+                                                        : {}),
+                                                }}
+                                                disabled={isLoading}
                                                 title="Prefill copilot with anomaly context"
                                             >
                                                 Ask Copilot
