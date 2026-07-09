@@ -27,6 +27,7 @@ const emptyGraph: TrafficSnapshot = {
     connected: true,
     sourceLabel: "tcpdump -i any",
     sensitivity: "medium",
+    markers: [],
 };
 
 const sampleGraph: TrafficSnapshot = {
