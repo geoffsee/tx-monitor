@@ -1,0 +1,32 @@
+name: Grok Auth Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  grok-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore GROK_CREDENTIALS from oz
+        env:
+          OZ_API_KEY: ${{ secrets.OZ_API_KEY }}
+          OZ_API_URL: ${{ secrets.OZ_API_URL }}
+          OZ_PROJECT: ${{ secrets.OZ_PROJECT }}
+        run: |
+          set -euo pipefail
+          echo "Restoring GROK_CREDENTIALS from oz using OZ_* envs..."
+          GROK_CREDENTIALS=$(oz get GROK_CREDENTIALS)
+          echo "::add-mask::$GROK_CREDENTIALS"
+          echo "GROK_CREDENTIALS=$GROK_CREDENTIALS" >> "$GITHUB_ENV"
+          echo "GROK_CREDENTIALS restored from oz (masked; never logged)"
+
+      - name: Run Grok auth verification (writes ~/.grok/auth.json + tests bundled CLI prompt)
+        run: bash scripts/verify-grok-auth.sh
+
+      - name: Report result
+        if: always()
+        run: |
+          echo "Grok auth test workflow completed."
+          echo "See previous step logs for 'Grok OAuth verified' (success) or failure details."
