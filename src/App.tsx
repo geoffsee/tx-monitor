@@ -20,6 +20,7 @@ export default function App() {
         updateCapture,
         summaryOnly,
         setSummaryOnly,
+        setEntityMarker,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
@@ -109,6 +110,7 @@ export default function App() {
                     onNavigateToFlow={handleNavigateToFlow}
                     onClearSelection={clearSelection}
                     onUpdateCapture={updateCapture}
+                    onSetEntityMarker={setEntityMarker}
                 />
             </section>
         </main>

@@ -21,6 +21,7 @@ const emptyGraph: TrafficSnapshot = {
     sourceLabel: "tcpdump -i any",
     capture: { iface: "any", direction: "out", bpf: "" },
     sensitivity: "medium",
+    markers: [],
 };
 
 const sampleGraph: TrafficSnapshot = {

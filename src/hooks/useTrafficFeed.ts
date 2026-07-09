@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+    fetchEntityMarkers,
     fetchSession,
     fetchSessionPackets,
+    fetchSessions,
     SESSION_PAGE_SIZE,
+    saveEntityMarker,
 } from "../lib/api";
 import { createGraph } from "../lib/graph";
 import type { ParsedPacket } from "../lib/tcpdumpParser";
@@ -37,6 +40,11 @@ export type TrafficFeedState = {
     }) => void;
     summaryOnly: boolean;
     setSummaryOnly: (enabled: boolean) => void;
+    setEntityMarker: (
+        kind: "host" | "flow",
+        id: string,
+        patch: { pinned?: boolean; note?: string | null; tags?: string | null },
+    ) => void;
 };
 
 export function useTrafficFeed(): TrafficFeedState {
@@ -71,6 +79,62 @@ export function useTrafficFeed(): TrafficFeedState {
         setSessionsVersion((version) => version + 1);
     }, []);
 
+    const loadMarkersForSession = useCallback(
+        async (sessionId: string) => {
+            try {
+                const list = await fetchEntityMarkers(sessionId);
+                trafficNetwork.replaceMarkers(list);
+                publishGraph();
+            } catch {
+                // non-fatal
+            }
+        },
+        [publishGraph],
+    );
+
+    const setEntityMarker = useCallback(
+        async (
+            kind: "host" | "flow",
+            id: string,
+            patch: {
+                pinned?: boolean;
+                note?: string | null;
+                tags?: string | null;
+            },
+        ) => {
+            trafficNetwork.setEntityMarker(kind, id, patch);
+            publishGraph();
+
+            let targetSessionId: string | null = activeSessionId;
+            if (!targetSessionId) {
+                try {
+                    const list = await fetchSessions(5);
+                    const live = list.find((s) => !s.endedAt);
+                    targetSessionId = live?.id ?? null;
+                } catch {
+                    // ignore
+                }
+            }
+            if (targetSessionId) {
+                try {
+                    await saveEntityMarker(targetSessionId, {
+                        kind,
+                        id,
+                        pinned: patch.pinned,
+                        note: patch.note,
+                        tags: patch.tags,
+                    });
+                } catch {
+                    trafficNetwork.remember(
+                        "Marker saved locally (persist failed)",
+                    );
+                    publishGraph();
+                }
+            }
+        },
+        [activeSessionId, publishGraph],
+    );
+
     const returnToLive = useCallback(() => {
         loadAbortRef.current += 1;
         livePausedRef.current = false;
@@ -80,6 +144,20 @@ export function useTrafficFeed(): TrafficFeedState {
         trafficNetwork.reset();
         publishGraph();
         refreshSessions();
+        // reload any markers for the live session
+        void (async () => {
+            try {
+                const sessions = await fetchSessions(3);
+                const liveSess = sessions.find((s) => s && !s.endedAt);
+                if (liveSess) {
+                    const list = await fetchEntityMarkers(liveSess.id);
+                    trafficNetwork.replaceMarkers(list);
+                    publishGraph();
+                }
+            } catch {
+                // silent
+            }
+        })();
     }, [publishGraph, refreshSessions]);
 
     const updateCapture = useCallback(
@@ -167,6 +245,7 @@ export function useTrafficFeed(): TrafficFeedState {
                 );
                 setSessionLoadProgress(null);
                 publishGraph();
+                await loadMarkersForSession(sessionId);
                 refreshSessions();
             } catch (error) {
                 if (loadAbortRef.current !== loadId) {
@@ -181,7 +260,7 @@ export function useTrafficFeed(): TrafficFeedState {
                 publishGraph();
             }
         },
-        [publishGraph, refreshSessions],
+        [publishGraph, refreshSessions, loadMarkersForSession],
     );
 
     useEffect(() => {
@@ -256,6 +335,20 @@ export function useTrafficFeed(): TrafficFeedState {
             if (!livePausedRef.current) {
                 trafficNetwork.setConnection(true);
                 publishGraph();
+                // load durable markers for the active live session if present
+                void (async () => {
+                    try {
+                        const sessions = await fetchSessions(3);
+                        const liveSess = sessions.find((s) => s && !s.endedAt);
+                        if (liveSess) {
+                            const list = await fetchEntityMarkers(liveSess.id);
+                            trafficNetwork.replaceMarkers(list);
+                            publishGraph();
+                        }
+                    } catch {
+                        // silent
+                    }
+                })();
             }
         });
 
@@ -378,5 +471,6 @@ export function useTrafficFeed(): TrafficFeedState {
         updateCapture,
         summaryOnly: graph.summaryOnly,
         setSummaryOnly,
+        setEntityMarker,
     };
 }

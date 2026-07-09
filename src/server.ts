@@ -992,6 +992,54 @@ async function handleApiRequest(
         );
     }
 
+    const markersMatch = url.pathname.match(
+        /^\/api\/sessions\/([^/]+)\/markers$/,
+    );
+    if (markersMatch) {
+        const sessionId = decodeURIComponent(markersMatch[1] ?? "");
+        const session = store.getSession(sessionId);
+        if (!session) {
+            return jsonResponse({ error: "Session not found" }, 404);
+        }
+        if (request.method === "GET") {
+            return jsonResponse(store.getEntityMarkers(sessionId));
+        }
+        if (request.method === "POST" || request.method === "PUT") {
+            try {
+                const body = (await readJsonBody(request)) as {
+                    kind?: string;
+                    entityId?: string;
+                    pinned?: boolean;
+                    note?: string | null;
+                    tags?: string | null;
+                };
+                if (
+                    !body ||
+                    (body.kind !== "host" && body.kind !== "flow") ||
+                    !body.entityId
+                ) {
+                    return jsonResponse(
+                        { error: "Invalid marker payload" },
+                        400,
+                    );
+                }
+                store.setEntityMarker(sessionId, {
+                    kind: body.kind,
+                    entityId: body.entityId,
+                    pinned: body.pinned,
+                    note: body.note,
+                    tags: body.tags,
+                });
+                return jsonResponse({ ok: true });
+            } catch {
+                return jsonResponse({ error: "Bad request" }, 400);
+            }
+        }
+        return jsonResponse({ error: "Method not allowed" }, 405, {
+            allow: "GET,POST",
+        });
+    }
+
     return jsonResponse({ error: "Not found" }, 404);
 }
 

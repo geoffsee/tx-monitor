@@ -27,6 +27,7 @@ const graph: TrafficSnapshot = {
     sourceLabel: "tcpdump -i any",
     capture: { iface: "any", direction: "out", bpf: "" },
     sensitivity: "medium",
+    markers: [],
 };
 
 const context = buildCopilotContext(graph, null);
