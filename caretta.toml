@@ -16,7 +16,7 @@ format_command = ["bash", "-lc", "bun install && bun run check:fix"]
 
 [agent_models]
 # Subscription OAuth exposes `grok-build`, not `grok-build-0.1` (API-key catalog name).
-xai = "grok-build"
+xai = "grok-4.5"
 
 [deploy]
 command = [

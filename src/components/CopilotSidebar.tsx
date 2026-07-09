@@ -39,6 +39,8 @@ type CopilotSidebarProps = {
     isCompact: boolean;
     sensitivity: "low" | "medium" | "high";
     onSetSensitivity: (level: "low" | "medium" | "high") => void;
+    summaryOnly: boolean;
+    onSetSummaryOnly: (enabled: boolean) => void;
 };
 
 type Tab = "copilot" | "anomalies";
@@ -49,6 +51,8 @@ export function CopilotSidebar({
     isCompact,
     sensitivity,
     onSetSensitivity,
+    summaryOnly,
+    onSetSummaryOnly,
 }: CopilotSidebarProps) {
     const [activeTab, setActiveTab] = useState<Tab>("copilot");
     const [messages, setMessages] = useState<CopilotMessage[]>([
@@ -352,6 +356,67 @@ export function CopilotSidebar({
                                     <code>api-key</code> (OPENAI_API_KEY). Set
                                     TXMON_CODEX_AUTH and/or use .env.copilot.
                                     Validation pings without exposing secrets.
+                                </div>
+                                <div
+                                    style={{
+                                        marginTop: 6,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <span style={{ color: "#7f99a7" }}>
+                                        Memory:
+                                    </span>
+                                    {(["full", "summary"] as const).map(
+                                        (mode) => {
+                                            const active =
+                                                (mode === "summary") ===
+                                                summaryOnly;
+                                            return (
+                                                <button
+                                                    key={mode}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        onSetSummaryOnly(
+                                                            mode === "summary",
+                                                        )
+                                                    }
+                                                    style={{
+                                                        fontSize: 10,
+                                                        padding: "1px 6px",
+                                                        borderRadius: 999,
+                                                        border: active
+                                                            ? "1px solid #66aec4"
+                                                            : "1px solid #33414a",
+                                                        background: active
+                                                            ? "rgba(102, 174, 196, 0.15)"
+                                                            : "#0f1921",
+                                                        color: active
+                                                            ? "#66aec4"
+                                                            : "#7f99a7",
+                                                        cursor: "pointer",
+                                                        textTransform:
+                                                            "uppercase",
+                                                        letterSpacing: "0.06em",
+                                                        fontWeight: 600,
+                                                    }}
+                                                >
+                                                    {mode}
+                                                </button>
+                                            );
+                                        },
+                                    )}
+                                    <span
+                                        style={{
+                                            fontSize: 9,
+                                            color: "#5c7889",
+                                            marginLeft: 4,
+                                        }}
+                                    >
+                                        (summary drops packet details)
+                                    </span>
                                 </div>
                             </div>
                         </header>

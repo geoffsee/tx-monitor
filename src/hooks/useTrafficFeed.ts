@@ -33,6 +33,8 @@ export type TrafficFeedState = {
     refreshSessions: () => void;
     sensitivity: "low" | "medium" | "high";
     setSensitivity: (level: "low" | "medium" | "high") => void;
+    summaryOnly: boolean;
+    setSummaryOnly: (enabled: boolean) => void;
     setEntityMarker: (
         kind: "host" | "flow",
         id: string,
@@ -415,6 +417,14 @@ export function useTrafficFeed(): TrafficFeedState {
         [publishGraph],
     );
 
+    const setSummaryOnly = useCallback(
+        (enabled: boolean) => {
+            trafficNetwork.setSummaryOnly(enabled);
+            publishGraph();
+        },
+        [publishGraph],
+    );
+
     return {
         graph,
         viewMode,
@@ -426,6 +436,8 @@ export function useTrafficFeed(): TrafficFeedState {
         refreshSessions,
         sensitivity: graph.sensitivity,
         setSensitivity,
+        summaryOnly: graph.summaryOnly,
+        setSummaryOnly,
         setEntityMarker,
     };
 }

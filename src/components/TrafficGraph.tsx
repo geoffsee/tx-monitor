@@ -194,12 +194,34 @@ export function TrafficGraph({
                                 <span style={compactKpiLabelStyle}>Hosts</span>
                                 <span style={compactKpiValueStyle}>
                                     {graph.hostCount}
+                                    {graph.hostsEvicted > 0 ? (
+                                        <span
+                                            style={{
+                                                fontSize: 9,
+                                                color: "#e6a07c",
+                                                marginLeft: 2,
+                                            }}
+                                        >
+                                            -{graph.hostsEvicted}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </div>
                             <div style={compactKpiStyle}>
                                 <span style={compactKpiLabelStyle}>Flows</span>
                                 <span style={compactKpiValueStyle}>
                                     {graph.flowCount}
+                                    {graph.flowsEvicted > 0 ? (
+                                        <span
+                                            style={{
+                                                fontSize: 9,
+                                                color: "#e6a07c",
+                                                marginLeft: 2,
+                                            }}
+                                        >
+                                            -{graph.flowsEvicted}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </div>
                             <div style={compactKpiStyle}>
@@ -208,6 +230,17 @@ export function TrafficGraph({
                                 </span>
                                 <span style={compactKpiValueStyle}>
                                     {graph.totalPackets}
+                                    {graph.packetsEvicted > 0 ? (
+                                        <span
+                                            style={{
+                                                fontSize: 9,
+                                                color: "#e6a07c",
+                                                marginLeft: 2,
+                                            }}
+                                        >
+                                            -{graph.packetsEvicted}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </div>
                         </div>

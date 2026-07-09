@@ -17,6 +17,8 @@ export default function App() {
         returnToLive,
         sensitivity,
         setSensitivity,
+        summaryOnly,
+        setSummaryOnly,
         setEntityMarker,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
@@ -81,6 +83,8 @@ export default function App() {
                     isCompact={isCompact}
                     sensitivity={sensitivity}
                     onSetSensitivity={setSensitivity}
+                    summaryOnly={summaryOnly}
+                    onSetSummaryOnly={setSummaryOnly}
                 />
                 <TrafficGraph
                     graph={graph}
