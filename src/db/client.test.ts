@@ -106,4 +106,31 @@ describe("openDatabase", () => {
         ]);
         sqlite.close();
     });
+
+    test("creates entity_markers table on legacy upgrade", () => {
+        const dbPath = createLegacyDatabase();
+        const store = new TrafficStore(openDatabase(dbPath));
+
+        const session = store.startSession("live", "legacy");
+        store.setEntityMarker(session.id, {
+            kind: "host",
+            entityId: "192.168.1.10",
+            pinned: true,
+            note: "legacy pin",
+        });
+
+        const markers = store.getEntityMarkers(session.id);
+        expect(markers.length).toBe(1);
+        expect(markers[0]?.note).toBe("legacy pin");
+
+        // table exists
+        const sqlite = new Database(dbPath);
+        const tables = sqlite
+            .query(
+                `SELECT name FROM sqlite_master WHERE type='table' AND name='entity_markers'`,
+            )
+            .all();
+        expect(tables.length).toBeGreaterThan(0);
+        sqlite.close();
+    });
 });

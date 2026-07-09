@@ -15,6 +15,10 @@ const SESSION_METADATA_MIGRATION_HASH =
     "b53bddff6befad22729fad5b20bb05444fe1e097e1e8a313bdbee1fcd8146622";
 const SESSION_METADATA_MIGRATION_CREATED_AT = 1781459047000;
 
+const ENTITY_MARKERS_MIGRATION_HASH =
+    "e7f2a1b3c4d5e6f708192a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4";
+const ENTITY_MARKERS_MIGRATION_CREATED_AT = 1781459048000;
+
 const CAPTURE_SESSION_OPTIONAL_COLUMNS = [
     "hostname text",
     "cmdline text",
@@ -61,6 +65,29 @@ export function upgradeLegacySchema(sqlite: Database) {
             );
         }
     }
+    ensureEntityMarkersTable(sqlite);
+}
+
+function ensureEntityMarkersTable(sqlite: Database) {
+    const tables = sqlite
+        .query(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='entity_markers'`,
+        )
+        .all() as Array<{ name: string }>;
+    if (tables.length === 0) {
+        sqlite.exec(`
+            CREATE TABLE entity_markers (
+                id text PRIMARY KEY NOT NULL,
+                session_id text NOT NULL,
+                kind text NOT NULL,
+                entity_id text NOT NULL,
+                pinned integer NOT NULL DEFAULT 0,
+                note text,
+                tags text
+            );
+            CREATE INDEX IF NOT EXISTS entity_markers_session_idx ON entity_markers (session_id, kind, entity_id);
+        `);
+    }
 }
 
 function initializeEmbeddedSchema(sqlite: Database) {
@@ -96,6 +123,17 @@ function initializeEmbeddedSchema(sqlite: Database) {
 
         CREATE INDEX IF NOT EXISTS packets_session_received_idx ON packets (session_id, received_at);
 
+        CREATE TABLE IF NOT EXISTS entity_markers (
+            id text PRIMARY KEY NOT NULL,
+            session_id text NOT NULL,
+            kind text NOT NULL,
+            entity_id text NOT NULL,
+            pinned integer NOT NULL DEFAULT 0,
+            note text,
+            tags text
+        );
+        CREATE INDEX IF NOT EXISTS entity_markers_session_idx ON entity_markers (session_id, kind, entity_id);
+
         CREATE TABLE IF NOT EXISTS __drizzle_migrations (
             id SERIAL PRIMARY KEY,
             hash text NOT NULL,
@@ -113,6 +151,11 @@ function initializeEmbeddedSchema(sqlite: Database) {
         sqlite,
         SESSION_METADATA_MIGRATION_HASH,
         SESSION_METADATA_MIGRATION_CREATED_AT,
+    );
+    recordMigrationIfMissing(
+        sqlite,
+        ENTITY_MARKERS_MIGRATION_HASH,
+        ENTITY_MARKERS_MIGRATION_CREATED_AT,
     );
 }
 

@@ -19,6 +19,7 @@ export default function App() {
         setSensitivity,
         summaryOnly,
         setSummaryOnly,
+        setEntityMarker,
     } = useTrafficFeed();
     const isCompact = useCompactLayout();
     const { selection, selectItem, clearSelection, setSelection } =
@@ -109,6 +110,7 @@ export default function App() {
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}
                     onClearSelection={clearSelection}
+                    onSetEntityMarker={setEntityMarker}
                 />
             </section>
         </main>
