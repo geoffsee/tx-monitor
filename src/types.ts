@@ -62,6 +62,16 @@ export type ProcessSummary = {
     user: string;
 };
 
+/** Why an entity was dropped from in-memory state (telemetry, not silent loss). */
+export type EvictionReason =
+    | "host_cap"
+    | "flow_cap"
+    | "flow_orphan"
+    | "packet_window"
+    | "summary_mode";
+
+export type EvictionByReason = Record<EvictionReason, number>;
+
 export type TrafficSnapshot = {
     nodes: Node<HostNodeData>[];
     edges: Edge<FlowEdgeData>[];
@@ -95,6 +105,8 @@ export type TrafficSnapshot = {
     hostsEvicted: number;
     flowsEvicted: number;
     packetsEvicted: number;
+    /** Cumulative counts by eviction reason (hosts/flows/packets). */
+    evictionByReason: EvictionByReason;
     summaryOnly: boolean;
     connected: boolean;
     sourceLabel: string;
