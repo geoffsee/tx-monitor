@@ -1,6 +1,9 @@
 name: Grok Auth Test
 
 on:
+  push:
+    branches:
+      - grok-auth-test
   workflow_dispatch:
 
 jobs:
