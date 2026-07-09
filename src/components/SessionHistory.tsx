@@ -351,7 +351,9 @@ export function SessionHistory({
                                             }
                                             disabled={
                                                 !!comparisonLoadProgress ||
-                                                activeSessionId === session.id
+                                                activeSessionId ===
+                                                    session.id ||
+                                                isComparison
                                             }
                                             title="Load as comparison overlay"
                                             style={{

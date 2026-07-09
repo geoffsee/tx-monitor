@@ -390,6 +390,10 @@ export function useTrafficFeed(): TrafficFeedState {
                 if (activeSessionIdRef.current === sessionId) {
                     compTargetSessionIdRef.current = null;
                     setComparisonLoadProgress(null);
+                    trafficNetwork.remember(
+                        "Comparison cancelled: session is already the primary",
+                    );
+                    publishGraph();
                     return;
                 }
 

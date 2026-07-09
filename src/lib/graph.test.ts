@@ -227,6 +227,15 @@ describe("createGraph", () => {
         expect(flowCommon?.inComparison).toBe(true);
         expect(flowOnlyPrimary?.inComparison).toBe(false);
 
+        const edgeCommon = snap.edges.find(
+            (e) => e.id === "10.0.0.1->203.0.113.10:TCP:443",
+        );
+        const edgeOnlyPrimary = snap.edges.find(
+            (e) => e.id === "10.0.0.2->203.0.113.20:TCP:443",
+        );
+        expect(edgeCommon?.data?.inComparison).toBe(true);
+        expect(edgeOnlyPrimary?.data?.inComparison).toBe(false);
+
         // Comparison summary present
         expect(snap.comparison?.sessionId).toBe("cmp-1");
         expect(snap.comparison?.commonHostCount).toBeGreaterThanOrEqual(1);
