@@ -85,6 +85,31 @@ describe("buildCopilotContext", () => {
         expect(context.topHosts[0]?.label).toBe("10.0.0.1");
     });
 
+    test("includes entity markers for pinned hosts and flows", () => {
+        const withMarkers: TrafficSnapshot = {
+            ...sampleGraph,
+            markers: [
+                {
+                    kind: "host",
+                    id: "10.0.0.1",
+                    pinned: true,
+                    note: "gateway",
+                    tags: "core",
+                },
+                {
+                    kind: "flow",
+                    id: "flow-1",
+                    pinned: false,
+                    note: "dns",
+                    tags: null,
+                },
+            ],
+        };
+        const context = buildCopilotContext(withMarkers, null);
+        expect(context.markers).toEqual(withMarkers.markers);
+        expect(context.markers[0]?.note).toBe("gateway");
+    });
+
     test("includes selected flow details", () => {
         const context = buildCopilotContext(sampleGraph, {
             kind: "flow",

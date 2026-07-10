@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { clearComparisonContext, setComparisonContext } from "./comparison";
-import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
+import { createGraph, FLOW_STALE_WINDOW_MS, MAX_GRAPH_HOSTS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
     MAX_MEMORY_FLOWS,
@@ -210,6 +210,119 @@ describe("createGraph", () => {
         ).toBe(snap2.flowsEvicted);
         expect(snap2.evictionByReason.flow_cap).toBeGreaterThan(0);
     }, 20000);
+
+    test("pinned hosts and flows survive display filters and surface marker flags", () => {
+        trafficNetwork.reset();
+        const staleFlowId = "10.0.0.1->203.0.113.50:TCP:443";
+        const freshFlowId = "10.0.0.2->203.0.113.51:TCP:443";
+
+        trafficNetwork.ingestPacket(
+            packet("stale-pin", "10.0.0.1", "203.0.113.50", 443),
+            true,
+            Date.now() - FLOW_STALE_WINDOW_MS - 1_000,
+        );
+        trafficNetwork.ingestPacket(
+            packet("fresh", "10.0.0.2", "203.0.113.51", 443),
+            true,
+            Date.now(),
+        );
+
+        // Without pin, stale flow is hidden in live mode.
+        expect(createGraph().edges.map((e) => e.id)).not.toContain(staleFlowId);
+
+        trafficNetwork.setEntityMarker("flow", staleFlowId, {
+            pinned: true,
+            note: "watch this",
+            tags: "lab",
+        });
+        trafficNetwork.setEntityMarker("host", "10.0.0.1", {
+            pinned: true,
+            note: "important host",
+        });
+
+        const graph = createGraph();
+        expect(graph.edges.map((e) => e.id)).toContain(staleFlowId);
+        expect(graph.edges.map((e) => e.id)).toContain(freshFlowId);
+        expect(graph.nodes.map((n) => n.id)).toContain("10.0.0.1");
+        expect(graph.nodes.find((n) => n.id === "10.0.0.1")?.data.pinned).toBe(
+            true,
+        );
+        expect(
+            graph.edges.find((e) => e.id === staleFlowId)?.data?.pinned,
+        ).toBe(true);
+        // Pinned flows are prioritized in list snapshot
+        expect(graph.flows[0]?.id).toBe(staleFlowId);
+        expect(graph.markers).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    kind: "flow",
+                    id: staleFlowId,
+                    pinned: true,
+                    note: "watch this",
+                    tags: "lab",
+                }),
+                expect.objectContaining({
+                    kind: "host",
+                    id: "10.0.0.1",
+                    pinned: true,
+                    note: "important host",
+                }),
+            ]),
+        );
+
+        // Clear pin: stale flow hides again; marker row removed when empty.
+        trafficNetwork.setEntityMarker("flow", staleFlowId, {
+            pinned: false,
+            note: null,
+            tags: null,
+        });
+        const cleared = createGraph();
+        expect(cleared.edges.map((e) => e.id)).not.toContain(staleFlowId);
+        expect(
+            cleared.markers.find((m) => m.id === staleFlowId),
+        ).toBeUndefined();
+    });
+
+    test("pinned flow alone keeps both endpoints when host selection is saturated", () => {
+        trafficNetwork.reset();
+        const now = Date.now();
+        // Fill the graph with more unique hosts than MAX_GRAPH_HOSTS via fresh flows.
+        // flowList is lastSeen-desc, so these sit ahead of the older pinned flow.
+        for (let i = 0; i < MAX_GRAPH_HOSTS; i++) {
+            trafficNetwork.ingestPacket(
+                packet(
+                    `fill-${i}`,
+                    `10.0.${Math.floor(i / 2)}.${(i % 2) * 10 + 1}`,
+                    `10.0.${Math.floor(i / 2)}.${(i % 2) * 10 + 2}`,
+                    443 + i,
+                ),
+                true,
+                now - i,
+            );
+        }
+
+        const pinSrc = "198.51.100.1";
+        const pinDst = "198.51.100.2";
+        const pinnedFlowId = `${pinSrc}->${pinDst}:TCP:8443`;
+        trafficNetwork.ingestPacket(
+            packet("pin-only", pinSrc, pinDst, 8443),
+            true,
+            now - 5_000,
+        );
+        // Pin only the flow — not its hosts — so keepHostSet is the only path that retains them.
+        trafficNetwork.setEntityMarker("flow", pinnedFlowId, { pinned: true });
+
+        const graph = createGraph();
+        const nodeIds = graph.nodes.map((n) => n.id);
+        expect(nodeIds).toContain(pinSrc);
+        expect(nodeIds).toContain(pinDst);
+        expect(graph.edges.map((e) => e.id)).toContain(pinnedFlowId);
+        expect(
+            graph.edges.find((e) => e.id === pinnedFlowId)?.data?.pinned,
+        ).toBe(true);
+        // Pin endpoints take priority slots within the host cap.
+        expect(graph.nodes.length).toBe(MAX_GRAPH_HOSTS);
+    });
 
     test("annotates nodes, flows and edges with inComparison when comparison context is set", () => {
         trafficNetwork.reset();
