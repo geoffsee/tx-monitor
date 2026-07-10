@@ -11,6 +11,7 @@ export type HostNodeData = {
     processes?: string[];
     processCount?: number;
     resolvedDns?: string;
+    inComparison?: boolean;
     pinned?: boolean;
 };
 
@@ -19,6 +20,7 @@ export type FlowEdgeData = {
     labelColor: string;
     stroke: string;
     active: boolean;
+    inComparison?: boolean;
     pinned?: boolean;
 };
 
@@ -42,6 +44,15 @@ export type CaptureSessionSummary = {
 };
 
 export type TrafficViewMode = "live" | "history";
+
+export type ComparisonSummary = {
+    sessionId: string;
+    label: string;
+    hostCount: number;
+    flowCount: number;
+    commonHostCount: number;
+    commonFlowCount: number;
+};
 
 export type SessionLoadProgress = {
     loaded: number;
@@ -97,6 +108,7 @@ export type TrafficSnapshot = {
         bytesTotal: number;
         active: boolean;
         process?: ProcessSummary;
+        inComparison?: boolean;
     }>;
     anomalies: Anomaly[];
     events: string[];
@@ -111,5 +123,6 @@ export type TrafficSnapshot = {
     connected: boolean;
     sourceLabel: string;
     sensitivity: "low" | "medium" | "high";
+    comparison?: ComparisonSummary;
     markers: EntityMarker[];
 };

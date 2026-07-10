@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { parseEnvFile } from "./secrets";
+import { parseEnvFile, SECRET_KEYS } from "./secrets";
 
 export type ConfigMap = Record<string, string>;
 
@@ -32,6 +32,18 @@ const KEY_ALIASES: Record<string, string> = {
     TXMON_CODEX_MODEL: "codex_model",
 };
 
+/** Keys never accepted from a config file (credentials / capture args). */
+const BLOCKED_CONFIG_KEYS = new Set(
+    [
+        ...SECRET_KEYS,
+        "TXMON_CODEX_AUTH",
+        "CODEX_AUTH",
+        "TXMON_TCPDUMP_ARGS",
+        "TCPDUMP_ARGS",
+        "CODEX_API_KEY",
+    ].map((k) => k.toUpperCase()),
+);
+
 function normalizeKey(raw: string): string | null {
     const upper = raw.trim().toUpperCase();
     if (KEY_ALIASES[upper]) {
@@ -52,9 +64,13 @@ const SECRET_PATTERNS = [
     /SECRET/i,
     /PASSWORD/i,
     /CREDENTIAL/i,
+    /TCPDUMP_ARGS/i,
 ];
 
 function isSecretKey(key: string, value?: string): boolean {
+    if (BLOCKED_CONFIG_KEYS.has(key.trim().toUpperCase())) {
+        return true;
+    }
     if (SECRET_PATTERNS.some((re) => re.test(key))) {
         return true;
     }
@@ -67,40 +83,46 @@ function isSecretKey(key: string, value?: string): boolean {
     return false;
 }
 
+/** Expand a leading `~/` or bare `~` to the user home directory. */
+export function expandHomePath(value: string, home = homedir()): string {
+    if (value === "~") {
+        return home;
+    }
+    if (value.startsWith("~/") || value.startsWith("~\\")) {
+        return join(home, value.slice(2));
+    }
+    return value;
+}
+
 let cachedCwd: string | null = null;
+let cachedHome: string | null = null;
 let cachedConfig: ConfigMap | null = null;
 
-function readConfigFile(path: string): ConfigMap {
+function readConfigFile(path: string, home: string): ConfigMap {
     if (!existsSync(path)) {
         return {};
     }
     try {
         const content = readFileSync(path, "utf8");
-        const parsed = parseEnvFile(content);
-        const out: ConfigMap = {};
-        for (const [k, v] of Object.entries(parsed)) {
-            if (isSecretKey(k, v)) {
-                console.warn(
-                    `[config] ignoring secret-like key in ${path}: ${k}`,
-                );
-                continue;
-            }
-            const norm = normalizeKey(k);
-            if (norm) {
-                out[norm] = v ?? "";
-            }
-        }
-        return out;
+        return parseConfigContent(content, { warnPath: path, home });
     } catch {
         return {};
     }
 }
 
-export function loadAppConfig(cwd = process.cwd()): ConfigMap {
-    if (cachedConfig && cachedCwd === cwd) {
+export type LoadAppConfigOptions = {
+    /** Override home directory (tests). Default: os.homedir(). */
+    home?: string;
+};
+
+export function loadAppConfig(
+    cwd = process.cwd(),
+    options: LoadAppConfigOptions = {},
+): ConfigMap {
+    const home = options.home ?? homedir();
+    if (cachedConfig && cachedCwd === cwd && cachedHome === home) {
         return cachedConfig;
     }
-    const home = homedir();
     const candidates: string[] = [
         join(home, ".tx-monitor", "config"),
         join(home, ".tx-monitor", "config.toml"),
@@ -109,29 +131,47 @@ export function loadAppConfig(cwd = process.cwd()): ConfigMap {
     ];
     let merged: ConfigMap = {};
     for (const p of candidates) {
-        const part = readConfigFile(p);
+        const part = readConfigFile(p, home);
         merged = { ...merged, ...part };
     }
     cachedCwd = cwd;
+    cachedHome = home;
     cachedConfig = merged;
     return merged;
 }
 
 export function resetConfigCache(): void {
     cachedCwd = null;
+    cachedHome = null;
     cachedConfig = null;
 }
 
-export function parseConfigContent(content: string): ConfigMap {
+export type ParseConfigOptions = {
+    /** When set, secret-like keys log a warning with this path. */
+    warnPath?: string;
+    home?: string;
+};
+
+export function parseConfigContent(
+    content: string,
+    options: ParseConfigOptions = {},
+): ConfigMap {
+    const home = options.home ?? homedir();
     const parsed = parseEnvFile(content);
     const out: ConfigMap = {};
     for (const [k, v] of Object.entries(parsed)) {
         if (isSecretKey(k, v)) {
+            if (options.warnPath) {
+                console.warn(
+                    `[config] ignoring secret-like or blocked key in ${options.warnPath}: ${k}`,
+                );
+            }
             continue;
         }
         const norm = normalizeKey(k);
         if (norm) {
-            out[norm] = v ?? "";
+            const raw = v ?? "";
+            out[norm] = norm === "db" ? expandHomePath(raw, home) : raw;
         }
     }
     return out;
@@ -223,6 +263,20 @@ export function resolveNumber(
     }
     if (cfg != null && Number.isFinite(cfg)) return cfg;
     return def;
+}
+
+/** Minimal startup line: no secrets, safe defaults only. */
+export function formatEffectiveSettings(opts: {
+    port: number;
+    dbPath: string | null;
+    fileReplaySpeed: number;
+    filePath?: string | null;
+}): string {
+    const effectiveDb = opts.dbPath ?? "disabled";
+    const effectiveReplay =
+        opts.fileReplaySpeed > 0 ? `speed=${opts.fileReplaySpeed}` : "fast";
+    const mode = opts.filePath ? "file" : "live";
+    return `Effective settings: port=${opts.port} db=${effectiveDb} replay=${effectiveReplay} mode=${mode}`;
 }
 
 // Effective getters for modules that currently read env directly (config < env)

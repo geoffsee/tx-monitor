@@ -17,6 +17,11 @@ export default function App() {
         returnToLive,
         sensitivity,
         setSensitivity,
+        comparisonSessionId,
+        comparisonLabel,
+        comparisonLoadProgress,
+        loadComparisonSession,
+        clearComparison,
         summaryOnly,
         setSummaryOnly,
         setEntityMarker,
@@ -114,8 +119,13 @@ export default function App() {
                     activeSessionId={activeSessionId}
                     sessionLoadProgress={sessionLoadProgress}
                     sessionsVersion={sessionsVersion}
+                    comparisonSessionId={comparisonSessionId}
+                    comparisonLabel={comparisonLabel}
+                    comparisonLoadProgress={comparisonLoadProgress}
                     onLoadSession={loadSession}
                     onReturnToLive={returnToLive}
+                    onLoadComparison={loadComparisonSession}
+                    onClearComparison={clearComparison}
                     onSelectFlow={handleSidebarSelectFlow}
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}
