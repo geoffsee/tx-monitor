@@ -117,9 +117,9 @@ codex_timeout_ms=180000
 codex_model=gpt-5.5
 ```
 
-Secrets, credentials, API keys, and `TXMON_TCPDUMP_ARGS` are not allowed in the config file and are ignored if present (with a warning for secret-like keys). Keep credentials in the environment or `.env.copilot` only.
+Secrets, credentials, API keys, and `TXMON_TCPDUMP_ARGS` are not allowed in the config file and are ignored if present (with a warning for secret-like or blocked keys). Keep credentials in the environment or `.env.copilot` only. Capture command args stay env-only so config files cannot change live `tcpdump` invocation.
 
-A brief effective settings line is logged at startup (port, db, replay mode). No new interactive settings UI is added.
+A brief effective settings line is logged at startup (port, db, replay, mode). No new interactive settings UI is added.
 
 ## Environment Variables
 
@@ -129,14 +129,14 @@ A brief effective settings line is logged at startup (port, db, replay mode). No
 | `TXMON_DB` | `~/.tx-monitor` | SQLite database path when persistence is enabled |
 | `TXMON_CODEX_AUTH` | `local` | Codex SDK auth mode for copilot requests. Use `local` for your logged-in Codex/OpenAI subscription credentials, or `api-key` to pass `OPENAI_API_KEY`. |
 | `OPENAI_API_KEY` | unset | Optional key used only when `TXMON_CODEX_AUTH=api-key`. Can also be set in `.env.copilot`. |
-| `TXMON_CODEX_MODEL` | `gpt-5.3-codex` | Optional model override for Codex SDK copilot requests |
+| `TXMON_CODEX_MODEL` | `gpt-5.5` | Optional model override for Codex SDK copilot requests |
 | `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
 | `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
 | `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
 | `TXMON_IFACE` | `any` | Default live capture interface (overridden by --iface) |
 | `TXMON_DIRECTION` | `out` | Default live capture direction |
 | `TXMON_BPF` | (none) | Default BPF filter expression |
-| `TXMON_TCPDUMP_ARGS` | (none) | Full custom tcpdump command (initial only; e.g. "tcpdump -i eth0 ...") |
+| `TXMON_TCPDUMP_ARGS` | unset | Optional full live-capture argv (initial only; env only; not accepted in config files) |
 | `TXMON_ALLOW_REMOTE_CAPTURE` | unset | When `1`/`true`, allow `set-capture` from non-loopback WebSocket clients (default: localhost only) |
 
 ## Persistence

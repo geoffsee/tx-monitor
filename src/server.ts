@@ -9,6 +9,8 @@ import appHtml from "../index.html";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
+    expandHomePath,
+    formatEffectiveSettings,
     getDb,
     getFileReplaySleepCapMs,
     getFileReplaySpeed,
@@ -137,11 +139,13 @@ const serveStatic =
     values.serve || (runningFromSource && existsSync(join(DIST, "index.html")));
 const dbPath = values["no-db"]
     ? null
-    : resolveDb(
-          values.db,
-          process.env.TXMON_DB,
-          getDb(__appConfig),
-          DEFAULT_DB,
+    : expandHomePath(
+          resolveDb(
+              values.db,
+              process.env.TXMON_DB,
+              getDb(__appConfig),
+              DEFAULT_DB,
+          ),
       );
 const store = dbPath
     ? new TrafficStore(
@@ -446,9 +450,8 @@ async function applyCaptureUpdate(updates: {
                 /* ignore */
             }
             // Wait briefly for old tcpdump to release the interface before spawn
-            const exited = (
-                oldProc as unknown as { exited: Promise<number> }
-            ).exited;
+            const exited = (oldProc as unknown as { exited: Promise<number> })
+                .exited;
             await Promise.race([exited, Bun.sleep(500)]).catch(() => {});
         }
         captureStarted = false;
@@ -1226,12 +1229,14 @@ if (import.meta.main) {
             "Capture control (set-capture) restricted to localhost clients; set TXMON_ALLOW_REMOTE_CAPTURE=1 to allow remote",
         );
     }
-    // Minimal effective settings exposure (no secrets)
-    const effectiveDb = dbPath ?? "disabled";
-    const effectiveReplay =
-        FILE_REPLAY_SPEED > 0 ? `speed=${FILE_REPLAY_SPEED}` : "fast";
+    // Minimal effective settings exposure (no secrets; config < env < CLI already applied)
     console.log(
-        `Effective settings: port=${listenPort} db=${effectiveDb} replay=${effectiveReplay}`,
+        formatEffectiveSettings({
+            port: listenPort,
+            dbPath,
+            fileReplaySpeed: FILE_REPLAY_SPEED,
+            filePath: activeFilePath,
+        }),
     );
     if (store && dbPath) {
         console.log(`Persisting traffic to ${dbPath}`);
