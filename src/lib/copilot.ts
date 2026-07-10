@@ -231,7 +231,8 @@ export function buildAnomalyExport(
             (p) =>
                 p.proto === flow.proto &&
                 p.srcHost === flow.srcHost &&
-                p.dstHost === flow.dstHost,
+                p.dstHost === flow.dstHost &&
+                p.dstPort === flow.dstPort,
         );
     } else if (hostId) {
         relatedHosts = graph.nodes.filter((n) => n.id === hostId);

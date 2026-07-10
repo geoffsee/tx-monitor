@@ -144,6 +144,8 @@ const graphWithPackets: TrafficSnapshot = {
             proto: "UDP",
             srcHost: "10.0.0.1",
             dstHost: "8.8.8.8",
+            srcPort: 50_000,
+            dstPort: 53,
             length: 60,
             info: "DNS",
         },
@@ -153,6 +155,8 @@ const graphWithPackets: TrafficSnapshot = {
             proto: "UDP",
             srcHost: "8.8.8.8",
             dstHost: "10.0.0.1",
+            srcPort: 53,
+            dstPort: 50_000,
             length: 120,
             info: "DNS resp",
         },
@@ -162,6 +166,8 @@ const graphWithPackets: TrafficSnapshot = {
             proto: "TCP",
             srcHost: "10.0.0.1",
             dstHost: "1.1.1.1",
+            srcPort: 50_001,
+            dstPort: 80,
             length: 100,
             info: "other",
         },
@@ -172,8 +178,22 @@ const graphWithPackets: TrafficSnapshot = {
             proto: "TCP",
             srcHost: "10.0.0.1",
             dstHost: "8.8.8.8",
+            srcPort: 50_002,
+            dstPort: 443,
             length: 80,
             info: "HTTPS",
+        },
+        // Same direction + proto as flow-1, different dstPort — must not leak
+        {
+            id: "p5",
+            timestamp: "12:00:01.200000",
+            proto: "UDP",
+            srcHost: "10.0.0.1",
+            dstHost: "8.8.8.8",
+            srcPort: 50_003,
+            dstPort: 123,
+            length: 70,
+            info: "NTP",
         },
     ],
 };
@@ -206,7 +226,7 @@ describe("buildAnomalyExport", () => {
         expect(exp.anomaly.id).toBe("rate-spike-flow-1");
         expect(exp.related.flows.length).toBe(1);
         expect(exp.related.flows[0]?.id).toBe("flow-1");
-        // direction + proto only: p1 matches; reverse p2 and ambient TCP p4 excluded
+        // direction + proto + dstPort: p1 matches; reverse p2, ambient TCP p4, other-port p5 excluded
         expect(exp.related.packets.map((p) => p.id)).toEqual(["p1"]);
         expect(exp.related.hosts.map((h) => h.id).sort()).toEqual([
             "10.0.0.1",
@@ -221,14 +241,20 @@ describe("buildAnomalyExport", () => {
         expect(exp.related.flows.some((f) => f.id === "flow-tcp")).toBe(false);
     });
 
+    test("excludes same-direction same-proto different-port ambient packets", () => {
+        const exp = buildAnomalyExport(sampleAnomalyFlow, graphWithPackets);
+        expect(exp.related.packets.some((p) => p.id === "p5")).toBe(false);
+        expect(exp.related.packets.some((p) => p.dstPort === 123)).toBe(false);
+    });
+
     test("exports host-targeted slice limited to that host", () => {
         const exp = buildAnomalyExport(sampleAnomalyHost, graphWithPackets);
         expect(exp.related.hosts.length).toBe(1);
         expect(exp.related.hosts[0]?.id).toBe("8.8.8.8");
         // flows involving the host (UDP flow-1 + TCP flow-tcp)
         expect(exp.related.flows.length).toBe(2);
-        // packets involving the host (p1, p2 reverse, p4 ambient TCP)
-        expect(exp.related.packets.length).toBe(3);
+        // packets involving the host (p1, p2 reverse, p4 ambient TCP, p5 other-port UDP)
+        expect(exp.related.packets.length).toBe(4);
     });
 
     test("exports global anomaly with empty related to avoid ambient leak", () => {

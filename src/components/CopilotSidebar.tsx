@@ -231,7 +231,8 @@ export function CopilotSidebar({
                 return;
             }
             const prompt = buildAnomalyPrompt(anomaly);
-            let selectionOverride: Selection | null | undefined;
+            // Default null so global anomalies do not inherit an unrelated UI selection.
+            let selectionOverride: Selection | null = null;
             if (anomaly.flowId) {
                 onSelectFlow?.(anomaly.flowId);
                 selectionOverride = { kind: "flow", id: anomaly.flowId };
