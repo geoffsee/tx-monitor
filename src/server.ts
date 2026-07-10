@@ -9,6 +9,8 @@ import appHtml from "../index.html";
 import { openDatabase } from "./db/client";
 import { TrafficStore } from "./db/store";
 import {
+    expandHomePath,
+    formatEffectiveSettings,
     getDb,
     getFileReplaySleepCapMs,
     getFileReplaySpeed,
@@ -126,11 +128,13 @@ const serveStatic =
     values.serve || (runningFromSource && existsSync(join(DIST, "index.html")));
 const dbPath = values["no-db"]
     ? null
-    : resolveDb(
-          values.db,
-          process.env.TXMON_DB,
-          getDb(__appConfig),
-          DEFAULT_DB,
+    : expandHomePath(
+          resolveDb(
+              values.db,
+              process.env.TXMON_DB,
+              getDb(__appConfig),
+              DEFAULT_DB,
+          ),
       );
 const store = dbPath
     ? new TrafficStore(
@@ -777,12 +781,14 @@ Bun.serve({
 console.log(
     `Traffic monitor websocket listening on ws://localhost:${listenPort}${WS_PATH}`,
 );
-// Minimal effective settings exposure (no secrets)
-const effectiveDb = dbPath ?? "disabled";
-const effectiveReplay =
-    FILE_REPLAY_SPEED > 0 ? `speed=${FILE_REPLAY_SPEED}` : "fast";
+// Minimal effective settings exposure (no secrets; config < env < CLI already applied)
 console.log(
-    `Effective settings: port=${listenPort} db=${effectiveDb} replay=${effectiveReplay}`,
+    formatEffectiveSettings({
+        port: listenPort,
+        dbPath,
+        fileReplaySpeed: FILE_REPLAY_SPEED,
+        filePath,
+    }),
 );
 if (store && dbPath) {
     console.log(`Persisting traffic to ${dbPath}`);
