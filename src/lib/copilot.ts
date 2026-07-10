@@ -82,10 +82,13 @@ function topHosts(graph: TrafficSnapshot, limit = 8) {
 }
 
 function createHostLabelLookup(graph: TrafficSnapshot) {
-    const hostLabel = new Map<string, string>(
-        graph.nodes.map((n) => [n.id, n.data.label]),
+    // Prefer full snapshot hostLabels (all known hosts + DNS); fall back to
+    // laid-out nodes for older/partial snapshots, then raw address.
+    const fromMap = graph.hostLabels ?? {};
+    const fromNodes = new Map(
+        graph.nodes.map((n) => [n.id, n.data.label] as const),
     );
-    return (addr: string) => hostLabel.get(addr) ?? addr;
+    return (addr: string) => fromMap[addr] ?? fromNodes.get(addr) ?? addr;
 }
 
 function serviceName(

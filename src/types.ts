@@ -111,4 +111,10 @@ export type TrafficSnapshot = {
     sourceLabel: string;
     sensitivity: "low" | "medium" | "high";
     markers: EntityMarker[];
+    /**
+     * Full id→display-label map for hosts known to trafficNetwork (not limited
+     * to laid-out graph.nodes / MAX_GRAPH_HOSTS). Used by copilot and any
+     * consumer that must label flows/packets outside the graph cap.
+     */
+    hostLabels: Record<string, string>;
 };

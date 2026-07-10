@@ -4,6 +4,7 @@ import {
     formatBytes,
     protoColor,
 } from "../layout";
+import { displayHostLabel } from "../lib/hostDisplay";
 import { formatService } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type { HostCategory, Selection } from "../types";
@@ -39,15 +40,6 @@ function ProcessDetails(props: { command: string; pid: number; user: string }) {
             </div>
         </>
     );
-}
-
-function getDisplayHostLabel(address: string): string {
-    const dns = trafficNetwork.resolvedDns.get(address);
-    const host = trafficNetwork.hosts.get(address);
-    if (host?.category === "public" && dns) {
-        return dns;
-    }
-    return host?.label ?? address;
 }
 
 function MarkerEditor({
@@ -186,7 +178,7 @@ export function DetailPanel({
                     {categoryLabel(host.category as HostCategory)}
                 </div>
                 <div style={detailTitleStyle}>
-                    {getDisplayHostLabel(host.id)}
+                    {displayHostLabel(host.id)}
                 </div>
                 <div style={detailSubtleStyle}>{host.address}</div>
                 <div style={detailMetricGridStyle}>
@@ -239,8 +231,8 @@ export function DetailPanel({
                                     >
                                         {flow.srcHost === host.id ? "→" : "←"}{" "}
                                         {flow.srcHost === host.id
-                                            ? getDisplayHostLabel(flow.dstHost)
-                                            : getDisplayHostLabel(flow.srcHost)}
+                                            ? displayHostLabel(flow.dstHost)
+                                            : displayHostLabel(flow.srcHost)}
                                     </span>
                                     <span
                                         style={detailSubtleStyle}
@@ -285,8 +277,8 @@ export function DetailPanel({
                                         style={detailSubtleStyle}
                                         title={`${packet.srcHost} -> ${packet.dstHost}`}
                                     >
-                                        {getDisplayHostLabel(packet.srcHost)} →{" "}
-                                        {getDisplayHostLabel(packet.dstHost)} ·{" "}
+                                        {displayHostLabel(packet.srcHost)} →{" "}
+                                        {displayHostLabel(packet.dstHost)} ·{" "}
                                         {packet.length} B
                                     </div>
                                 </div>
@@ -350,8 +342,8 @@ export function DetailPanel({
                     style={detailTitleStyle}
                     title={`${flow.srcHost} -> ${flow.dstHost}`}
                 >
-                    {getDisplayHostLabel(flow.srcHost)} →{" "}
-                    {getDisplayHostLabel(flow.dstHost)}
+                    {displayHostLabel(flow.srcHost)} →{" "}
+                    {displayHostLabel(flow.dstHost)}
                 </div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>
@@ -465,13 +457,13 @@ export function DetailPanel({
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Source</div>
                 <div style={detailSubtleStyle} title={packet.srcHost}>
-                    {getDisplayHostLabel(packet.srcHost)}
+                    {displayHostLabel(packet.srcHost)}
                 </div>
             </div>
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Destination</div>
                 <div style={detailSubtleStyle} title={packet.dstHost}>
-                    {getDisplayHostLabel(packet.dstHost)}
+                    {displayHostLabel(packet.dstHost)}
                 </div>
             </div>
             {packet.processCommand &&

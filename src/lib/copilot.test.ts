@@ -21,6 +21,7 @@ const emptyGraph: TrafficSnapshot = {
     sourceLabel: "tcpdump -i any",
     sensitivity: "medium",
     markers: [],
+    hostLabels: {},
 };
 
 const sampleGraph: TrafficSnapshot = {
@@ -98,5 +99,31 @@ describe("buildCopilotContext", () => {
         // UDP 53 -> DNS
         expect(context.topFlows[0]?.service).toBe("DNS");
         expect(context.selection).toMatchObject({ service: "DNS" });
+    });
+
+    test("uses hostLabels for addresses outside graph.nodes", () => {
+        const graph: TrafficSnapshot = {
+            ...sampleGraph,
+            nodes: sampleGraph.nodes.slice(0, 1), // only 10.0.0.1 laid out
+            hostLabels: {
+                "10.0.0.1": "10.0.0.1",
+                "8.8.8.8": "dns.google",
+            },
+            flows: [
+                {
+                    id: "flow-1",
+                    srcHost: "10.0.0.1",
+                    dstHost: "8.8.8.8",
+                    proto: "UDP",
+                    dstPort: 53,
+                    packetCount: 40,
+                    bytesTotal: 16_000,
+                    active: true,
+                },
+            ],
+        };
+        const context = buildCopilotContext(graph, null);
+        expect(context.topFlows[0]?.dstLabel).toBe("dns.google");
+        expect(context.topFlows[0]?.service).toBe("DNS dns.google");
     });
 });

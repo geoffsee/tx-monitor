@@ -12,6 +12,7 @@ import type {
     HostNodeData,
     TrafficSnapshot,
 } from "../types";
+import { resolveDisplayHostLabel } from "./hostDisplay";
 import { formatService } from "./tcpdumpParser";
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
@@ -135,10 +136,25 @@ export function createGraph(): TrafficSnapshot {
         });
     }
 
+    // Full id→label map (all known hosts + DNS), not capped at MAX_GRAPH_HOSTS.
+    const hostLabels: Record<string, string> = {};
+    for (const host of trafficNetwork.hostList) {
+        hostLabels[host.id] = resolveDisplayHostLabel(
+            host.id,
+            host,
+            trafficNetwork.resolvedDns.get(host.id),
+        );
+    }
+    // DNS-only entries for addresses that resolved but have no host record yet.
+    for (const [addr, dns] of trafficNetwork.resolvedDns.entries()) {
+        if (hostLabels[addr] === undefined) {
+            hostLabels[addr] = dns;
+        }
+    }
+
     const nodes: Node<HostNodeData>[] = hostList.map((host) => {
         const dns = trafficNetwork.resolvedDns.get(host.id);
-        const isPublic = host.category === "public";
-        const displayLabel = isPublic && dns ? dns : host.label;
+        const displayLabel = resolveDisplayHostLabel(host.id, host, dns);
         return {
             id: host.id,
             type: "host",
@@ -335,5 +351,6 @@ export function createGraph(): TrafficSnapshot {
                 tags: m.tags,
             }),
         ),
+        hostLabels,
     };
 }
