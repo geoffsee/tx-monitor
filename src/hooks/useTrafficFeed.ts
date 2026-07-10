@@ -378,17 +378,18 @@ export function useTrafficFeed(): TrafficFeedState {
                         total: session.totalPackets,
                     });
 
-                    const atHostCap =
-                        hostSet.size >= MAX_COMPARISON_ENTRIES;
-                    const atFlowCap =
-                        flowSet.size >= MAX_COMPARISON_ENTRIES;
+                    const atHostCap = hostSet.size >= MAX_COMPARISON_ENTRIES;
+                    const atFlowCap = flowSet.size >= MAX_COMPARISON_ENTRIES;
                     const grew =
                         hostSet.size > hostsBefore ||
                         flowSet.size > flowsBefore;
                     // Stop when both caps are hit, or when one cap is hit
                     // and a full page added nothing (the other dimension has
                     // converged; real captures rarely hit both 2000s).
-                    if ((atHostCap && atFlowCap) || (!grew && (atHostCap || atFlowCap))) {
+                    if (
+                        (atHostCap && atFlowCap) ||
+                        (!grew && (atHostCap || atFlowCap))
+                    ) {
                         break;
                     }
                 }

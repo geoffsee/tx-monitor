@@ -110,6 +110,9 @@ describe("comparison context", () => {
             (f) => f.id === flowId,
         );
         expect(networkFlow).toBeDefined();
+        if (!networkFlow) {
+            throw new Error("expected networkFlow after ingest");
+        }
 
         setComparisonContext(
             "cmp",
@@ -117,7 +120,7 @@ describe("comparison context", () => {
             [packet.srcHost, packet.dstHost],
             [flowId],
         );
-        expect(isFlowInComparison(networkFlow!.id)).toBe(true);
+        expect(isFlowInComparison(networkFlow.id)).toBe(true);
         expect(isHostInComparison(packet.srcHost)).toBe(true);
         expect(isHostInComparison(packet.dstHost)).toBe(true);
     });
