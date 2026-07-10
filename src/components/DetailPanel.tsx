@@ -177,9 +177,7 @@ export function DetailPanel({
                 >
                     {categoryLabel(host.category as HostCategory)}
                 </div>
-                <div style={detailTitleStyle}>
-                    {displayHostLabel(host.id)}
-                </div>
+                <div style={detailTitleStyle}>{displayHostLabel(host.id)}</div>
                 <div style={detailSubtleStyle}>{host.address}</div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>

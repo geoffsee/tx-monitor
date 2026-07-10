@@ -1,10 +1,13 @@
 import { trafficNetwork } from "./trafficNetwork";
 
 /** Host-like fields needed for public/DNS vs label fallback. */
-export type HostLabelSource = {
-    category?: string;
-    label?: string;
-} | null | undefined;
+export type HostLabelSource =
+    | {
+          category?: string;
+          label?: string;
+      }
+    | null
+    | undefined;
 
 /**
  * Resolve a display label for an address: public hosts prefer resolved DNS,
