@@ -356,6 +356,7 @@ export function createGraph(): TrafficSnapshot {
         hostsEvicted: trafficNetwork.hostsEvicted || 0,
         flowsEvicted: trafficNetwork.flowsEvicted || 0,
         packetsEvicted: trafficNetwork.packetsEvicted || 0,
+        evictionByReason: trafficNetwork.evictionReasonSnapshot,
         summaryOnly: !!trafficNetwork.summaryOnly,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,
