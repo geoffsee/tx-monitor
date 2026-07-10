@@ -8,14 +8,6 @@ export const MAX_MEMORY_FLOWS = 2000;
 export const MAX_MEMORY_PACKETS = 80;
 export const MAX_MEMORY_PACKETS_SUMMARY = 8;
 
-export const EMPTY_EVICTION_BY_REASON: EvictionByReason = {
-    host_cap: 0,
-    flow_cap: 0,
-    flow_orphan: 0,
-    packet_window: 0,
-    summary_mode: 0,
-};
-
 const EvictionReasonsModel = types.model("EvictionReasons", {
     host_cap: types.optional(types.number, 0),
     flow_cap: types.optional(types.number, 0),
