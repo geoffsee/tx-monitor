@@ -168,6 +168,15 @@ export function Sidebar({
     };
 
     const pinnedById = new Map((graph.markers ?? []).map((m) => [m.id, m]));
+    const formatMarkerSuffix = (
+        marker: { note?: string | null; tags?: string | null } | undefined,
+    ): string => {
+        if (!marker) return "";
+        const bits: string[] = [];
+        if (marker.note?.trim()) bits.push(marker.note.trim());
+        if (marker.tags?.trim()) bits.push(marker.tags.trim());
+        return bits.length > 0 ? ` · ${bits.join(" · ")}` : "";
+    };
 
     return (
         <aside
@@ -491,6 +500,9 @@ export function Sidebar({
                                                     : ""}{" "}
                                                 · {flow.packetCount} pkts ·{" "}
                                                 {formatBytes(flow.bytesTotal)}
+                                                {formatMarkerSuffix(
+                                                    pinnedById.get(flow.id),
+                                                )}
                                             </div>
                                         </div>
                                         <div
