@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { clearComparisonContext, setComparisonContext } from "./comparison";
 import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
@@ -185,6 +186,63 @@ describe("createGraph", () => {
         const snap2 = createGraph();
         expect(snap2.flowsEvicted).toBeGreaterThan(0);
     }, 20000);
+
+    test("annotates nodes, flows and edges with inComparison when comparison context is set", () => {
+        trafficNetwork.reset();
+        clearComparisonContext();
+
+        // Primary data
+        trafficNetwork.ingestPacket(
+            packet("p1", "10.0.0.1", "203.0.113.10", 443),
+            true,
+            Date.now(),
+        );
+        trafficNetwork.ingestPacket(
+            packet("p2", "10.0.0.2", "203.0.113.20", 443),
+            true,
+            Date.now(),
+        );
+
+        // Comparison overlaps on one host and one flow
+        setComparisonContext(
+            "cmp-1",
+            "reference",
+            ["10.0.0.1", "10.0.0.9"],
+            ["10.0.0.1->203.0.113.10:TCP:443"],
+        );
+
+        const snap = createGraph();
+
+        const host1 = snap.nodes.find((n) => n.id === "10.0.0.1");
+        const host2 = snap.nodes.find((n) => n.id === "10.0.0.2");
+        expect(host1?.data.inComparison).toBe(true);
+        expect(host2?.data.inComparison).toBe(false);
+
+        const flowCommon = snap.flows.find(
+            (f) => f.id === "10.0.0.1->203.0.113.10:TCP:443",
+        );
+        const flowOnlyPrimary = snap.flows.find(
+            (f) => f.id === "10.0.0.2->203.0.113.20:TCP:443",
+        );
+        expect(flowCommon?.inComparison).toBe(true);
+        expect(flowOnlyPrimary?.inComparison).toBe(false);
+
+        const edgeCommon = snap.edges.find(
+            (e) => e.id === "10.0.0.1->203.0.113.10:TCP:443",
+        );
+        const edgeOnlyPrimary = snap.edges.find(
+            (e) => e.id === "10.0.0.2->203.0.113.20:TCP:443",
+        );
+        expect(edgeCommon?.data?.inComparison).toBe(true);
+        expect(edgeOnlyPrimary?.data?.inComparison).toBe(false);
+
+        // Comparison summary present
+        expect(snap.comparison?.sessionId).toBe("cmp-1");
+        expect(snap.comparison?.commonHostCount).toBeGreaterThanOrEqual(1);
+        expect(snap.comparison?.commonFlowCount).toBeGreaterThanOrEqual(1);
+
+        clearComparisonContext();
+    });
 
     test("summary-only mode drops fine-grained packets after threshold while retaining aggregates, recent window, and caps", () => {
         trafficNetwork.reset();
