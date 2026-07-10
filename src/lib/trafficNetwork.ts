@@ -502,30 +502,58 @@ const TrafficNetworkModel = types
             self.captureBpf = bpf ?? "";
         };
 
-        const reset = () => {
+        const clearTraffic = () => {
             self.hosts.clear();
             self.flows.clear();
             self.packets.clear();
             self.resolvedDns.clear();
             self.anomalies.clear();
-            self.markers.clear();
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
             self.dnsPacketCount = 0;
-            self.sensitivity = "medium";
             self.hostsEvicted = 0;
             self.flowsEvicted = 0;
             self.packetsEvicted = 0;
-            self.summaryOnly = false;
             flowArrivals.clear();
             dnsTargets.clear();
+        };
+
+        const reset = () => {
+            clearTraffic();
+            self.markers.clear();
+            self.sensitivity = "medium";
+            self.summaryOnly = false;
             self.sourceMode = "live";
-            self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
             self.connected = false;
             // Keep captureIface/Direction/Bpf: connection-level state set by
             // server status. Cleared defaults here would desync UI after
             // history → returnToLive (server does not re-broadcast status).
+            // Rebuild sourceLabel from those fields so Capture Source stays consistent.
+            const iface = self.captureIface || "any";
+            const dir =
+                self.captureDirection === "in" ||
+                self.captureDirection === "out" ||
+                self.captureDirection === "inout"
+                    ? self.captureDirection
+                    : "out";
+            const bpf = (self.captureBpf || "").trim();
+            const parts = [
+                "sudo",
+                "tcpdump",
+                "-i",
+                iface,
+                "-Q",
+                dir,
+                "-nn",
+                "-vv",
+                "-l",
+                "--",
+            ];
+            if (bpf) {
+                parts.push(bpf);
+            }
+            self.sourceLabel = parts.join(" ");
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {
@@ -637,6 +665,7 @@ const TrafficNetworkModel = types
             setCapture,
             setSensitivity,
             setSummaryOnly,
+            clearTraffic,
             reset,
             remember,
             setEntityMarker,

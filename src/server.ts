@@ -182,6 +182,63 @@ export function sanitizeBpf(expr: string): string | null {
 }
 
 /**
+ * File-replay post-filter only supports [src|dst] host|port with top-level and/or.
+ * Returns an error message when the expression would be silently wrong (not/net/proto),
+ * or null when acceptable (including empty).
+ */
+export function validateBasicFileBpf(expr: string): string | null {
+    const b = expr.trim();
+    if (!b) return null;
+    if (b.includes("/")) {
+        return "File BPF does not support CIDR/net masks; use host or port only";
+    }
+    const lower = b.toLowerCase();
+    // Token reject list: real BPF features we do not implement for file post-filter
+    const unsupported = new Set([
+        "not",
+        "net",
+        "portrange",
+        "less",
+        "greater",
+        "gateway",
+        "proto",
+        "tcp",
+        "udp",
+        "icmp",
+        "icmp6",
+        "arp",
+        "rarp",
+        "ether",
+        "ip",
+        "ip6",
+        "sctp",
+        "vlan",
+        "mpls",
+    ]);
+    for (const tok of lower.replace(/[()]/g, " ").split(/\s+/)) {
+        if (tok && unsupported.has(tok)) {
+            return "File BPF supports only [src|dst] host|port with and/or (not, net, tcp/udp, … unsupported)";
+        }
+    }
+    const stripped = lower.replace(/[()]/g, " ");
+    const parts = stripped
+        .split(/\s+(?:and|or)\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (parts.length === 0) return null;
+    for (const part of parts) {
+        const m = part.match(/^(?:(src|dst)\s+)?(host|port)\s+(\S+)$/);
+        if (!m?.[2] || !m[3]) {
+            return `Unsupported BPF clause "${part}" (use [src|dst] host|port …)`;
+        }
+        if (m[2] === "port" && !/^\d+$/.test(m[3])) {
+            return `Invalid port "${m[3]}"`;
+        }
+    }
+    return null;
+}
+
+/**
  * Build tcpdump argv for live capture. Pure helper used by production path and tests.
  * BPF is passed as a single expression after `--` so tokens cannot be parsed as options.
  */
@@ -253,6 +310,15 @@ if (cliBpf && sanitizedCliBpf === null) {
     );
 }
 const activeFilePath: string | null = filePath ?? null;
+if (activeFilePath && captureBpf) {
+    const fileBpfErr = validateBasicFileBpf(captureBpf);
+    if (fileBpfErr) {
+        console.error(
+            `Ignoring --bpf / TXMON_BPF for file mode: ${fileBpfErr}`,
+        );
+        captureBpf = "";
+    }
+}
 let useFullOverride = false;
 const tcpdumpFullOverride = process.env.TXMON_TCPDUMP_ARGS?.trim() ?? null;
 if (tcpdumpFullOverride) {
@@ -270,7 +336,20 @@ if (tcpdumpFullOverride) {
         .trim();
     if (tail) {
         const s = sanitizeBpf(tail);
-        if (s !== null) captureBpf = s;
+        if (s !== null) {
+            if (activeFilePath) {
+                const fileBpfErr = validateBasicFileBpf(s);
+                if (fileBpfErr) {
+                    console.error(
+                        `Ignoring TXMON_TCPDUMP_ARGS BPF for file mode: ${fileBpfErr}`,
+                    );
+                } else {
+                    captureBpf = s;
+                }
+            } else {
+                captureBpf = s;
+            }
+        }
     }
 }
 
@@ -315,29 +394,9 @@ function matchAtomicBpfClause(p: ParsedPacket, clause: string): boolean {
         return sp === pt || dp === pt;
     }
 
-    // Fallback token heuristic for bare host/port-ish tokens
-    const hosts: string[] = [];
-    const ports: string[] = [];
-    const tokens = c
-        .split(/[\s|&]+/)
-        .filter((t) => t && !["and", "or"].includes(t));
-    for (const t of tokens) {
-        if (t.startsWith("-")) continue;
-        if (/[.:]/.test(t) || /^[0-9a-f]{3,}$/.test(t)) {
-            hosts.push(t);
-        } else if (/^\d+$/.test(t)) {
-            ports.push(t);
-        }
-    }
-    if (hosts.length === 0 && ports.length === 0) {
-        // Unrecognized clause (e.g. net/tcp): pass so we don't over-drop
-        return true;
-    }
-    const hostOk =
-        hosts.length === 0 || hosts.some((h) => sh === h || dh === h);
-    const portOk =
-        ports.length === 0 || ports.some((pt) => sp === pt || dp === pt);
-    return hostOk && portOk;
+    // Unrecognized clause: pass-all. Unsupported forms (not/net/proto) are
+    // rejected by validateBasicFileBpf before they reach this matcher.
+    return true;
 }
 
 /**
@@ -416,6 +475,12 @@ async function applyCaptureUpdate(updates: {
         if (sanitized === null) {
             return "BPF must not contain option-like tokens";
         }
+        if (activeFilePath) {
+            const fileErr = validateBasicFileBpf(sanitized);
+            if (fileErr) {
+                return fileErr;
+            }
+        }
         nextBpf = sanitized;
     }
 
@@ -456,9 +521,20 @@ async function applyCaptureUpdate(updates: {
         }
         captureStarted = false;
         startCapture();
+        emitStatus("live", newLabel);
+    } else {
+        // Restart file replay under the new filter and ask clients to clear
+        // already-ingested packets so Apply matches user expectation.
+        emitStatus("file", newLabel, { resetFeed: true });
+        pendingPackets = [];
+        if (packetBatchTimer) {
+            clearTimeout(packetBatchTimer);
+            packetBatchTimer = null;
+        }
+        captureGeneration += 1;
+        captureStarted = false;
+        startCapture();
     }
-    // file mode: BPF filter applies to subsequent parsed packets without restart
-    emitStatus(activeFilePath ? "file" : "live", newLabel);
     return null;
 }
 
@@ -590,7 +666,11 @@ function emitPacket(packet: ParsedPacket) {
     );
 }
 
-function emitStatus(mode: string, label: string) {
+function emitStatus(
+    mode: string,
+    label: string,
+    opts?: { resetFeed?: boolean },
+) {
     broadcast({
         type: "status",
         mode,
@@ -598,6 +678,7 @@ function emitStatus(mode: string, label: string) {
         iface: captureIface,
         direction: captureDirection,
         bpf: captureBpf,
+        ...(opts?.resetFeed ? { resetFeed: true } : {}),
     });
 }
 
@@ -1107,6 +1188,7 @@ export {
     isValidIface as testIsValidIface,
     packetMatchesBpf as testPacketMatchesBpf,
     sanitizeBpf as testSanitizeBpf,
+    validateBasicFileBpf as testValidateBasicFileBpf,
 };
 
 if (import.meta.main) {

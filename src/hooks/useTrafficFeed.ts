@@ -379,6 +379,7 @@ export function useTrafficFeed(): TrafficFeedState {
                       iface?: string;
                       direction?: string;
                       bpf?: string;
+                      resetFeed?: boolean;
                   }
                 | { type: "error"; message: string }
                 | { type: "complete" };
@@ -400,6 +401,13 @@ export function useTrafficFeed(): TrafficFeedState {
             }
 
             if (payload.type === "status") {
+                if (payload.resetFeed) {
+                    // File-mode BPF re-apply: drop in-flight queue and graph state
+                    // before re-ingest under the new filter.
+                    pendingPackets.length = 0;
+                    trafficNetwork.clearTraffic();
+                    hasDisplayedPacketsRef.current = false;
+                }
                 trafficNetwork.setSource(payload.mode, payload.label);
                 if (typeof payload.iface === "string") {
                     trafficNetwork.setCapture(
