@@ -523,9 +523,9 @@ const TrafficNetworkModel = types
             self.sourceMode = "live";
             self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
             self.connected = false;
-            self.captureIface = "any";
-            self.captureDirection = "out";
-            self.captureBpf = "";
+            // Keep captureIface/Direction/Bpf: connection-level state set by
+            // server status. Cleared defaults here would desync UI after
+            // history → returnToLive (server does not re-broadcast status).
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {

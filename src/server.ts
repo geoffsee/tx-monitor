@@ -384,11 +384,11 @@ function shouldIncludePacket(p: ParsedPacket): boolean {
     return packetMatchesBpf(p, captureBpf);
 }
 
-function applyCaptureUpdate(updates: {
+async function applyCaptureUpdate(updates: {
     iface?: string;
     direction?: string;
     bpf?: string;
-}): string | null {
+}): Promise<string | null> {
     // Validate all fields first so a bad bpf never partially applies iface/dir
     let nextIface: string | undefined;
     let nextDirection: string | undefined;
@@ -437,13 +437,19 @@ function applyCaptureUpdate(updates: {
     const isLive = !activeFilePath;
     if (isLive) {
         captureGeneration += 1;
-        if (liveProc) {
+        const oldProc = liveProc;
+        liveProc = null;
+        if (oldProc) {
             try {
-                liveProc.kill();
+                oldProc.kill();
             } catch {
                 /* ignore */
             }
-            liveProc = null;
+            // Wait briefly for old tcpdump to release the interface before spawn
+            const exited = (
+                oldProc as unknown as { exited: Promise<number> }
+            ).exited;
+            await Promise.race([exited, Bun.sleep(500)]).catch(() => {});
         }
         captureStarted = false;
         startCapture();
@@ -470,6 +476,13 @@ function enrichPacket(packet: ParsedPacket): ParsedPacket {
 function startLsofCollector() {
     if (!isLsofEnabled() || activeFilePath) {
         return;
+    }
+
+    // Idempotent: clear any prior interval so a superseded generation cannot leak
+    // timers if start/stop ordering flips across set-capture restarts.
+    if (lsofTimer) {
+        clearInterval(lsofTimer);
+        lsofTimer = null;
     }
 
     const refresh = async () => {
@@ -786,8 +799,11 @@ async function streamLiveTcpdump(expectedGen = captureGeneration) {
         if (liveProc === proc) {
             liveProc = null;
         }
-        stopLsofCollector();
+        // Only the owning generation stops the collector / session. A superseded
+        // stream must not tear down the new generation's lsof timer after
+        // set-capture bumps captureGeneration and restarts live capture.
         if (captureGeneration === myGen) {
+            stopLsofCollector();
             endCaptureSession();
         }
     }
@@ -1151,7 +1167,7 @@ if (import.meta.main) {
             close(ws) {
                 clients.delete(ws);
             },
-            message(ws, message) {
+            async message(ws, message) {
                 try {
                     const data = JSON.parse(String(message)) as {
                         type?: string;
@@ -1172,7 +1188,7 @@ if (import.meta.main) {
                             );
                             return;
                         }
-                        const err = applyCaptureUpdate({
+                        const err = await applyCaptureUpdate({
                             iface:
                                 typeof data.iface === "string"
                                     ? data.iface

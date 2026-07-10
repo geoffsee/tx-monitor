@@ -95,13 +95,36 @@ export function Sidebar({
     const serverDirection = graph.capture?.direction;
     const serverBpf = graph.capture?.bpf;
     useEffect(() => {
-        if (captureDirty) return;
         if (serverIface === undefined) return;
-        setPendingIface(serverIface || "any");
+        const iface = serverIface || "any";
         const d = serverDirection as "in" | "out" | "inout" | undefined;
-        if (d === "in" || d === "out" || d === "inout") setPendingDirection(d);
-        setPendingBpf(serverBpf ?? "");
-    }, [serverIface, serverDirection, serverBpf, captureDirty]);
+        const dir =
+            d === "in" || d === "out" || d === "inout" ? d : ("out" as const);
+        const bpf = serverBpf ?? "";
+        if (captureDirty) {
+            // Clear dirty only after server confirms matching params (or
+            // leave dirty on reject so drafts do not pretend to be applied).
+            if (
+                iface === (pendingIface || "any") &&
+                dir === pendingDirection &&
+                bpf === pendingBpf
+            ) {
+                setCaptureDirty(false);
+            }
+            return;
+        }
+        setPendingIface(iface);
+        setPendingDirection(dir);
+        setPendingBpf(bpf);
+    }, [
+        serverIface,
+        serverDirection,
+        serverBpf,
+        captureDirty,
+        pendingIface,
+        pendingDirection,
+        pendingBpf,
+    ]);
 
     const FLOW_ITEM_HEIGHT = 58;
     const PACKET_ITEM_HEIGHT = 58;
@@ -286,7 +309,9 @@ export function Sidebar({
                         <button
                             type="button"
                             onClick={() => {
-                                setCaptureDirty(false);
+                                // Leave captureDirty true until status matches
+                                // pending (see effect); rejected set-capture
+                                // never emits status so drafts stay editable.
                                 onUpdateCapture?.({
                                     iface: pendingIface || "any",
                                     direction: pendingDirection,
