@@ -123,6 +123,15 @@ export function Sidebar({
     // displayHostLabel uses full trafficNetwork (not graph.nodes) so hosts
     // outside MAX_GRAPH_HOSTS still resolve DNS / labels for flows, packets, ticker.
     const pinnedById = new Map((graph.markers ?? []).map((m) => [m.id, m]));
+    const formatMarkerSuffix = (
+        marker: { note?: string | null; tags?: string | null } | undefined,
+    ): string => {
+        if (!marker) return "";
+        const bits: string[] = [];
+        if (marker.note?.trim()) bits.push(marker.note.trim());
+        if (marker.tags?.trim()) bits.push(marker.tags.trim());
+        return bits.length > 0 ? ` · ${bits.join(" · ")}` : "";
+    };
 
     // Packet ticker: service name + DNS labels (raw values via title).
     const latestPacket = trafficNetwork.packets[0];
@@ -357,6 +366,9 @@ export function Sidebar({
                                                 )}{" "}
                                                 · {flow.packetCount} pkts ·{" "}
                                                 {formatBytes(flow.bytesTotal)}
+                                                {formatMarkerSuffix(
+                                                    pinnedById.get(flow.id),
+                                                )}
                                             </div>
                                         </div>
                                         <div

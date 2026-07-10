@@ -30,13 +30,14 @@ function selectGraphHosts(
     hosts: TrafficHost[],
     eligibleFlows = trafficNetwork.flowList,
     pinnedHostSet = new Set<string>(),
+    keepHostSet = new Set<string>(),
 ): TrafficHost[] {
     const hostById = new Map(hosts.map((host) => [host.id, host]));
     const selectedIds = new Set<string>();
 
-    // Always keep pinned hosts (survive filters / keep)
+    // Always keep pinned hosts and endpoints of pinned flows (survive filters)
     for (const host of hosts) {
-        if (pinnedHostSet.has(host.id)) {
+        if (pinnedHostSet.has(host.id) || keepHostSet.has(host.id)) {
             selectedIds.add(host.id);
         }
     }
@@ -113,13 +114,25 @@ export function createGraph(): TrafficSnapshot {
     const staleCutoff = now - FLOW_STALE_WINDOW_MS;
     const activeCutoff = now - FLOW_ACTIVE_WINDOW_MS;
     const { pinnedHosts, pinnedFlows } = getPinnedSets();
+    // Pinned flows survive stale-window filtering so durable markers stay visible.
     const eligibleFlows = useLiveStaleWindow
-        ? trafficNetwork.flowList.filter((flow) => flow.lastSeen >= staleCutoff)
+        ? trafficNetwork.flowList.filter(
+              (flow) =>
+                  flow.lastSeen >= staleCutoff || pinnedFlows.has(flow.id),
+          )
         : trafficNetwork.flowList;
+    const pinnedFlowHostIds = new Set<string>();
+    for (const flow of trafficNetwork.flowList) {
+        if (pinnedFlows.has(flow.id)) {
+            pinnedFlowHostIds.add(flow.srcHost);
+            pinnedFlowHostIds.add(flow.dstHost);
+        }
+    }
     const hostList = selectGraphHosts(
         trafficNetwork.hostList,
         eligibleFlows,
         pinnedHosts,
+        pinnedFlowHostIds,
     );
     const hostIds = new Set(hostList.map((host) => host.id));
     const positions = resolveLayout(hostList);
