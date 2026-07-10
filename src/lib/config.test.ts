@@ -128,6 +128,23 @@ describe("resolve helpers (config < env < cli)", () => {
         expect(resolveDb(undefined, undefined, undefined, "def")).toBe("def");
     });
 
+    test("expandHomePath expands env/CLI tilde after resolveDb", () => {
+        // server wraps resolveDb with expandHomePath so env/CLI ~/ paths expand
+        // (config-file db=~ is expanded at parse time)
+        expect(
+            expandHomePath(
+                resolveDb(undefined, "~/from-env", "/cfg", "/def"),
+                "/home/u",
+            ),
+        ).toBe(join("/home/u", "from-env"));
+        expect(
+            expandHomePath(
+                resolveDb("~/from-cli", "~/from-env", "/cfg", "/def"),
+                "/home/u",
+            ),
+        ).toBe(join("/home/u", "from-cli"));
+    });
+
     test("resolvePortNumber: cli/env/cfg/def with validity", () => {
         expect(resolvePortNumber(4000, "5000", 6000, 3001)).toBe(4000);
         expect(resolvePortNumber(undefined, "5000", 6000, 3001)).toBe(5000);
@@ -211,7 +228,7 @@ file_replay_speed=2
         }
     });
 
-    test("local config does not override env for getters but load still surfaces it", () => {
+    test("loads port from local config", () => {
         setupLocalConfig("port=2222");
         const prev = process.cwd();
         try {
@@ -224,21 +241,37 @@ file_replay_speed=2
             resetConfigCache();
         }
     });
+
+    test("resolvePortNumber: env overrides config port", () => {
+        setupLocalConfig("port=2222");
+        const prev = process.cwd();
+        try {
+            process.chdir(TEST_DIR);
+            resetConfigCache();
+            const cfg = loadAppConfig(process.cwd(), { home: FAKE_HOME });
+            expect(
+                resolvePortNumber(undefined, "3333", getPort(cfg), 3001),
+            ).toBe(3333);
+            expect(
+                resolvePortNumber(undefined, undefined, getPort(cfg), 3001),
+            ).toBe(2222);
+        } finally {
+            process.chdir(prev);
+            resetConfigCache();
+        }
+    });
 });
 
 describe("effective getters (config < env)", () => {
+    // getEffective* call bare loadAppConfig() (real homedir); isolation is via
+    // chdir so only the cwd-local .tx-monitor/config key under test applies.
     test("getEffectiveLsofDisabled: env overrides config", () => {
         setupLocalConfig("lsof_disable=1");
         const prev = process.cwd();
         const prevEnv = process.env.TXMON_LSOF_DISABLE;
         try {
             process.chdir(TEST_DIR);
-            resetConfigCache();
             delete process.env.TXMON_LSOF_DISABLE;
-            // load so cache has config; effective uses loadAppConfig()
-            loadAppConfig(process.cwd(), { home: FAKE_HOME });
-            // Without env, config applies — but loadAppConfig in getter uses real cwd.
-            // Re-load with real process.cwd after chdir:
             resetConfigCache();
             expect(getEffectiveLsofDisabled()).toBe(true);
 

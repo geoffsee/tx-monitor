@@ -40,7 +40,6 @@ const BLOCKED_CONFIG_KEYS = new Set(
         "CODEX_AUTH",
         "TXMON_TCPDUMP_ARGS",
         "TCPDUMP_ARGS",
-        "OPENAI_API_KEY",
         "CODEX_API_KEY",
     ].map((k) => k.toUpperCase()),
 );
