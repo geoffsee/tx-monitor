@@ -57,8 +57,7 @@ function MarkerEditor({
     const pinned = !!m?.pinned;
     const note = m?.note ?? "";
     const tags = m?.tags ?? "";
-    // Remount inputs when async session markers load so defaults stay in sync.
-    const markerEpoch = `${pinned ? 1 : 0}:${note}:${tags}`;
+    // Key each field on its own persisted value so saving note does not remount tags (and steal focus).
     return (
         <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
             <button
@@ -79,7 +78,7 @@ function MarkerEditor({
                 {pinned ? "★ Pinned (click to unpin)" : "☆ Pin this entity"}
             </button>
             <input
-                key={`${entityId}-note-${markerEpoch}`}
+                key={`${entityId}-note-${note}`}
                 placeholder="Note (lightweight, persists with session)"
                 defaultValue={note}
                 onBlur={(e) => {
@@ -99,7 +98,7 @@ function MarkerEditor({
                 }}
             />
             <input
-                key={`${entityId}-tags-${markerEpoch}`}
+                key={`${entityId}-tags-${tags}`}
                 placeholder="tags (comma,separated)"
                 defaultValue={tags}
                 onBlur={(e) => {

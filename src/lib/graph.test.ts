@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createGraph, FLOW_STALE_WINDOW_MS } from "./graph";
+import { createGraph, FLOW_STALE_WINDOW_MS, MAX_GRAPH_HOSTS } from "./graph";
 import type { PacketProto, ParsedPacket } from "./tcpdumpParser";
 import {
     MAX_MEMORY_FLOWS,
@@ -256,6 +256,47 @@ describe("createGraph", () => {
         expect(
             cleared.markers.find((m) => m.id === staleFlowId),
         ).toBeUndefined();
+    });
+
+    test("pinned flow alone keeps both endpoints when host selection is saturated", () => {
+        trafficNetwork.reset();
+        const now = Date.now();
+        // Fill the graph with more unique hosts than MAX_GRAPH_HOSTS via fresh flows.
+        // flowList is lastSeen-desc, so these sit ahead of the older pinned flow.
+        for (let i = 0; i < MAX_GRAPH_HOSTS; i++) {
+            trafficNetwork.ingestPacket(
+                packet(
+                    `fill-${i}`,
+                    `10.0.${Math.floor(i / 2)}.${(i % 2) * 10 + 1}`,
+                    `10.0.${Math.floor(i / 2)}.${(i % 2) * 10 + 2}`,
+                    443 + i,
+                ),
+                true,
+                now - i,
+            );
+        }
+
+        const pinSrc = "198.51.100.1";
+        const pinDst = "198.51.100.2";
+        const pinnedFlowId = `${pinSrc}->${pinDst}:TCP:8443`;
+        trafficNetwork.ingestPacket(
+            packet("pin-only", pinSrc, pinDst, 8443),
+            true,
+            now - 5_000,
+        );
+        // Pin only the flow — not its hosts — so keepHostSet is the only path that retains them.
+        trafficNetwork.setEntityMarker("flow", pinnedFlowId, { pinned: true });
+
+        const graph = createGraph();
+        const nodeIds = graph.nodes.map((n) => n.id);
+        expect(nodeIds).toContain(pinSrc);
+        expect(nodeIds).toContain(pinDst);
+        expect(graph.edges.map((e) => e.id)).toContain(pinnedFlowId);
+        expect(
+            graph.edges.find((e) => e.id === pinnedFlowId)?.data?.pinned,
+        ).toBe(true);
+        // Pin endpoints take priority slots within the host cap.
+        expect(graph.nodes.length).toBe(MAX_GRAPH_HOSTS);
     });
 
     test("summary-only mode drops fine-grained packets after threshold while retaining aggregates, recent window, and caps", () => {
