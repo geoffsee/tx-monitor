@@ -55,6 +55,9 @@ function MarkerEditor({
 }) {
     const m = trafficNetwork.markers.get(entityId);
     const pinned = !!m?.pinned;
+    const note = m?.note ?? "";
+    const tags = m?.tags ?? "";
+    // Key each field on its own persisted value so saving note does not remount tags (and steal focus).
     return (
         <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
             <button
@@ -75,9 +78,9 @@ function MarkerEditor({
                 {pinned ? "★ Pinned (click to unpin)" : "☆ Pin this entity"}
             </button>
             <input
-                key={`${entityId}-note`}
+                key={`${entityId}-note-${note}`}
                 placeholder="Note (lightweight, persists with session)"
-                defaultValue={m?.note ?? ""}
+                defaultValue={note}
                 onBlur={(e) => {
                     const v = e.target.value.trim();
                     if (onSetEntityMarker) {
@@ -95,9 +98,9 @@ function MarkerEditor({
                 }}
             />
             <input
-                key={`${entityId}-tags`}
+                key={`${entityId}-tags-${tags}`}
                 placeholder="tags (comma,separated)"
-                defaultValue={m?.tags ?? ""}
+                defaultValue={tags}
                 onBlur={(e) => {
                     const v = e.target.value.trim();
                     if (onSetEntityMarker) {
