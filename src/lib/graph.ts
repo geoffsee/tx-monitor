@@ -210,14 +210,24 @@ export function createGraph(): TrafficSnapshot {
 
     let commonHostCount = 0;
     let commonFlowCount = 0;
+    let deltaHostCount = 0;
+    let deltaFlowCount = 0;
     if (compHostSet) {
         for (const h of trafficNetwork.hostList) {
-            if (compHostSet.has(h.id)) commonHostCount++;
+            if (compHostSet.has(h.id)) {
+                commonHostCount++;
+            } else {
+                deltaHostCount++;
+            }
         }
     }
     if (compFlowSet) {
         for (const f of trafficNetwork.flowList) {
-            if (compFlowSet.has(f.id)) commonFlowCount++;
+            if (compFlowSet.has(f.id)) {
+                commonFlowCount++;
+            } else {
+                deltaFlowCount++;
+            }
         }
     }
 
@@ -309,6 +319,8 @@ export function createGraph(): TrafficSnapshot {
             flowCount: comp.flowIds.size,
             commonHostCount,
             commonFlowCount,
+            deltaHostCount,
+            deltaFlowCount,
         };
     }
 
@@ -317,28 +329,34 @@ export function createGraph(): TrafficSnapshot {
         edges,
         packets: trafficNetwork.packets
             .slice(0, MAX_FEED_PACKETS)
-            .map((packet) => ({
-                id: packet.id,
-                timestamp: packet.timestamp,
-                proto: packet.proto,
-                srcHost: packet.srcHost,
-                dstHost: packet.dstHost,
-                srcPort: packet.srcPort,
-                dstPort: packet.dstPort,
-                length: packet.length,
-                info: packet.info,
-                ...(packet.processCommand &&
-                packet.processPid &&
-                packet.processUser
-                    ? {
-                          process: {
-                              command: packet.processCommand,
-                              pid: packet.processPid,
-                              user: packet.processUser,
-                          },
-                      }
-                    : {}),
-            })),
+            .map((packet) => {
+                const flowKey = `${packet.srcHost}->${packet.dstHost}:${packet.proto}:${packet.dstPort ?? "any"}`;
+                return {
+                    id: packet.id,
+                    timestamp: packet.timestamp,
+                    proto: packet.proto,
+                    srcHost: packet.srcHost,
+                    dstHost: packet.dstHost,
+                    srcPort: packet.srcPort,
+                    dstPort: packet.dstPort,
+                    length: packet.length,
+                    info: packet.info,
+                    inComparison: compFlowSet
+                        ? compFlowSet.has(flowKey)
+                        : undefined,
+                    ...(packet.processCommand &&
+                    packet.processPid &&
+                    packet.processUser
+                        ? {
+                              process: {
+                                  command: packet.processCommand,
+                                  pid: packet.processPid,
+                                  user: packet.processUser,
+                              },
+                          }
+                        : {}),
+                };
+            }),
         // Provide a larger window of recent flows for sidebar lists (virtualized
         // to keep DOM bounded even when many flows present under the model cap).
         // Pinned flows prioritized to survive filters.
