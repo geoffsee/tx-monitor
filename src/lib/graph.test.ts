@@ -310,7 +310,11 @@ describe("createGraph", () => {
             now - 5_000,
         );
         // Pin only the flow — not its hosts — so keepHostSet is the only path that retains them.
-        trafficNetwork.setEntityMarker("flow", pinnedFlowId, { pinned: true });
+        trafficNetwork.setEntityMarker("flow", pinnedFlowId, {
+            pinned: true,
+            note: "keep me",
+            tags: "watch",
+        });
 
         const graph = createGraph();
         const nodeIds = graph.nodes.map((n) => n.id);
@@ -320,9 +324,81 @@ describe("createGraph", () => {
         expect(
             graph.edges.find((e) => e.id === pinnedFlowId)?.data?.pinned,
         ).toBe(true);
+        expect(graph.edges.find((e) => e.id === pinnedFlowId)?.data?.note).toBe(
+            "keep me",
+        );
+        expect(graph.edges.find((e) => e.id === pinnedFlowId)?.data?.tags).toBe(
+            "watch",
+        );
         // Pin endpoints take priority slots within the host cap.
         expect(graph.nodes.length).toBe(MAX_GRAPH_HOSTS);
     });
+
+    test("pinned hosts and flows survive memory eviction under cap pressure", () => {
+        trafficNetwork.reset();
+        const pinHost = "10.0.0.99";
+        const pinPeer = "203.0.113.99";
+        const pinnedFlowId = `${pinHost}->${pinPeer}:TCP:8443`;
+
+        trafficNetwork.ingestPacket(
+            packet("pin-seed", pinHost, pinPeer, 8443),
+            true,
+            Date.now(),
+        );
+        trafficNetwork.setEntityMarker("host", pinHost, {
+            pinned: true,
+            note: "must keep host",
+        });
+        trafficNetwork.setEntityMarker("flow", pinnedFlowId, {
+            pinned: true,
+            note: "must keep flow",
+        });
+
+        // Flood with unique low-count hosts/flows so caps would drop the pin seed
+        // if pins were not protected.
+        for (let i = 0; i < MAX_MEMORY_HOSTS + 80; i++) {
+            trafficNetwork.ingestPacket(
+                {
+                    id: `cap-h-${i}`,
+                    timestamp: "12:00:00.000000",
+                    proto: "UDP",
+                    srcHost: `198.51.${Math.floor(i / 250)}.${i % 250}`,
+                    srcPort: 40000 + (i % 1000),
+                    dstHost: `203.0.${Math.floor(i / 250)}.${(i % 250) + 1}`,
+                    dstPort: 9000 + (i % 500),
+                    length: 40,
+                    info: "cap pressure",
+                },
+                true,
+                Date.now() + i,
+            );
+        }
+
+        expect(trafficNetwork.hosts.has(pinHost)).toBe(true);
+        expect(trafficNetwork.hosts.has(pinPeer)).toBe(true);
+        expect(trafficNetwork.flows.has(pinnedFlowId)).toBe(true);
+        // Unpinned pressure still triggers eviction of other entities.
+        expect(trafficNetwork.hostsEvicted).toBeGreaterThan(0);
+        expect(trafficNetwork.hosts.size).toBeGreaterThanOrEqual(2);
+        // Soft cap: pins may push slightly over when many are protected, but
+        // without pins the size is hard-capped — here only two hosts are pinned.
+        expect(trafficNetwork.hosts.size).toBeLessThanOrEqual(
+            MAX_MEMORY_HOSTS + 2,
+        );
+        expect(trafficNetwork.flows.size).toBeLessThanOrEqual(
+            MAX_MEMORY_FLOWS + 1,
+        );
+
+        const graph = createGraph();
+        expect(graph.nodes.map((n) => n.id)).toContain(pinHost);
+        expect(graph.nodes.find((n) => n.id === pinHost)?.data.note).toBe(
+            "must keep host",
+        );
+        expect(graph.edges.map((e) => e.id)).toContain(pinnedFlowId);
+        expect(graph.edges.find((e) => e.id === pinnedFlowId)?.data?.note).toBe(
+            "must keep flow",
+        );
+    }, 20000);
 
     test("annotates nodes, flows and edges with inComparison when comparison context is set", () => {
         trafficNetwork.reset();

@@ -153,25 +153,32 @@ export function createGraph(): TrafficSnapshot {
         });
     }
 
-    const nodes: Node<HostNodeData>[] = hostList.map((host) => ({
-        id: host.id,
-        type: "host",
-        position: positions.get(host.id) ?? { x: 0, y: 0 },
-        width: HOST_NODE_SIZE.width,
-        height: HOST_NODE_SIZE.height,
-        data: {
-            label: host.label,
-            address: host.address,
-            category: host.category as HostCategory,
-            packetCount: host.packetCount,
-            bytesTotal: formatBytes(host.bytesTotal),
-            processes: [],
-            processCount: 0,
-            resolvedDns: trafficNetwork.resolvedDns.get(host.id),
-            inComparison: compHostSet ? compHostSet.has(host.id) : undefined,
-            pinned: markerById.get(host.id)?.pinned ?? false,
-        },
-    }));
+    const nodes: Node<HostNodeData>[] = hostList.map((host) => {
+        const marker = markerById.get(host.id);
+        return {
+            id: host.id,
+            type: "host",
+            position: positions.get(host.id) ?? { x: 0, y: 0 },
+            width: HOST_NODE_SIZE.width,
+            height: HOST_NODE_SIZE.height,
+            data: {
+                label: host.label,
+                address: host.address,
+                category: host.category as HostCategory,
+                packetCount: host.packetCount,
+                bytesTotal: formatBytes(host.bytesTotal),
+                processes: [],
+                processCount: 0,
+                resolvedDns: trafficNetwork.resolvedDns.get(host.id),
+                inComparison: compHostSet
+                    ? compHostSet.has(host.id)
+                    : undefined,
+                pinned: marker?.pinned ?? false,
+                note: marker?.note ?? null,
+                tags: marker?.tags ?? null,
+            },
+        };
+    });
 
     let flowCandidates = eligibleFlows.filter(
         (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
@@ -246,6 +253,7 @@ export function createGraph(): TrafficSnapshot {
                           targetHandle: "target-left",
                       };
             const inComp = compFlowSet ? compFlowSet.has(flow.id) : undefined;
+            const flowMarker = markerById.get(flow.id);
             return {
                 id: flow.id,
                 source: flow.srcHost,
@@ -264,7 +272,9 @@ export function createGraph(): TrafficSnapshot {
                     stroke,
                     active,
                     inComparison: inComp,
-                    pinned: markerById.get(flow.id)?.pinned ?? false,
+                    pinned: flowMarker?.pinned ?? false,
+                    note: flowMarker?.note ?? null,
+                    tags: flowMarker?.tags ?? null,
                 },
             };
         });

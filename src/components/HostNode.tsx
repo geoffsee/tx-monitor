@@ -36,10 +36,20 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
             : firstProcess;
     const showResolvedDns = data.category === "public" && data.resolvedDns;
     const isPinned = !!data.pinned;
+    const markerBits = [
+        isPinned ? "pinned" : "",
+        data.note?.trim() ?? "",
+        data.tags?.trim() ?? "",
+    ].filter(Boolean);
+    const markerTitle =
+        markerBits.length > 0
+            ? `${data.address} · ${markerBits.join(" · ")}`
+            : data.address;
 
     return (
         <div
             className="host-node-shell"
+            title={markerTitle}
             style={{
                 width: HOST_NODE_SIZE.width,
                 height: HOST_NODE_SIZE.height,
