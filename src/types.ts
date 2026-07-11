@@ -102,6 +102,8 @@ export type TrafficSnapshot = {
         proto: string;
         srcHost: string;
         dstHost: string;
+        srcPort: number | null;
+        dstPort: number | null;
         length: number;
         info: string;
         process?: ProcessSummary;

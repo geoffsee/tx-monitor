@@ -56,6 +56,16 @@ export default function App() {
         [setSelection],
     );
 
+    const handleFocusHost = useCallback(
+        (id: string) => setSelection({ kind: "host", id }),
+        [setSelection],
+    );
+
+    const handleFocusFlow = useCallback(
+        (id: string) => setSelection({ kind: "flow", id }),
+        [setSelection],
+    );
+
     return (
         <main
             style={{
@@ -91,6 +101,8 @@ export default function App() {
                     onSetSensitivity={setSensitivity}
                     summaryOnly={summaryOnly}
                     onSetSummaryOnly={setSummaryOnly}
+                    onSelectHost={handleFocusHost}
+                    onSelectFlow={handleFocusFlow}
                 />
                 <TrafficGraph
                     graph={graph}
