@@ -447,95 +447,116 @@ function shouldIncludePacket(p: ParsedPacket): boolean {
     return packetMatchesBpf(p, captureBpf);
 }
 
+// Serialize set-capture so overlapping Apply (double-click / multi-tab) cannot
+// interleave across the kill/await and double-start the same generation.
+let captureUpdateChain: Promise<unknown> = Promise.resolve();
+
 async function applyCaptureUpdate(updates: {
     iface?: string;
     direction?: string;
     bpf?: string;
 }): Promise<string | null> {
-    // Validate all fields first so a bad bpf never partially applies iface/dir
-    let nextIface: string | undefined;
-    let nextDirection: string | undefined;
-    let nextBpf: string | undefined;
-    if (updates.iface !== undefined) {
-        const v = updates.iface.trim() || "any";
-        if (!isValidIface(v)) {
-            return `Invalid iface "${v}" (allowed: A-Za-z0-9_.:-)`;
-        }
-        nextIface = v;
-    }
-    if (updates.direction !== undefined) {
-        const v = updates.direction;
-        if (!["in", "out", "inout"].includes(v)) {
-            return `Invalid direction "${v}" (use in|out|inout)`;
-        }
-        nextDirection = v;
-    }
-    if (updates.bpf !== undefined) {
-        const sanitized = sanitizeBpf(updates.bpf);
-        if (sanitized === null) {
-            return "BPF must not contain option-like tokens";
-        }
-        if (activeFilePath) {
-            const fileErr = validateBasicFileBpf(sanitized);
-            if (fileErr) {
-                return fileErr;
+    const run = async (): Promise<string | null> => {
+        // Validate all fields first so a bad bpf never partially applies iface/dir
+        let nextIface: string | undefined;
+        let nextDirection: string | undefined;
+        let nextBpf: string | undefined;
+        if (updates.iface !== undefined) {
+            const v = updates.iface.trim() || "any";
+            if (!isValidIface(v)) {
+                return `Invalid iface "${v}" (allowed: A-Za-z0-9_.:-)`;
             }
+            nextIface = v;
         }
-        nextBpf = sanitized;
-    }
+        if (updates.direction !== undefined) {
+            const v = updates.direction;
+            if (!["in", "out", "inout"].includes(v)) {
+                return `Invalid direction "${v}" (use in|out|inout)`;
+            }
+            nextDirection = v;
+        }
+        if (updates.bpf !== undefined) {
+            const sanitized = sanitizeBpf(updates.bpf);
+            if (sanitized === null) {
+                return "BPF must not contain option-like tokens";
+            }
+            if (activeFilePath) {
+                const fileErr = validateBasicFileBpf(sanitized);
+                if (fileErr) {
+                    return fileErr;
+                }
+            }
+            nextBpf = sanitized;
+        }
 
-    let changed = false;
-    if (nextIface !== undefined && nextIface !== captureIface) {
-        captureIface = nextIface;
-        changed = true;
-    }
-    if (nextDirection !== undefined && nextDirection !== captureDirection) {
-        captureDirection = nextDirection;
-        changed = true;
-    }
-    if (nextBpf !== undefined && nextBpf !== captureBpf) {
-        captureBpf = nextBpf;
-        changed = true;
-    }
-    if (!changed) return null;
-    useFullOverride = false;
-    const newLabel = activeFilePath ? `file ${activeFilePath}` : getLiveLabel();
-    console.log(
-        `Updated capture: iface=${captureIface} dir=${captureDirection} bpf="${captureBpf}"`,
-    );
-    const isLive = !activeFilePath;
-    if (isLive) {
-        captureGeneration += 1;
-        const oldProc = liveProc;
-        liveProc = null;
-        if (oldProc) {
-            try {
-                oldProc.kill();
-            } catch {
-                /* ignore */
+        let changed = false;
+        if (nextIface !== undefined && nextIface !== captureIface) {
+            captureIface = nextIface;
+            changed = true;
+        }
+        if (nextDirection !== undefined && nextDirection !== captureDirection) {
+            captureDirection = nextDirection;
+            changed = true;
+        }
+        if (nextBpf !== undefined && nextBpf !== captureBpf) {
+            captureBpf = nextBpf;
+            changed = true;
+        }
+        if (!changed) return null;
+        useFullOverride = false;
+        const newLabel = activeFilePath
+            ? `file ${activeFilePath}`
+            : getLiveLabel();
+        console.log(
+            `Updated capture: iface=${captureIface} dir=${captureDirection} bpf="${captureBpf}"`,
+        );
+        const isLive = !activeFilePath;
+        if (isLive) {
+            captureGeneration += 1;
+            const myGen = captureGeneration;
+            const oldProc = liveProc;
+            liveProc = null;
+            if (oldProc) {
+                try {
+                    oldProc.kill();
+                } catch {
+                    /* ignore */
+                }
+                // Wait briefly for old tcpdump to release the interface before spawn
+                const exited = (
+                    oldProc as unknown as { exited: Promise<number> }
+                ).exited;
+                await Promise.race([exited, Bun.sleep(500)]).catch(() => {});
             }
-            // Wait briefly for old tcpdump to release the interface before spawn
-            const exited = (oldProc as unknown as { exited: Promise<number> })
-                .exited;
-            await Promise.race([exited, Bun.sleep(500)]).catch(() => {});
+            // Only the owner restarts; a superseded update must not clear
+            // captureStarted / startCapture for a newer generation.
+            if (captureGeneration !== myGen) {
+                return null;
+            }
+            captureStarted = false;
+            startCapture();
+            emitStatus("live", newLabel);
+        } else {
+            // Stop old generation first so in-flight replay cannot emit after
+            // clients clear, then clear server batch, notify, and restart.
+            captureGeneration += 1;
+            pendingPackets = [];
+            if (packetBatchTimer) {
+                clearTimeout(packetBatchTimer);
+                packetBatchTimer = null;
+            }
+            emitStatus("file", newLabel, { resetFeed: true });
+            captureStarted = false;
+            startCapture();
         }
-        captureStarted = false;
-        startCapture();
-        emitStatus("live", newLabel);
-    } else {
-        // Restart file replay under the new filter and ask clients to clear
-        // already-ingested packets so Apply matches user expectation.
-        emitStatus("file", newLabel, { resetFeed: true });
-        pendingPackets = [];
-        if (packetBatchTimer) {
-            clearTimeout(packetBatchTimer);
-            packetBatchTimer = null;
-        }
-        captureGeneration += 1;
-        captureStarted = false;
-        startCapture();
-    }
-    return null;
+        return null;
+    };
+    const result = captureUpdateChain.then(run, run);
+    captureUpdateChain = result.then(
+        () => {},
+        () => {},
+    );
+    return result;
 }
 
 const PACKET_BATCH_INTERVAL_MS = 50;

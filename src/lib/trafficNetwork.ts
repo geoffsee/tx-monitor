@@ -556,9 +556,16 @@ const TrafficNetworkModel = types
             );
         };
 
+        // Last non-history label from server status. Authoritative for
+        // history → returnToLive (server does not re-broadcast status).
+        let lastServerSourceLabel = self.sourceLabel;
+
         const setSource = (mode: string, label: string) => {
             self.sourceMode = mode;
             self.sourceLabel = label;
+            if (mode !== "history") {
+                lastServerSourceLabel = label;
+            }
             remember(`Source: ${label}`);
         };
 
@@ -597,34 +604,10 @@ const TrafficNetworkModel = types
             self.summaryOnly = false;
             self.sourceMode = "live";
             self.connected = false;
-            // Keep captureIface/Direction/Bpf: connection-level state set by
-            // server status. Cleared defaults here would desync UI after
-            // history → returnToLive (server does not re-broadcast status).
-            // Rebuild sourceLabel from those fields so Capture Source stays consistent.
-            const iface = self.captureIface || "any";
-            const dir =
-                self.captureDirection === "in" ||
-                self.captureDirection === "out" ||
-                self.captureDirection === "inout"
-                    ? self.captureDirection
-                    : "out";
-            const bpf = (self.captureBpf || "").trim();
-            const parts = [
-                "sudo",
-                "tcpdump",
-                "-i",
-                iface,
-                "-Q",
-                dir,
-                "-nn",
-                "-vv",
-                "-l",
-                "--",
-            ];
-            if (bpf) {
-                parts.push(bpf);
-            }
-            self.sourceLabel = parts.join(" ");
+            // Keep captureIface/Direction/Bpf and last server-provided
+            // sourceLabel. Do not synthesize a sudo/tcpdump string that can
+            // disagree with root capture or TXMON_TCPDUMP_ARGS.
+            self.sourceLabel = lastServerSourceLabel;
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {

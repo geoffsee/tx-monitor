@@ -5,6 +5,7 @@ import {
     testIsValidIface,
     testPacketMatchesBpf,
     testSanitizeBpf,
+    testValidateBasicFileBpf,
 } from "./server";
 
 describe("capture control surface", () => {
@@ -182,5 +183,21 @@ describe("capture control surface", () => {
         expect(testPacketMatchesBpf(pktHostOnly, expr)).toBe(true);
         expect(testPacketMatchesBpf(pktPortOnly, expr)).toBe(true);
         expect(testPacketMatchesBpf(pktNeither, expr)).toBe(false);
+    });
+
+    test("validateBasicFileBpf accepts host/port and/or", () => {
+        expect(testValidateBasicFileBpf("")).toBe(null);
+        expect(testValidateBasicFileBpf("host 1.2.3.4 or port 53")).toBe(null);
+        expect(
+            testValidateBasicFileBpf("src host 10.0.0.1 and dst port 443"),
+        ).toBe(null);
+    });
+
+    test("validateBasicFileBpf rejects unsupported forms", () => {
+        expect(testValidateBasicFileBpf("not port 53")).not.toBe(null);
+        expect(testValidateBasicFileBpf("net 10.0.0.0/8")).not.toBe(null);
+        expect(testValidateBasicFileBpf("tcp port 80")).not.toBe(null);
+        expect(testValidateBasicFileBpf("host 1.2.3.4/24")).not.toBe(null);
+        expect(testValidateBasicFileBpf("garbage")).not.toBe(null);
     });
 });
