@@ -1,6 +1,6 @@
 project_name = "tx-monitor"
 
-geodynamo-url = "https://geoffsee.github.io/geodynamo/"
+geodynamo-url = "https://geodynamo.seemueller.workers.dev/"
 
 
 [test]
