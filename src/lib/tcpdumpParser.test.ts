@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { TcpdumpParser } from "./tcpdumpParser";
+import { formatService, TcpdumpParser } from "./tcpdumpParser";
 
 describe("TcpdumpParser", () => {
     test("parses IPv4 two-line tcp packets", () => {
@@ -37,5 +37,35 @@ describe("TcpdumpParser", () => {
             length: 74,
             info: "[udp sum ok] quic, protected",
         });
+    });
+});
+
+describe("formatService", () => {
+    test("maps well-known ports", () => {
+        expect(formatService(443, "TCP")).toBe("HTTPS");
+        expect(formatService(80, "TCP")).toBe("HTTP");
+        expect(formatService(53, "UDP")).toBe("DNS");
+    });
+
+    test("falls back to proto/port for unknown", () => {
+        expect(formatService(12345, "TCP")).toBe("TCP/12345");
+        expect(formatService(9000, "UDP")).toBe("UDP/9000");
+    });
+
+    test("returns proto when port is null", () => {
+        expect(formatService(null, "ICMP")).toBe("ICMP");
+    });
+
+    test("augments with name when provided", () => {
+        expect(formatService(443, "TCP", "api.example.com")).toBe(
+            "HTTPS api.example.com",
+        );
+        expect(formatService(53, "UDP", "dns.google")).toBe("DNS dns.google");
+        expect(formatService(1234, "TCP", "foo.bar")).toBe("TCP/1234 foo.bar");
+    });
+
+    test("ignores empty name", () => {
+        expect(formatService(443, "TCP", "")).toBe("HTTPS");
+        expect(formatService(443, "TCP", "   ")).toBe("HTTPS");
     });
 });

@@ -525,6 +525,51 @@ describe("createGraph", () => {
         expect(trafficNetwork.packets.length).toBeGreaterThan(0);
     }, 10000);
 
+    test("uses service names for edge labels (formatService)", () => {
+        trafficNetwork.reset();
+
+        trafficNetwork.ingestPacket(
+            packet("https", "10.0.0.1", "203.0.113.10", 443),
+            true,
+            Date.now(),
+        );
+        trafficNetwork.ingestPacket(
+            packet("http", "10.0.0.1", "203.0.113.11", 80),
+            true,
+            Date.now(),
+        );
+        trafficNetwork.ingestPacket(
+            packet("other", "10.0.0.1", "203.0.113.12", 9000),
+            true,
+            Date.now(),
+        );
+
+        const graph = createGraph();
+        const labels = graph.edges.map((e) => e.data?.label);
+        expect(labels).toContain("HTTPS");
+        expect(labels).toContain("HTTP");
+        expect(labels).toContain("TCP/9000");
+    });
+
+    test("prefers resolved DNS as node label for public hosts", () => {
+        trafficNetwork.reset();
+        trafficNetwork.setResolvedDns("203.0.113.99", "example.com");
+
+        trafficNetwork.ingestPacket(
+            packet("dnsname", "10.0.0.5", "203.0.113.99", 443),
+            true,
+            Date.now(),
+        );
+
+        const graph = createGraph();
+        const pub = graph.nodes.find((n) => n.id === "203.0.113.99");
+        expect(pub?.data.label).toBe("example.com");
+        expect(pub?.data.address).toBe("203.0.113.99");
+        // name-augmentation path: formatService(port, proto, dstDns)
+        const labels = graph.edges.map((e) => e.data?.label);
+        expect(labels).toContain("HTTPS example.com");
+    });
+
     test("setSummaryOnly mid-stream drops excess packet details with summary_mode reason", () => {
         trafficNetwork.reset();
         const baseTime = Date.now();
