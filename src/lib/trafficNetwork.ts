@@ -94,6 +94,9 @@ const TrafficNetworkModel = types
             "sudo tcpdump -i any -Q out -nn -vv",
         ),
         connected: types.optional(types.boolean, false),
+        captureIface: types.optional(types.string, "any"),
+        captureDirection: types.optional(types.string, "out"),
+        captureBpf: types.optional(types.string, ""),
         hostsEvicted: types.optional(types.number, 0),
         flowsEvicted: types.optional(types.number, 0),
         packetsEvicted: types.optional(types.number, 0),
@@ -553,24 +556,35 @@ const TrafficNetworkModel = types
             );
         };
 
+        // Last non-history label from server status. Authoritative for
+        // history → returnToLive (server does not re-broadcast status).
+        let lastServerSourceLabel = self.sourceLabel;
+
         const setSource = (mode: string, label: string) => {
             self.sourceMode = mode;
             self.sourceLabel = label;
+            if (mode !== "history") {
+                lastServerSourceLabel = label;
+            }
             remember(`Source: ${label}`);
         };
 
-        const reset = () => {
+        const setCapture = (iface: string, direction: string, bpf: string) => {
+            self.captureIface = iface || "any";
+            self.captureDirection = direction || "out";
+            self.captureBpf = bpf ?? "";
+        };
+
+        const clearTraffic = () => {
             self.hosts.clear();
             self.flows.clear();
             self.packets.clear();
             self.resolvedDns.clear();
             self.anomalies.clear();
-            self.markers.clear();
             self.events.clear();
             self.totalPackets = 0;
             self.totalBytes = 0;
             self.dnsPacketCount = 0;
-            self.sensitivity = "medium";
             self.hostsEvicted = 0;
             self.flowsEvicted = 0;
             self.packetsEvicted = 0;
@@ -579,12 +593,21 @@ const TrafficNetworkModel = types
             self.evictionByReason.flow_orphan = 0;
             self.evictionByReason.packet_window = 0;
             self.evictionByReason.summary_mode = 0;
-            self.summaryOnly = false;
             flowArrivals.clear();
             dnsTargets.clear();
+        };
+
+        const reset = () => {
+            clearTraffic();
+            self.markers.clear();
+            self.sensitivity = "medium";
+            self.summaryOnly = false;
             self.sourceMode = "live";
-            self.sourceLabel = "sudo tcpdump -i any -Q out -nn -vv";
             self.connected = false;
+            // Keep captureIface/Direction/Bpf and last server-provided
+            // sourceLabel. Do not synthesize a sudo/tcpdump string that can
+            // disagree with root capture or TXMON_TCPDUMP_ARGS.
+            self.sourceLabel = lastServerSourceLabel;
         };
 
         const setSensitivity = (level: "low" | "medium" | "high") => {
@@ -701,8 +724,10 @@ const TrafficNetworkModel = types
             setResolvedDns,
             setConnection,
             setSource,
+            setCapture,
             setSensitivity,
             setSummaryOnly,
+            clearTraffic,
             reset,
             remember,
             setEntityMarker,

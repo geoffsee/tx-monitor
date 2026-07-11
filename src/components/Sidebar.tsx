@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatBytes } from "../layout";
 import { isRowSelected } from "../lib/selection";
 import type {
@@ -45,6 +45,11 @@ type SidebarProps = {
     onSelectPacket: (id: string) => void;
     onNavigateToFlow: (id: string) => void;
     onClearSelection: () => void;
+    onUpdateCapture?: (updates: {
+        iface?: string;
+        direction?: string;
+        bpf?: string;
+    }) => void;
     onSetEntityMarker?: (
         kind: "host" | "flow",
         id: string,
@@ -71,6 +76,7 @@ export function Sidebar({
     onSelectPacket,
     onNavigateToFlow,
     onClearSelection,
+    onUpdateCapture,
     onSetEntityMarker,
 }: SidebarProps) {
     const feedLabel =
@@ -79,6 +85,7 @@ export function Sidebar({
             : graph.connected
               ? "Live"
               : "Offline";
+    const isFileSource = graph.sourceLabel.startsWith("file ");
 
     // Windowed list state for long flow and packet lists (virtualized to bound
     // DOM nodes under large sessions while allowing scroll through window).
@@ -86,6 +93,49 @@ export function Sidebar({
     const [flowsScrollTop, setFlowsScrollTop] = useState(0);
     const packetsContainerRef = useRef<HTMLUListElement>(null);
     const [packetsScrollTop, setPacketsScrollTop] = useState(0);
+
+    // Pending capture control drafts (synced from live graph.capture primitives only;
+    // object identity of graph.capture changes every publishGraph and must not reset drafts)
+    const [pendingIface, setPendingIface] = useState("any");
+    const [pendingDirection, setPendingDirection] = useState<
+        "in" | "out" | "inout"
+    >("out");
+    const [pendingBpf, setPendingBpf] = useState("");
+    const [captureDirty, setCaptureDirty] = useState(false);
+    const serverIface = graph.capture?.iface;
+    const serverDirection = graph.capture?.direction;
+    const serverBpf = graph.capture?.bpf;
+    useEffect(() => {
+        if (serverIface === undefined) return;
+        const iface = serverIface || "any";
+        const d = serverDirection as "in" | "out" | "inout" | undefined;
+        const dir =
+            d === "in" || d === "out" || d === "inout" ? d : ("out" as const);
+        const bpf = serverBpf ?? "";
+        if (captureDirty) {
+            // Clear dirty only after server confirms matching params (or
+            // leave dirty on reject so drafts do not pretend to be applied).
+            if (
+                iface === (pendingIface || "any") &&
+                dir === pendingDirection &&
+                bpf === pendingBpf
+            ) {
+                setCaptureDirty(false);
+            }
+            return;
+        }
+        setPendingIface(iface);
+        setPendingDirection(dir);
+        setPendingBpf(bpf);
+    }, [
+        serverIface,
+        serverDirection,
+        serverBpf,
+        captureDirty,
+        pendingIface,
+        pendingDirection,
+        pendingBpf,
+    ]);
 
     const FLOW_ITEM_HEIGHT = 58;
     const PACKET_ITEM_HEIGHT = 58;
@@ -226,6 +276,110 @@ export function Sidebar({
                 <div style={{ ...denseFeedRowStyle, marginTop: 8 }}>
                     {graph.sourceLabel}
                 </div>
+                {viewMode !== "history" && graph.capture ? (
+                    <div
+                        style={{
+                            marginTop: 6,
+                            display: "grid",
+                            gap: 4,
+                            fontSize: 11,
+                        }}
+                    >
+                        {!isFileSource ? (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    gap: 4,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <span>iface</span>
+                                <input
+                                    value={pendingIface}
+                                    onChange={(e) => {
+                                        setCaptureDirty(true);
+                                        setPendingIface(e.target.value);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        fontSize: 11,
+                                        padding: "1px 3px",
+                                        minWidth: 0,
+                                    }}
+                                    placeholder="any"
+                                />
+                                <span>dir</span>
+                                <select
+                                    value={pendingDirection}
+                                    onChange={(e) => {
+                                        setCaptureDirty(true);
+                                        setPendingDirection(
+                                            e.target.value as
+                                                | "in"
+                                                | "out"
+                                                | "inout",
+                                        );
+                                    }}
+                                    style={{ fontSize: 11 }}
+                                >
+                                    <option value="out">out</option>
+                                    <option value="in">in</option>
+                                    <option value="inout">inout</option>
+                                </select>
+                            </div>
+                        ) : null}
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 4,
+                                alignItems: "center",
+                            }}
+                        >
+                            <span>bpf</span>
+                            <input
+                                value={pendingBpf}
+                                onChange={(e) => {
+                                    setCaptureDirty(true);
+                                    setPendingBpf(e.target.value);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    fontSize: 11,
+                                    padding: "1px 3px",
+                                    minWidth: 0,
+                                }}
+                                placeholder="host 1.2.3.4 or port 53"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                // Leave captureDirty true until status matches
+                                // pending (see effect); rejected set-capture
+                                // never emits status so drafts stay editable.
+                                if (isFileSource) {
+                                    onUpdateCapture?.({ bpf: pendingBpf });
+                                } else {
+                                    onUpdateCapture?.({
+                                        iface: pendingIface || "any",
+                                        direction: pendingDirection,
+                                        bpf: pendingBpf,
+                                    });
+                                }
+                            }}
+                            style={{
+                                fontSize: 11,
+                                padding: "1px 4px",
+                                cursor: "pointer",
+                                alignSelf: "start",
+                            }}
+                        >
+                            {isFileSource
+                                ? "Apply BPF filter"
+                                : "Apply (restart live capture)"}
+                        </button>
+                    </div>
+                ) : null}
             </section>
             <div
                 style={{

@@ -134,6 +134,11 @@ export type TrafficSnapshot = {
     summaryOnly: boolean;
     connected: boolean;
     sourceLabel: string;
+    capture: {
+        iface: string;
+        direction: string;
+        bpf: string;
+    };
     sensitivity: "low" | "medium" | "high";
     comparison?: ComparisonSummary;
     markers: EntityMarker[];

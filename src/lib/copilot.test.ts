@@ -30,6 +30,7 @@ const emptyGraph: TrafficSnapshot = {
     summaryOnly: false,
     connected: true,
     sourceLabel: "tcpdump -i any",
+    capture: { iface: "any", direction: "out", bpf: "" },
     sensitivity: "medium",
     markers: [],
 };
