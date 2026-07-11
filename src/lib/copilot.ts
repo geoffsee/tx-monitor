@@ -1,5 +1,6 @@
 import { formatBytes } from "../layout";
 import type { Anomaly, Selection, TrafficSnapshot } from "../types";
+import { formatService, shortHost } from "./tcpdumpParser";
 
 export type CopilotMessage = {
     id: string;
@@ -80,9 +81,35 @@ function topHosts(graph: TrafficSnapshot, limit = 8) {
         .slice(0, limit);
 }
 
+function createHostLabelLookup(graph: TrafficSnapshot) {
+    // Prefer full snapshot hostLabels (all known hosts + DNS); fall back to
+    // laid-out nodes for older/partial snapshots, then raw address.
+    const fromMap = graph.hostLabels ?? {};
+    const fromNodes = new Map(
+        graph.nodes.map((n) => [n.id, n.data.label] as const),
+    );
+    return (addr: string) => fromMap[addr] ?? fromNodes.get(addr) ?? addr;
+}
+
+function serviceName(
+    dstPort: number | null | undefined,
+    proto: string,
+    dstHost: string,
+    getLabel: (addr: string) => string,
+) {
+    const dstLabel = getLabel(dstHost);
+    // shortHost labels are display truncations, not DNS — never append them
+    const name =
+        dstLabel !== dstHost && dstLabel !== shortHost(dstHost)
+            ? dstLabel
+            : undefined;
+    return formatService(dstPort ?? null, proto, name);
+}
+
 function describeSelectionContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
+    getLabel: (addr: string) => string,
 ) {
     if (!selection) {
         return null;
@@ -110,7 +137,18 @@ function describeSelectionContext(
             return { kind: "flow", missing: selection.id };
         }
 
-        return { kind: "flow", ...flow };
+        return {
+            kind: "flow",
+            ...flow,
+            srcLabel: getLabel(flow.srcHost),
+            dstLabel: getLabel(flow.dstHost),
+            service: serviceName(
+                flow.dstPort,
+                flow.proto,
+                flow.dstHost,
+                getLabel,
+            ),
+        };
     }
 
     const packet = graph.packets.find((item) => item.id === selection.id);
@@ -118,7 +156,18 @@ function describeSelectionContext(
         return { kind: "packet", missing: selection.id };
     }
 
-    return { kind: "packet", ...packet };
+    return {
+        kind: "packet",
+        ...packet,
+        srcLabel: getLabel(packet.srcHost),
+        dstLabel: getLabel(packet.dstHost),
+        service: serviceName(
+            packet.dstPort,
+            packet.proto,
+            packet.dstHost,
+            getLabel,
+        ),
+    };
 }
 
 // buildCopilotContext produces the snapshot-derived context for the strict
@@ -128,6 +177,8 @@ export function buildCopilotContext(
     graph: TrafficSnapshot,
     selection: Selection | null,
 ) {
+    const getLabel = createHostLabelLookup(graph);
+
     return {
         summary: {
             totalPackets: graph.totalPackets,
@@ -149,8 +200,16 @@ export function buildCopilotContext(
             id: flow.id,
             srcHost: flow.srcHost,
             dstHost: flow.dstHost,
+            srcLabel: getLabel(flow.srcHost),
+            dstLabel: getLabel(flow.dstHost),
             proto: flow.proto,
             dstPort: flow.dstPort,
+            service: serviceName(
+                flow.dstPort,
+                flow.proto,
+                flow.dstHost,
+                getLabel,
+            ),
             packetCount: flow.packetCount,
             bytesTotal: flow.bytesTotal,
             bytesTotalLabel: formatBytes(flow.bytesTotal),
@@ -163,13 +222,25 @@ export function buildCopilotContext(
             proto: packet.proto,
             srcHost: packet.srcHost,
             dstHost: packet.dstHost,
+            srcLabel: getLabel(packet.srcHost),
+            dstLabel: getLabel(packet.dstHost),
+            ...(packet.dstPort != null
+                ? {
+                      service: serviceName(
+                          packet.dstPort,
+                          packet.proto,
+                          packet.dstHost,
+                          getLabel,
+                      ),
+                  }
+                : {}),
             length: packet.length,
             info: packet.info,
             process: packet.process,
         })),
         anomalies: graph.anomalies.slice(0, 10),
         recentEvents: graph.events.slice(-8),
-        selection: describeSelectionContext(graph, selection),
+        selection: describeSelectionContext(graph, selection, getLabel),
         markers: graph.markers ?? [],
     };
 }

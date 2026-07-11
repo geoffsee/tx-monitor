@@ -33,6 +33,7 @@ const emptyGraph: TrafficSnapshot = {
     capture: { iface: "any", direction: "out", bpf: "" },
     sensitivity: "medium",
     markers: [],
+    hostLabels: {},
 };
 
 const sampleGraph: TrafficSnapshot = {
@@ -125,6 +126,97 @@ describe("buildCopilotContext", () => {
             proto: "UDP",
             dstPort: 53,
         });
+    });
+
+    test("includes service names via formatService in topFlows and selection", () => {
+        const context = buildCopilotContext(sampleGraph, {
+            kind: "flow",
+            id: "flow-1",
+        });
+        // UDP 53 -> DNS
+        expect(context.topFlows[0]?.service).toBe("DNS");
+        expect(context.selection).toMatchObject({ service: "DNS" });
+    });
+
+    test("uses hostLabels for addresses outside graph.nodes", () => {
+        const graph: TrafficSnapshot = {
+            ...sampleGraph,
+            nodes: sampleGraph.nodes.slice(0, 1), // only 10.0.0.1 laid out
+            hostLabels: {
+                "10.0.0.1": "10.0.0.1",
+                "8.8.8.8": "dns.google",
+            },
+            flows: [
+                {
+                    id: "flow-1",
+                    srcHost: "10.0.0.1",
+                    dstHost: "8.8.8.8",
+                    proto: "UDP",
+                    dstPort: 53,
+                    packetCount: 40,
+                    bytesTotal: 16_000,
+                    active: true,
+                },
+            ],
+        };
+        const context = buildCopilotContext(graph, null);
+        expect(context.topFlows[0]?.dstLabel).toBe("dns.google");
+        expect(context.topFlows[0]?.service).toBe("DNS dns.google");
+    });
+
+    test("does not treat shortHost IPv6 truncation as DNS in service", () => {
+        const longIpv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+        // shortHost truncates long addresses for display; that is not DNS.
+        const truncated = `${longIpv6.slice(0, 8)}…${longIpv6.slice(-6)}`;
+        const graph: TrafficSnapshot = {
+            ...emptyGraph,
+            totalPackets: 10,
+            totalBytes: 5_000,
+            hostCount: 2,
+            flowCount: 1,
+            hostLabels: {
+                "10.0.0.1": "10.0.0.1",
+                [longIpv6]: truncated,
+            },
+            flows: [
+                {
+                    id: "flow-ipv6",
+                    srcHost: "10.0.0.1",
+                    dstHost: longIpv6,
+                    proto: "TCP",
+                    dstPort: 443,
+                    packetCount: 10,
+                    bytesTotal: 5_000,
+                    active: true,
+                },
+            ],
+        };
+        const context = buildCopilotContext(graph, null);
+        expect(context.topFlows[0]?.service).toBe("HTTPS");
+    });
+
+    test("still appends real DNS names to service", () => {
+        const graph: TrafficSnapshot = {
+            ...sampleGraph,
+            hostLabels: {
+                "10.0.0.1": "10.0.0.1",
+                "8.8.8.8": "example.com",
+            },
+            flows: [
+                {
+                    id: "flow-1",
+                    srcHost: "10.0.0.1",
+                    dstHost: "8.8.8.8",
+                    proto: "TCP",
+                    dstPort: 443,
+                    packetCount: 40,
+                    bytesTotal: 16_000,
+                    active: true,
+                },
+            ],
+        };
+        const context = buildCopilotContext(graph, null);
+        expect(context.topFlows[0]?.service).toBe("HTTPS example.com");
     });
 });
 

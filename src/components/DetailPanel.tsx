@@ -4,6 +4,8 @@ import {
     formatBytes,
     protoColor,
 } from "../layout";
+import { displayHostLabel } from "../lib/hostDisplay";
+import { formatService } from "../lib/tcpdumpParser";
 import { trafficNetwork } from "../lib/trafficNetwork";
 import type { HostCategory, Selection } from "../types";
 import {
@@ -178,7 +180,7 @@ export function DetailPanel({
                 >
                     {categoryLabel(host.category as HostCategory)}
                 </div>
-                <div style={detailTitleStyle}>{host.label}</div>
+                <div style={detailTitleStyle}>{displayHostLabel(host.id)}</div>
                 <div style={detailSubtleStyle}>{host.address}</div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>
@@ -222,15 +224,25 @@ export function DetailPanel({
                                             fontWeight: 600,
                                             fontSize: 12,
                                         }}
+                                        title={
+                                            flow.srcHost === host.id
+                                                ? `${flow.srcHost} -> ${flow.dstHost}`
+                                                : `${flow.dstHost} -> ${flow.srcHost}`
+                                        }
                                     >
                                         {flow.srcHost === host.id ? "→" : "←"}{" "}
                                         {flow.srcHost === host.id
-                                            ? flow.dstHost
-                                            : flow.srcHost}
+                                            ? displayHostLabel(flow.dstHost)
+                                            : displayHostLabel(flow.srcHost)}
                                     </span>
-                                    <span style={detailSubtleStyle}>
-                                        {flow.proto}
-                                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                                    <span
+                                        style={detailSubtleStyle}
+                                        title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
+                                    >
+                                        {formatService(
+                                            flow.dstPort,
+                                            flow.proto,
+                                        )}
                                         {flow.processCommand
                                             ? ` · ${flow.processCommand}`
                                             : ""}{" "}
@@ -254,11 +266,20 @@ export function DetailPanel({
                                             fontSize: 12,
                                             fontWeight: 600,
                                         }}
+                                        title={`${packet.proto}${packet.dstPort ? `:${packet.dstPort}` : ""}`}
                                     >
-                                        {packet.timestamp} · {packet.proto}
+                                        {packet.timestamp} ·{" "}
+                                        {formatService(
+                                            packet.dstPort,
+                                            packet.proto,
+                                        )}
                                     </div>
-                                    <div style={detailSubtleStyle}>
-                                        {packet.srcHost} → {packet.dstHost} ·{" "}
+                                    <div
+                                        style={detailSubtleStyle}
+                                        title={`${packet.srcHost} -> ${packet.dstHost}`}
+                                    >
+                                        {displayHostLabel(packet.srcHost)} →{" "}
+                                        {displayHostLabel(packet.dstHost)} ·{" "}
                                         {packet.length} B
                                     </div>
                                 </div>
@@ -310,16 +331,20 @@ export function DetailPanel({
                             borderColor: `${stroke}44`,
                             background: `${stroke}1f`,
                         }}
+                        title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
                     >
-                        {flow.proto}
-                        {flow.dstPort ? `:${flow.dstPort}` : ""}
+                        {formatService(flow.dstPort, flow.proto)}
                     </div>
                     <div style={statusBadgeStyle(active)}>
                         {active ? "active" : "idle"}
                     </div>
                 </div>
-                <div style={detailTitleStyle}>
-                    {flow.srcHost} → {flow.dstHost}
+                <div
+                    style={detailTitleStyle}
+                    title={`${flow.srcHost} -> ${flow.dstHost}`}
+                >
+                    {displayHostLabel(flow.srcHost)} →{" "}
+                    {displayHostLabel(flow.dstHost)}
                 </div>
                 <div style={detailMetricGridStyle}>
                     <div style={detailMetricStyle}>
@@ -406,8 +431,9 @@ export function DetailPanel({
                     borderColor: `${stroke}44`,
                     background: `${stroke}1f`,
                 }}
+                title={`${packet.proto}${packet.dstPort ? `:${packet.dstPort}` : ""}`}
             >
-                {packet.proto}
+                {formatService(packet.dstPort, packet.proto)}
             </div>
             <div style={detailTitleStyle}>{packet.timestamp}</div>
             <div style={detailMetricGridStyle}>
@@ -431,11 +457,15 @@ export function DetailPanel({
             <div style={detailSectionTitleStyle}>Endpoints</div>
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Source</div>
-                <div style={detailSubtleStyle}>{packet.srcHost}</div>
+                <div style={detailSubtleStyle} title={packet.srcHost}>
+                    {displayHostLabel(packet.srcHost)}
+                </div>
             </div>
             <div style={detailRowStyle}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>Destination</div>
-                <div style={detailSubtleStyle}>{packet.dstHost}</div>
+                <div style={detailSubtleStyle} title={packet.dstHost}>
+                    {displayHostLabel(packet.dstHost)}
+                </div>
             </div>
             {packet.processCommand &&
             packet.processPid &&
