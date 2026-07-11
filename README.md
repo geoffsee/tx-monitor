@@ -72,7 +72,7 @@ Open [http://localhost:3001](http://localhost:3001). The compiled server embeds 
 ## Server Options
 
 ```bash
-bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db]
+bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db] [--iface <name>] [--direction <dir>] [--bpf <expr>]
 ```
 
 | Flag | Description |
@@ -82,6 +82,13 @@ bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [-
 | `--serve` | Serve the built frontend from `dist/` |
 | `--db <path>` | SQLite database path for packet persistence (default: `~/.tx-monitor`) |
 | `--no-db` | Disable SQLite persistence |
+| `--iface <name>` | Live capture interface (default: `any`) |
+| `--direction <dir>` | Live capture direction: `in`, `out`, or `inout` (default: `out`) |
+| `--bpf <expr>` | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53`. Tokens starting with `-` are rejected. Live BPF is a single argv after `--`. |
+
+Capture params (iface, direction, effective command, BPF) are surfaced in UI "Capture Source", status updates, and server logs. Controls in the sidebar let you change them at runtime for live capture (restarts subprocess cleanly) and apply basic BPF to file replays without full server restart. Session continuity preserved on live param changes.
+
+**Security:** Runtime `set-capture` over WebSocket is an unauthenticated admin control (restarts `sudo tcpdump`). By default it is accepted only from loopback clients. Do not expose the server on untrusted networks. Set `TXMON_ALLOW_REMOTE_CAPTURE=1` only if you intentionally allow remote capture control.
 
 ## Configuration File
 
@@ -126,7 +133,11 @@ A brief effective settings line is logged at startup (port, db, replay, mode). N
 | `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
 | `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
 | `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
-| `TXMON_TCPDUMP_ARGS` | unset | Optional full live-capture argv (env only; not accepted in config files) |
+| `TXMON_IFACE` | `any` | Default live capture interface (overridden by --iface) |
+| `TXMON_DIRECTION` | `out` | Default live capture direction |
+| `TXMON_BPF` | (none) | Default BPF filter expression |
+| `TXMON_TCPDUMP_ARGS` | unset | Optional full live-capture argv (initial only; env only; not accepted in config files) |
+| `TXMON_ALLOW_REMOTE_CAPTURE` | unset | When `1`/`true`, allow `set-capture` from non-loopback WebSocket clients (default: localhost only) |
 
 ## Persistence
 

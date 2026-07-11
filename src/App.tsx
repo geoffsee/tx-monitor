@@ -17,6 +17,7 @@ export default function App() {
         returnToLive,
         sensitivity,
         setSensitivity,
+        updateCapture,
         comparisonSessionId,
         comparisonLabel,
         comparisonLoadProgress,
@@ -130,6 +131,7 @@ export default function App() {
                     onSelectPacket={handleSelectPacket}
                     onNavigateToFlow={handleNavigateToFlow}
                     onClearSelection={clearSelection}
+                    onUpdateCapture={updateCapture}
                     onSetEntityMarker={setEntityMarker}
                 />
             </section>

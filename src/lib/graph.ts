@@ -393,6 +393,11 @@ export function createGraph(): TrafficSnapshot {
         summaryOnly: !!trafficNetwork.summaryOnly,
         connected: trafficNetwork.connected,
         sourceLabel: trafficNetwork.sourceLabel,
+        capture: {
+            iface: trafficNetwork.captureIface,
+            direction: trafficNetwork.captureDirection,
+            bpf: trafficNetwork.captureBpf,
+        },
         sensitivity:
             (trafficNetwork.sensitivity as "low" | "medium" | "high") ??
             "medium",
