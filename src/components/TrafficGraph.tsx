@@ -190,7 +190,14 @@ export function TrafficGraph({
                                 gap: 8,
                             }}
                         >
-                            <div style={compactKpiStyle}>
+                            <div
+                                style={compactKpiStyle}
+                                title={
+                                    graph.hostsEvicted > 0
+                                        ? `Hosts in memory (cap). Evicted ${graph.hostsEvicted} (reason: host_cap)`
+                                        : "Hosts in memory"
+                                }
+                            >
                                 <span style={compactKpiLabelStyle}>Hosts</span>
                                 <span style={compactKpiValueStyle}>
                                     {graph.hostCount}
@@ -207,7 +214,14 @@ export function TrafficGraph({
                                     ) : null}
                                 </span>
                             </div>
-                            <div style={compactKpiStyle}>
+                            <div
+                                style={compactKpiStyle}
+                                title={
+                                    graph.flowsEvicted > 0
+                                        ? `Flows in memory (cap). Evicted ${graph.flowsEvicted} (flow_cap: ${graph.evictionByReason.flow_cap}, orphan: ${graph.evictionByReason.flow_orphan})`
+                                        : "Flows in memory"
+                                }
+                            >
                                 <span style={compactKpiLabelStyle}>Flows</span>
                                 <span style={compactKpiValueStyle}>
                                     {graph.flowCount}
@@ -224,7 +238,15 @@ export function TrafficGraph({
                                     ) : null}
                                 </span>
                             </div>
-                            <div style={compactKpiStyle}>
+                            <div
+                                style={compactKpiStyle}
+                                title={
+                                    graph.packetsEvicted > 0 ||
+                                    graph.summaryOnly
+                                        ? `Packet details window${graph.summaryOnly ? " (summary-only)" : ""}. Evicted ${graph.packetsEvicted} (window: ${graph.evictionByReason.packet_window}, summary: ${graph.evictionByReason.summary_mode}). Aggregates retained.`
+                                        : "Total packets (aggregates; detail window capped)"
+                                }
+                            >
                                 <span style={compactKpiLabelStyle}>
                                     Packets
                                 </span>
