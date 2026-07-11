@@ -145,8 +145,27 @@ describe("createGraph", () => {
         expect(trafficNetwork.packetsEvicted).toBeGreaterThan(0);
         expect(snap.hostsEvicted).toBeGreaterThan(0);
         expect(snap.packetsEvicted).toBeGreaterThan(0);
-        // flows under cap (explicit flow eviction verified in history test)
+        // Structured reasons — no silent loss of host/packet detail under cap pressure
+        expect(snap.evictionByReason.host_cap).toBe(
+            trafficNetwork.hostsEvicted,
+        );
+        expect(snap.evictionByReason.host_cap).toBeGreaterThan(0);
+        expect(
+            snap.evictionByReason.packet_window +
+                snap.evictionByReason.summary_mode,
+        ).toBe(snap.packetsEvicted);
+        expect(snap.evictionByReason.packet_window).toBeGreaterThan(0);
+        // Host cap often cascades orphan flows (explicit reason, not silent)
+        expect(
+            snap.evictionByReason.flow_cap + snap.evictionByReason.flow_orphan,
+        ).toBe(snap.flowsEvicted);
+        expect(snap.evictionByReason.flow_orphan).toBeGreaterThan(0);
         expect(trafficNetwork.flowsEvicted).toBeGreaterThanOrEqual(0);
+        // Event stream includes reason labels for operator console/ticker
+        const evictionEvents = trafficNetwork.events.filter((e) =>
+            e.includes("reason:"),
+        );
+        expect(evictionEvents.length).toBeGreaterThan(0);
     }, 20000);
 
     test("history ingest respects caps and uses progressive page-style batching", () => {
@@ -185,6 +204,11 @@ describe("createGraph", () => {
         expect(trafficNetwork.flowsEvicted).toBeGreaterThan(0);
         const snap2 = createGraph();
         expect(snap2.flowsEvicted).toBeGreaterThan(0);
+        expect(
+            snap2.evictionByReason.flow_cap +
+                snap2.evictionByReason.flow_orphan,
+        ).toBe(snap2.flowsEvicted);
+        expect(snap2.evictionByReason.flow_cap).toBeGreaterThan(0);
     }, 20000);
 
     test("pinned hosts and flows survive display filters and surface marker flags", () => {
@@ -402,6 +426,17 @@ describe("createGraph", () => {
         );
         expect(snap.totalPackets).toBe(numPackets);
         expect(snap.packetsEvicted).toBeGreaterThanOrEqual(0);
+        // Summary-only attributes drops to summary_mode (not silent packet_window alone)
+        expect(snap.evictionByReason.summary_mode).toBe(snap.packetsEvicted);
+        expect(snap.evictionByReason.packet_window).toBe(0);
+        // Mode toggle surfaces reason immediately (event ring may rotate under load)
+        trafficNetwork.setSummaryOnly(false);
+        trafficNetwork.setSummaryOnly(true);
+        expect(
+            trafficNetwork.events.some((e) =>
+                e.includes("reason: summary_mode"),
+            ),
+        ).toBe(true);
 
         // Toggle back to full retains behavior
         trafficNetwork.setSummaryOnly(false);
@@ -413,4 +448,27 @@ describe("createGraph", () => {
         );
         expect(trafficNetwork.packets.length).toBeGreaterThan(0);
     }, 10000);
+
+    test("setSummaryOnly mid-stream drops excess packet details with summary_mode reason", () => {
+        trafficNetwork.reset();
+        const baseTime = Date.now();
+        for (let i = 0; i < 40; i++) {
+            trafficNetwork.ingestPacket(
+                packet(`pre-${i}`, "10.0.0.1", "203.0.113.1", 443),
+                true,
+                baseTime + i,
+            );
+        }
+        expect(trafficNetwork.packets.length).toBeGreaterThan(
+            MAX_MEMORY_PACKETS_SUMMARY,
+        );
+        const before = trafficNetwork.packetsEvicted;
+        trafficNetwork.setSummaryOnly(true);
+        expect(trafficNetwork.packets.length).toBe(MAX_MEMORY_PACKETS_SUMMARY);
+        expect(trafficNetwork.packetsEvicted).toBeGreaterThan(before);
+        expect(
+            trafficNetwork.evictionReasonSnapshot.summary_mode,
+        ).toBeGreaterThan(0);
+        expect(trafficNetwork.totalPackets).toBe(40);
+    });
 });

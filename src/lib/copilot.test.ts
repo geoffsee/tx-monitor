@@ -20,6 +20,13 @@ const emptyGraph: TrafficSnapshot = {
     hostsEvicted: 0,
     flowsEvicted: 0,
     packetsEvicted: 0,
+    evictionByReason: {
+        host_cap: 0,
+        flow_cap: 0,
+        flow_orphan: 0,
+        packet_window: 0,
+        summary_mode: 0,
+    },
     summaryOnly: false,
     connected: true,
     sourceLabel: "tcpdump -i any",
