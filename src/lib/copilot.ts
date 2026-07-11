@@ -1,6 +1,6 @@
 import { formatBytes } from "../layout";
 import type { Selection, TrafficSnapshot } from "../types";
-import { formatService } from "./tcpdumpParser";
+import { formatService, shortHost } from "./tcpdumpParser";
 
 export type CopilotMessage = {
     id: string;
@@ -98,11 +98,12 @@ function serviceName(
     getLabel: (addr: string) => string,
 ) {
     const dstLabel = getLabel(dstHost);
-    return formatService(
-        dstPort ?? null,
-        proto,
-        dstLabel !== dstHost ? dstLabel : undefined,
-    );
+    // shortHost labels are display truncations, not DNS — never append them
+    const name =
+        dstLabel !== dstHost && dstLabel !== shortHost(dstHost)
+            ? dstLabel
+            : undefined;
+    return formatService(dstPort ?? null, proto, name);
 }
 
 function describeSelectionContext(

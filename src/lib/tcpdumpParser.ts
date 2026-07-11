@@ -172,7 +172,8 @@ export function formatService(
     const p = (proto as string).toUpperCase() as PacketProto;
     if (port === null) {
         const base = p;
-        return name ? `${base} ${name}` : base;
+        const n = name?.trim();
+        return n ? `${base} ${n}` : base;
     }
     let svc: string;
     if (port === 443) {
