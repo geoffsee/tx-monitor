@@ -458,3 +458,21 @@ export const copilotSendButtonStyle: React.CSSProperties = {
     cursor: "pointer",
     font: "inherit",
 };
+
+export const anomalyActionButtonStyle: React.CSSProperties = {
+    fontSize: 10,
+    padding: "1px 6px",
+    borderRadius: 4,
+    border: "1px solid #33414a",
+    background: "#101d26",
+    color: "#9eb4c0",
+    cursor: "pointer",
+    font: "inherit",
+};
+
+export const anomalyActionsRowStyle: React.CSSProperties = {
+    display: "flex",
+    gap: 4,
+    marginTop: 4,
+    flexWrap: "wrap",
+};
