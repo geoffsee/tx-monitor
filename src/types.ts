@@ -13,6 +13,8 @@ export type HostNodeData = {
     resolvedDns?: string;
     inComparison?: boolean;
     pinned?: boolean;
+    note?: string | null;
+    tags?: string | null;
 };
 
 export type FlowEdgeData = {
@@ -22,6 +24,8 @@ export type FlowEdgeData = {
     active: boolean;
     inComparison?: boolean;
     pinned?: boolean;
+    note?: string | null;
+    tags?: string | null;
 };
 
 export type Selection =

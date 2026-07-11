@@ -172,6 +172,7 @@ export function createGraph(): TrafficSnapshot {
     }
 
     const nodes: Node<HostNodeData>[] = hostList.map((host) => {
+        const marker = markerById.get(host.id);
         const dns = trafficNetwork.resolvedDns.get(host.id);
         const displayLabel = resolveDisplayHostLabel(host.id, host, dns);
         return {
@@ -192,7 +193,9 @@ export function createGraph(): TrafficSnapshot {
                 inComparison: compHostSet
                     ? compHostSet.has(host.id)
                     : undefined,
-                pinned: markerById.get(host.id)?.pinned ?? false,
+                pinned: marker?.pinned ?? false,
+                note: marker?.note ?? null,
+                tags: marker?.tags ?? null,
             },
         };
     });
@@ -277,6 +280,7 @@ export function createGraph(): TrafficSnapshot {
                           targetHandle: "target-left",
                       };
             const inComp = compFlowSet ? compFlowSet.has(flow.id) : undefined;
+            const flowMarker = markerById.get(flow.id);
             return {
                 id: flow.id,
                 source: flow.srcHost,
@@ -295,7 +299,9 @@ export function createGraph(): TrafficSnapshot {
                     stroke,
                     active,
                     inComparison: inComp,
-                    pinned: markerById.get(flow.id)?.pinned ?? false,
+                    pinned: flowMarker?.pinned ?? false,
+                    note: flowMarker?.note ?? null,
+                    tags: flowMarker?.tags ?? null,
                 },
             };
         });

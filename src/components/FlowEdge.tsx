@@ -30,6 +30,18 @@ export function FlowEdge({
         offset: 24,
     });
 
+    const markerBits = [
+        data?.pinned ? "★" : "",
+        data?.note?.trim() ?? "",
+        data?.tags?.trim() ?? "",
+    ].filter(Boolean);
+    const selectedLabel =
+        data?.label && selected
+            ? markerBits.length > 0
+                ? `${data.label} · ${markerBits.join(" · ")}`
+                : data.label
+            : null;
+
     return (
         <>
             <BaseEdge
@@ -50,7 +62,7 @@ export function FlowEdge({
                     cursor: "pointer",
                 }}
             />
-            {data?.label && selected ? (
+            {selectedLabel ? (
                 <EdgeLabelRenderer>
                     <div
                         className="nodrag nopan"
@@ -58,8 +70,8 @@ export function FlowEdge({
                             position: "absolute",
                             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
                             background: "rgba(10, 19, 26, 0.94)",
-                            color: data.labelColor,
-                            border: `1px solid ${data.labelColor}55`,
+                            color: data?.labelColor ?? "#d9e6ec",
+                            border: `1px solid ${data?.labelColor ?? "#d9e6ec"}55`,
                             padding: "3px 6px",
                             borderRadius: 4,
                             fontSize: 10,
@@ -70,7 +82,7 @@ export function FlowEdge({
                             zIndex: 1,
                         }}
                     >
-                        {data.label}
+                        {selectedLabel}
                     </div>
                 </EdgeLabelRenderer>
             ) : null}

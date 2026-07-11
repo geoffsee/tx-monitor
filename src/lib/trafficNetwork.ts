@@ -304,6 +304,31 @@ const TrafficNetworkModel = types
             }
         };
 
+        /** Hosts retained by durable pin markers (host pin or endpoint of pinned flow). */
+        const protectedHostIds = (): Set<string> => {
+            const keep = new Set<string>();
+            for (const [entityId, marker] of self.markers.entries()) {
+                if (!marker.pinned) {
+                    continue;
+                }
+                if (marker.kind === "host") {
+                    keep.add(entityId);
+                    continue;
+                }
+                const flow = self.flows.get(entityId);
+                if (flow) {
+                    keep.add(flow.srcHost);
+                    keep.add(flow.dstHost);
+                }
+            }
+            return keep;
+        };
+
+        const isPinnedFlow = (flowId: string): boolean => {
+            const marker = self.markers.get(flowId);
+            return !!marker?.pinned && marker.kind === "flow";
+        };
+
         const pruneOrphanFlows = () => {
             const toDelete: string[] = [];
             for (const flow of self.flows.values()) {
@@ -311,6 +336,8 @@ const TrafficNetworkModel = types
                     !self.hosts.has(flow.srcHost) ||
                     !self.hosts.has(flow.dstHost)
                 ) {
+                    // Pinned flows stay only while both endpoints exist; pin
+                    // protection on hosts should prevent this path for pins.
                     toDelete.push(flow.id);
                 }
             }
@@ -331,18 +358,22 @@ const TrafficNetworkModel = types
                 return;
             }
             const excess = self.hosts.size - MAX_MEMORY_HOSTS;
+            const protectedIds = protectedHostIds();
             const sorted = Array.from(self.hosts.values()).sort((a, b) => {
                 if (a.packetCount !== b.packetCount)
                     return a.packetCount - b.packetCount;
                 return a.id.localeCompare(b.id);
             });
             let evicted = 0;
-            for (let i = 0; i < excess; i++) {
-                const victim = sorted[i];
-                if (victim) {
-                    self.hosts.delete(victim.id);
-                    evicted++;
+            for (const victim of sorted) {
+                if (evicted >= excess) {
+                    break;
                 }
+                if (protectedIds.has(victim.id)) {
+                    continue;
+                }
+                self.hosts.delete(victim.id);
+                evicted++;
             }
             if (evicted > 0) {
                 recordEviction("host_cap", evicted);
@@ -365,12 +396,15 @@ const TrafficNetworkModel = types
                 return a.id.localeCompare(b.id);
             });
             let evicted = 0;
-            for (let i = 0; i < excess; i++) {
-                const victim = sorted[i];
-                if (victim) {
-                    self.flows.delete(victim.id);
-                    evicted++;
+            for (const victim of sorted) {
+                if (evicted >= excess) {
+                    break;
                 }
+                if (isPinnedFlow(victim.id)) {
+                    continue;
+                }
+                self.flows.delete(victim.id);
+                evicted++;
             }
             if (evicted > 0) {
                 recordEviction("flow_cap", evicted);
