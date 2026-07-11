@@ -1,11 +1,20 @@
 import type { SnapshotIn } from "mobx-state-tree";
 import { types } from "mobx-state-tree";
+import type { EvictionByReason, EvictionReason } from "../types";
 import { hostCategory, type ParsedPacket, shortHost } from "./tcpdumpParser";
 
 export const MAX_MEMORY_HOSTS = 500;
 export const MAX_MEMORY_FLOWS = 2000;
 export const MAX_MEMORY_PACKETS = 80;
 export const MAX_MEMORY_PACKETS_SUMMARY = 8;
+
+const EvictionReasonsModel = types.model("EvictionReasons", {
+    host_cap: types.optional(types.number, 0),
+    flow_cap: types.optional(types.number, 0),
+    flow_orphan: types.optional(types.number, 0),
+    packet_window: types.optional(types.number, 0),
+    summary_mode: types.optional(types.number, 0),
+});
 
 const HostModel = types.model("Host", {
     id: types.identifier,
@@ -91,6 +100,7 @@ const TrafficNetworkModel = types
         hostsEvicted: types.optional(types.number, 0),
         flowsEvicted: types.optional(types.number, 0),
         packetsEvicted: types.optional(types.number, 0),
+        evictionByReason: types.optional(EvictionReasonsModel, {}),
         summaryOnly: types.optional(types.boolean, false),
     })
     .views((self) => ({
@@ -113,12 +123,35 @@ const TrafficNetworkModel = types
                 (left, right) => right.timestamp - left.timestamp,
             );
         },
+        get evictionReasonSnapshot(): EvictionByReason {
+            return {
+                host_cap: self.evictionByReason.host_cap,
+                flow_cap: self.evictionByReason.flow_cap,
+                flow_orphan: self.evictionByReason.flow_orphan,
+                packet_window: self.evictionByReason.packet_window,
+                summary_mode: self.evictionByReason.summary_mode,
+            };
+        },
     }))
     .actions((self) => {
         const remember = (message: string) => {
             self.events.unshift(message);
             if (self.events.length > 16) {
                 self.events.pop();
+            }
+        };
+
+        const recordEviction = (reason: EvictionReason, count: number) => {
+            if (count <= 0) {
+                return;
+            }
+            self.evictionByReason[reason] += count;
+            if (reason === "host_cap") {
+                self.hostsEvicted += count;
+            } else if (reason === "flow_cap" || reason === "flow_orphan") {
+                self.flowsEvicted += count;
+            } else {
+                self.packetsEvicted += count;
             }
         };
 
@@ -281,9 +314,16 @@ const TrafficNetworkModel = types
                     toDelete.push(flow.id);
                 }
             }
+            if (toDelete.length === 0) {
+                return;
+            }
             for (const id of toDelete) {
                 self.flows.delete(id);
             }
+            recordEviction("flow_orphan", toDelete.length);
+            remember(
+                `Evicted ${toDelete.length} flow(s) (reason: flow_orphan; host missing)`,
+            );
         };
 
         const pruneHosts = () => {
@@ -301,13 +341,13 @@ const TrafficNetworkModel = types
                 const victim = sorted[i];
                 if (victim) {
                     self.hosts.delete(victim.id);
-                    self.hostsEvicted += 1;
                     evicted++;
                 }
             }
             if (evicted > 0) {
+                recordEviction("host_cap", evicted);
                 remember(
-                    `Evicted ${evicted} host(s) (cap ${MAX_MEMORY_HOSTS})`,
+                    `Evicted ${evicted} host(s) (reason: host_cap; cap ${MAX_MEMORY_HOSTS})`,
                 );
             }
             pruneOrphanFlows();
@@ -329,13 +369,13 @@ const TrafficNetworkModel = types
                 const victim = sorted[i];
                 if (victim) {
                     self.flows.delete(victim.id);
-                    self.flowsEvicted += 1;
                     evicted++;
                 }
             }
             if (evicted > 0) {
+                recordEviction("flow_cap", evicted);
                 remember(
-                    `Evicted ${evicted} flow(s) (cap ${MAX_MEMORY_FLOWS})`,
+                    `Evicted ${evicted} flow(s) (reason: flow_cap; cap ${MAX_MEMORY_FLOWS})`,
                 );
             }
         };
@@ -446,9 +486,35 @@ const TrafficNetworkModel = types
             const packetCap = self.summaryOnly
                 ? MAX_MEMORY_PACKETS_SUMMARY
                 : MAX_MEMORY_PACKETS;
+            const packetReason: EvictionReason = self.summaryOnly
+                ? "summary_mode"
+                : "packet_window";
+            let packetDropped = 0;
             while (self.packets.length > packetCap) {
                 self.packets.pop();
-                self.packetsEvicted += 1;
+                packetDropped++;
+            }
+            if (packetDropped > 0) {
+                const prevTotal = self.packetsEvicted;
+                recordEviction(packetReason, packetDropped);
+                const total = self.packetsEvicted;
+                // Avoid spam under steady single-packet drops: log multi-drops and
+                // power-of-10 milestones (1, 10, 100, …) so the ticker stays useful.
+                let crossedMilestone = false;
+                for (let t = 1; t <= total; t *= 10) {
+                    if (prevTotal < t && total >= t) {
+                        crossedMilestone = true;
+                        break;
+                    }
+                    if (t > Number.MAX_SAFE_INTEGER / 10) {
+                        break;
+                    }
+                }
+                if (packetDropped > 1 || crossedMilestone) {
+                    remember(
+                        `Evicted ${packetDropped} packet detail(s) (reason: ${packetReason}; cap ${packetCap}; total ${total})`,
+                    );
+                }
             }
 
             self.totalPackets += 1;
@@ -515,6 +581,11 @@ const TrafficNetworkModel = types
             self.hostsEvicted = 0;
             self.flowsEvicted = 0;
             self.packetsEvicted = 0;
+            self.evictionByReason.host_cap = 0;
+            self.evictionByReason.flow_cap = 0;
+            self.evictionByReason.flow_orphan = 0;
+            self.evictionByReason.packet_window = 0;
+            self.evictionByReason.summary_mode = 0;
             flowArrivals.clear();
             dnsTargets.clear();
         };
@@ -644,14 +715,22 @@ const TrafficNetworkModel = types
                 let dropped = 0;
                 while (self.packets.length > target) {
                     self.packets.pop();
-                    self.packetsEvicted += 1;
                     dropped++;
                 }
                 if (dropped > 0) {
+                    recordEviction("summary_mode", dropped);
                     remember(
-                        `Summary mode: dropped ${dropped} packet detail(s) (retaining recent window)`,
+                        `Summary mode: dropped ${dropped} packet detail(s) (reason: summary_mode; retaining recent window of ${target})`,
+                    );
+                } else {
+                    remember(
+                        `Summary mode on (reason: summary_mode; packet detail window ${target}; aggregates retained)`,
                     );
                 }
+            } else if (!enabled && was) {
+                remember(
+                    `Full packet detail mode on (window ${MAX_MEMORY_PACKETS})`,
+                );
             }
         };
 
