@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { formatBytes } from "../layout";
+import { displayHostLabel } from "../lib/hostDisplay";
 import { isRowSelected } from "../lib/selection";
+import { formatService } from "../lib/tcpdumpParser";
+import { trafficNetwork } from "../lib/trafficNetwork";
 import type {
     Selection,
     SessionLoadProgress,
@@ -275,6 +278,8 @@ export function Sidebar({
             </div>
         ) : null;
 
+    // displayHostLabel uses full trafficNetwork (not graph.nodes) so hosts
+    // outside MAX_GRAPH_HOSTS still resolve DNS / labels for flows, packets, ticker.
     const pinnedById = new Map((graph.markers ?? []).map((m) => [m.id, m]));
     const formatMarkerSuffix = (
         marker: { note?: string | null; tags?: string | null } | undefined,
@@ -285,6 +290,15 @@ export function Sidebar({
         if (marker.tags?.trim()) bits.push(marker.tags.trim());
         return bits.length > 0 ? ` · ${bits.join(" · ")}` : "";
     };
+
+    // Packet ticker: service name + DNS labels (raw values via title).
+    const latestPacket = trafficNetwork.packets[0];
+    const latestTicker = latestPacket
+        ? `${latestPacket.timestamp} ${formatService(latestPacket.dstPort, latestPacket.proto)} ${displayHostLabel(latestPacket.srcHost)} → ${displayHostLabel(latestPacket.dstHost)}`
+        : (graph.events[0] ?? "Waiting for traffic");
+    const latestTickerTitle = latestPacket
+        ? `${latestPacket.srcHost} -> ${latestPacket.dstHost} · ${latestPacket.proto}${latestPacket.dstPort ? `:${latestPacket.dstPort}` : ""}`
+        : undefined;
 
     return (
         <aside
@@ -316,8 +330,9 @@ export function Sidebar({
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                     }}
+                    title={latestTickerTitle}
                 >
-                    {graph.events[0] ?? "Waiting for traffic"}
+                    {latestTicker}
                 </span>
             </div>
             <section
@@ -599,21 +614,26 @@ export function Sidebar({
                                                     alignItems: "center",
                                                     gap: 6,
                                                 }}
+                                                title={`${flow.srcHost} -> ${flow.dstHost}`}
                                             >
                                                 {pinnedById.get(flow.id)?.pinned
                                                     ? "★ "
                                                     : ""}
-                                                {flow.srcHost} -&gt;{" "}
-                                                {flow.dstHost}
+                                                {displayHostLabel(flow.srcHost)}{" "}
+                                                -&gt;{" "}
+                                                {displayHostLabel(flow.dstHost)}
                                                 {comparisonBadge(
                                                     flow.inComparison,
                                                 )}
                                             </div>
-                                            <div style={denseSubtleStyle}>
-                                                {flow.proto}
-                                                {flow.dstPort
-                                                    ? `:${flow.dstPort}`
-                                                    : ""}{" "}
+                                            <div
+                                                style={denseSubtleStyle}
+                                                title={`${flow.proto}${flow.dstPort ? `:${flow.dstPort}` : ""}`}
+                                            >
+                                                {formatService(
+                                                    flow.dstPort,
+                                                    flow.proto,
+                                                )}{" "}
                                                 · {flow.packetCount} pkts ·{" "}
                                                 {formatBytes(flow.bytesTotal)}
                                                 {formatMarkerSuffix(
@@ -708,19 +728,32 @@ export function Sidebar({
                                                         gap: 6,
                                                         fontSize: 13,
                                                     }}
+                                                    title={`${packet.proto}${packet.dstPort ? `:${packet.dstPort}` : ""}`}
                                                 >
                                                     <span>
                                                         {packet.timestamp}{" "}
-                                                        {packet.proto}
+                                                        {formatService(
+                                                            packet.dstPort ??
+                                                                null,
+                                                            packet.proto,
+                                                        )}
                                                     </span>
                                                     {comparisonBadge(
                                                         packet.inComparison,
                                                     )}
                                                 </strong>
-                                                <div style={denseSubtleStyle}>
-                                                    {packet.srcHost} -&gt;{" "}
-                                                    {packet.dstHost} ·{" "}
-                                                    {packet.length} B
+                                                <div
+                                                    style={denseSubtleStyle}
+                                                    title={`${packet.srcHost} -> ${packet.dstHost}`}
+                                                >
+                                                    {displayHostLabel(
+                                                        packet.srcHost,
+                                                    )}{" "}
+                                                    -&gt;{" "}
+                                                    {displayHostLabel(
+                                                        packet.dstHost,
+                                                    )}{" "}
+                                                    · {packet.length} B
                                                 </div>
                                                 <div style={denseSubtleStyle}>
                                                     {packet.info ||

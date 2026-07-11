@@ -14,6 +14,8 @@ import type {
     TrafficSnapshot,
 } from "../types";
 import { getComparisonContext } from "./comparison";
+import { resolveDisplayHostLabel } from "./hostDisplay";
+import { formatService } from "./tcpdumpParser";
 import type { TrafficHost } from "./trafficNetwork";
 import { trafficNetwork } from "./trafficNetwork";
 
@@ -153,25 +155,47 @@ export function createGraph(): TrafficSnapshot {
         });
     }
 
-    const nodes: Node<HostNodeData>[] = hostList.map((host) => ({
-        id: host.id,
-        type: "host",
-        position: positions.get(host.id) ?? { x: 0, y: 0 },
-        width: HOST_NODE_SIZE.width,
-        height: HOST_NODE_SIZE.height,
-        data: {
-            label: host.label,
-            address: host.address,
-            category: host.category as HostCategory,
-            packetCount: host.packetCount,
-            bytesTotal: formatBytes(host.bytesTotal),
-            processes: [],
-            processCount: 0,
-            resolvedDns: trafficNetwork.resolvedDns.get(host.id),
-            inComparison: compHostSet ? compHostSet.has(host.id) : undefined,
-            pinned: markerById.get(host.id)?.pinned ?? false,
-        },
-    }));
+    // Full id→label map (all known hosts + DNS), not capped at MAX_GRAPH_HOSTS.
+    const hostLabels: Record<string, string> = {};
+    for (const host of trafficNetwork.hostList) {
+        hostLabels[host.id] = resolveDisplayHostLabel(
+            host.id,
+            host,
+            trafficNetwork.resolvedDns.get(host.id),
+        );
+    }
+    // DNS-only entries for addresses that resolved but have no host record yet.
+    for (const [addr, dns] of trafficNetwork.resolvedDns.entries()) {
+        if (hostLabels[addr] === undefined) {
+            hostLabels[addr] = dns;
+        }
+    }
+
+    const nodes: Node<HostNodeData>[] = hostList.map((host) => {
+        const dns = trafficNetwork.resolvedDns.get(host.id);
+        const displayLabel = resolveDisplayHostLabel(host.id, host, dns);
+        return {
+            id: host.id,
+            type: "host",
+            position: positions.get(host.id) ?? { x: 0, y: 0 },
+            width: HOST_NODE_SIZE.width,
+            height: HOST_NODE_SIZE.height,
+            data: {
+                label: displayLabel,
+                address: host.address,
+                category: host.category as HostCategory,
+                packetCount: host.packetCount,
+                bytesTotal: formatBytes(host.bytesTotal),
+                processes: [],
+                processCount: 0,
+                resolvedDns: dns,
+                inComparison: compHostSet
+                    ? compHostSet.has(host.id)
+                    : undefined,
+                pinned: markerById.get(host.id)?.pinned ?? false,
+            },
+        };
+    });
 
     let flowCandidates = eligibleFlows.filter(
         (flow) => hostIds.has(flow.srcHost) && hostIds.has(flow.dstHost),
@@ -245,7 +269,14 @@ export function createGraph(): TrafficSnapshot {
         .map((flow) => {
             const active = activeFlowIds.has(flow.id);
             const stroke = protoColor(flow.proto);
-            const portLabel = flow.dstPort ? `:${flow.dstPort}` : "";
+            const dstDns = trafficNetwork.resolvedDns.get(flow.dstHost);
+            const dstIsPublic =
+                trafficNetwork.hosts.get(flow.dstHost)?.category === "public";
+            const svcLabel = formatService(
+                flow.dstPort,
+                flow.proto,
+                dstIsPublic ? dstDns : undefined,
+            );
             const sourcePos = positions.get(flow.srcHost);
             const targetPos = positions.get(flow.dstHost);
             const handles =
@@ -269,7 +300,7 @@ export function createGraph(): TrafficSnapshot {
                     color: stroke,
                 },
                 data: {
-                    label: `${flow.proto}${portLabel}`,
+                    label: svcLabel,
                     labelColor: stroke,
                     stroke,
                     active,
@@ -398,5 +429,6 @@ export function createGraph(): TrafficSnapshot {
                 tags: m.tags,
             }),
         ),
+        hostLabels,
     };
 }

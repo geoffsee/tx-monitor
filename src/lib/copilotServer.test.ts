@@ -35,6 +35,7 @@ const graph: TrafficSnapshot = {
     capture: { iface: "any", direction: "out", bpf: "" },
     sensitivity: "medium",
     markers: [],
+    hostLabels: {},
 };
 
 const context = buildCopilotContext(graph, null);
