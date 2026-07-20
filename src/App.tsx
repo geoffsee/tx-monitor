@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { CopilotSidebar } from "./components/CopilotSidebar";
 import { Sidebar } from "./components/Sidebar";
+import { StorageMetrics } from "./components/StorageMetrics";
 import { TrafficGraph } from "./components/TrafficGraph";
 import { useCompactLayout } from "./hooks/useCompactLayout";
 import { useSelection } from "./hooks/useSelection";
@@ -135,6 +136,7 @@ export default function App() {
                     onSetEntityMarker={setEntityMarker}
                 />
             </section>
+            <StorageMetrics />
         </main>
     );
 }
