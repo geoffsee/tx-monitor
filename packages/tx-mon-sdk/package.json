@@ -1,0 +1,35 @@
+{
+    "name": "tx-mon-sdk",
+    "version": "0.1.0",
+    "description": "Read-only SDK for querying tx-monitor capture sessions from SQLite",
+    "license": "MIT",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./schema": "./src/schema.ts"
+    },
+    "files": [
+        "src",
+        "README.md"
+    ],
+    "engines": {
+        "bun": ">=1.0.0"
+    },
+    "keywords": [
+        "tx-monitor",
+        "tcpdump",
+        "sqlite",
+        "network",
+        "capture"
+    ],
+    "scripts": {
+        "test": "bun test",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "drizzle-orm": "^0.45.2"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}

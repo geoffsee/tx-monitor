@@ -10,7 +10,10 @@ Persistence turns transient packet streams into inspectable sessions. Schema or 
 - Migration compatibility for existing local databases where practical.
 - Clear behavior for WAL/shm side files and local database paths.
 
-Use `src/db/store.test.ts` as the first place to encode persistence expectations.
+Use `src/db/store.test.ts` as the first place to encode persistence write expectations.
+Use `packages/tx-mon-sdk` tests for read-only historical query / event-context behavior.
+
+The shared Drizzle schema lives in `packages/tx-mon-sdk/src/schema.ts` (re-exported from `src/db/schema.ts`). The app owns writes and migrations; the SDK opens the DB read-only.
 
 ## HTTP APIs
 
@@ -23,6 +26,10 @@ The README-documented APIs are part of the user contract:
 - `POST /api/copilot`
 
 If route behavior changes, update README and tests together.
+
+## SDK (external readers)
+
+Dashboard and agent tooling should prefer `tx-mon-sdk` (`openTxMon` / `contextAround`) when they can read `~/.tx-monitor` directly. Keep HTTP as the contract for the in-app UI and remote clients that cannot share the DB file.
 
 ## Copilot and secrets
 

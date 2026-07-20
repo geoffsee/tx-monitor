@@ -4,6 +4,9 @@
     "description": "Real-time network traffic visualizer powered by tcpdump and WebSockets",
     "license": "MIT",
     "type": "module",
+    "workspaces": [
+        "packages/*"
+    ],
     "bin": {
         "tx-monitor": "bin/tx-monitor.js"
     },
@@ -57,6 +60,7 @@
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.1",
         "drizzle-kit": "^0.31.10",
+        "typescript": "^7.0.2",
         "vite": "^8.0.10"
     },
     "dependencies": {
@@ -66,6 +70,7 @@
         "mobx": "^6.15.0",
         "mobx-state-tree": "^7.2.0",
         "react": "^19.2.5",
-        "react-dom": "^19.2.5"
+        "react-dom": "^19.2.5",
+        "tx-mon-sdk": "workspace:*"
     }
 }

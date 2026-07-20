@@ -143,7 +143,21 @@ A brief effective settings line is logged at startup (port, db, replay, mode). N
 
 Captured packets are persisted to SQLite via [Drizzle ORM](https://orm.drizzle.team) using Bun's built-in driver. Persistence is enabled by default and writes to `~/.tx-monitor`.
 
-Read persisted data over HTTP:
+### Read from another app (`tx-mon-sdk`)
+
+Use the workspace package [`packages/tx-mon-sdk`](packages/tx-mon-sdk) to open that SQLite file **read-only** and pull capture context around a timestamp (for dashboards / triage):
+
+```ts
+import { openTxMon } from "tx-mon-sdk";
+
+const tx = openTxMon();
+const ctx = tx.contextAround(eventAtMs, { windowMs: 30_000 });
+tx.close();
+```
+
+See [`packages/tx-mon-sdk/README.md`](packages/tx-mon-sdk/README.md) for the full query API.
+
+### Read over HTTP
 
 | Endpoint | Description |
 | --- | --- |
@@ -168,10 +182,12 @@ bun test
 ## Project Layout
 
 ```
+packages/
+  tx-mon-sdk/          # Read-only SQLite SDK for capture context
 src/
   App.tsx              # React UI and network diagram
   server.ts            # Bun WebSocket server
-  db/                  # Drizzle ORM schema, client, and store
+  db/                  # Drizzle ORM client/store (schema via tx-mon-sdk)
   tcpdumpParser.ts     # tcpdump line parser
   trafficNetwork.ts    # Application state
   layout.ts            # Host positioning
