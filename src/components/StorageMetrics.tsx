@@ -87,23 +87,27 @@ export function StorageMetrics({ onOptimize }: StorageMetricsProps) {
         }
     }, [onOptimize, fetchMetrics]);
 
-    if (!metrics && loading) {
-        return (
-            <StorageMetricsContainer>
-                <span>Loading storage metrics...</span>
-            </StorageMetricsContainer>
-        );
-    }
-
     if (error) {
+        // Only show the component if persistence is enabled
+        // If persistence is disabled or there's an error, hide the component
+        if (error.includes("Persistence is disabled")) {
+            return null;
+        }
         return (
             <StorageMetricsContainer>
-                <span style={{ color: "#ff6b6b" }}>Storage: Error</span>
+                <span style={{ color: "#ff6b6b" }}>Storage: {error}</span>
             </StorageMetricsContainer>
         );
     }
 
     if (!metrics) {
+        if (loading) {
+            return (
+                <StorageMetricsContainer>
+                    <span>Loading storage metrics...</span>
+                </StorageMetricsContainer>
+            );
+        }
         return null;
     }
 
