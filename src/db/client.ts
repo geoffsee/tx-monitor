@@ -60,6 +60,7 @@ function recordMigrationIfMissing(
 }
 
 export function upgradeLegacySchema(sqlite: Database) {
+    ensurePacketsTable(sqlite);
     for (const columnDefinition of CAPTURE_SESSION_OPTIONAL_COLUMNS) {
         const columnName = columnDefinition.split(" ")[0];
         if (
@@ -78,6 +79,29 @@ export function upgradeLegacySchema(sqlite: Database) {
         }
     }
     ensureEntityMarkersTable(sqlite);
+}
+
+function ensurePacketsTable(sqlite: Database) {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS packets (
+            id text PRIMARY KEY NOT NULL,
+            session_id text NOT NULL,
+            timestamp text NOT NULL,
+            proto text NOT NULL,
+            src_host text NOT NULL,
+            src_port integer,
+            dst_host text NOT NULL,
+            dst_port integer,
+            length integer NOT NULL,
+            info text NOT NULL,
+            received_at integer NOT NULL,
+            process_command text,
+            process_pid integer,
+            process_user text,
+            FOREIGN KEY (session_id) REFERENCES capture_sessions(id) ON UPDATE no action ON DELETE no action
+        );
+        CREATE INDEX IF NOT EXISTS packets_session_received_idx ON packets (session_id, received_at);
+    `);
 }
 
 function ensureEntityMarkersTable(sqlite: Database) {
