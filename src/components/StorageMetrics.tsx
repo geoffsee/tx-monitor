@@ -25,6 +25,10 @@ export function StorageMetrics({ onOptimize }: StorageMetricsProps) {
         try {
             const response = await fetch("/api/storage/metrics");
             if (!response.ok) {
+                if (response.status === 503) {
+                    setError("Persistence is disabled");
+                    return;
+                }
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
