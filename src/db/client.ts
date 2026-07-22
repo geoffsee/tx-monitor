@@ -26,6 +26,12 @@ const CAPTURE_SESSION_OPTIONAL_COLUMNS = [
     "tags text",
 ] as const;
 
+const PACKET_PROCESS_OPTIONAL_COLUMNS = [
+    "process_command text",
+    "process_pid integer",
+    "process_user text",
+] as const;
+
 function tableHasColumn(
     sqlite: Database,
     table: string,
@@ -63,6 +69,12 @@ export function upgradeLegacySchema(sqlite: Database) {
             sqlite.exec(
                 `ALTER TABLE capture_sessions ADD COLUMN ${columnDefinition}`,
             );
+        }
+    }
+    for (const columnDefinition of PACKET_PROCESS_OPTIONAL_COLUMNS) {
+        const columnName = columnDefinition.split(" ")[0];
+        if (columnName && !tableHasColumn(sqlite, "packets", columnName)) {
+            sqlite.exec(`ALTER TABLE packets ADD COLUMN ${columnDefinition}`);
         }
     }
     ensureEntityMarkersTable(sqlite);
@@ -118,6 +130,9 @@ function initializeEmbeddedSchema(sqlite: Database) {
             length integer NOT NULL,
             info text NOT NULL,
             received_at integer NOT NULL,
+            process_command text,
+            process_pid integer,
+            process_user text,
             FOREIGN KEY (session_id) REFERENCES capture_sessions(id) ON UPDATE no action ON DELETE no action
         );
 

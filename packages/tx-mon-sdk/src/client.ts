@@ -250,13 +250,46 @@ function topEntries(
         .slice(0, topN);
 }
 
+function tableHasColumn(
+    sqlite: Database,
+    table: string,
+    column: string,
+): boolean {
+    const columns = sqlite.query(`PRAGMA table_info(${table})`).all() as Array<{
+        name: string;
+    }>;
+    return columns.some((entry) => entry.name === column);
+}
+
+/** Core packet columns present on all schema versions (no process attribution). */
+const packetCoreColumns = {
+    id: packets.id,
+    sessionId: packets.sessionId,
+    timestamp: packets.timestamp,
+    proto: packets.proto,
+    srcHost: packets.srcHost,
+    srcPort: packets.srcPort,
+    dstHost: packets.dstHost,
+    dstPort: packets.dstPort,
+    length: packets.length,
+    info: packets.info,
+    receivedAt: packets.receivedAt,
+};
+
 export class TxMonClient {
     private readonly sqlite: Database;
     private readonly db: SchemaDb;
+    /** False on older capture DBs that predate process attribution columns. */
+    private readonly hasProcessColumns: boolean;
 
     constructor(sqlite: Database, db: SchemaDb) {
         this.sqlite = sqlite;
         this.db = db;
+        this.hasProcessColumns = tableHasColumn(
+            sqlite,
+            "packets",
+            "process_command",
+        );
     }
 
     get dbPath(): string {
@@ -335,12 +368,38 @@ export class TxMonClient {
             | undefined;
         const total = totalRow?.total ?? 0;
 
-        const base = this.db.select().from(packets);
-        const rows = (where ? base.where(where) : base)
-            .orderBy(asc(packets.receivedAt), asc(packets.id))
-            .limit(limit)
-            .offset(offset)
-            .all() as PacketRow[];
+        const rows = this.hasProcessColumns
+            ? ((where
+                  ? this.db.select().from(packets).where(where)
+                  : this.db.select().from(packets)
+              )
+                  .orderBy(asc(packets.receivedAt), asc(packets.id))
+                  .limit(limit)
+                  .offset(offset)
+                  .all() as PacketRow[])
+            : (
+                  (where
+                      ? this.db
+                            .select(packetCoreColumns)
+                            .from(packets)
+                            .where(where)
+                      : this.db.select(packetCoreColumns).from(packets)
+                  )
+                      .orderBy(asc(packets.receivedAt), asc(packets.id))
+                      .limit(limit)
+                      .offset(offset)
+                      .all() as Array<
+                      Omit<
+                          PacketRow,
+                          "processCommand" | "processPid" | "processUser"
+                      >
+                  >
+              ).map((row) => ({
+                  ...row,
+                  processCommand: null,
+                  processPid: null,
+                  processUser: null,
+              }));
 
         return { packets: rows, total, offset, limit };
     }

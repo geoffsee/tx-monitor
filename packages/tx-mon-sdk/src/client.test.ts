@@ -36,7 +36,10 @@ function createSchema(sqlite: Database) {
             dst_port integer,
             length integer NOT NULL,
             info text NOT NULL,
-            received_at integer NOT NULL
+            received_at integer NOT NULL,
+            process_command text,
+            process_pid integer,
+            process_user text
         );
         CREATE TABLE entity_markers (
             id text PRIMARY KEY NOT NULL,
@@ -99,6 +102,9 @@ function seedFixture() {
                 length: 100,
                 info: "Flags [S]",
                 receivedAt: t0 + 10_000,
+                processCommand: "curl",
+                processPid: 4242,
+                processUser: "alice",
             },
             {
                 id: "pkt-2",
@@ -228,6 +234,11 @@ describe("TxMonClient", () => {
 
         const byInfo = client.queryPackets({ q: "DNS" });
         expect(byInfo.packets).toHaveLength(1);
+
+        const withProcess = client.queryPackets({ host: "1.1.1.1" });
+        expect(withProcess.packets[0]?.processCommand).toBe("curl");
+        expect(withProcess.packets[0]?.processPid).toBe(4242);
+        expect(withProcess.packets[0]?.processUser).toBe("alice");
 
         client.close();
     });

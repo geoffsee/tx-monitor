@@ -129,6 +129,9 @@ export class TrafficStore {
             length: packet.length,
             info: packet.info,
             receivedAt,
+            processCommand: packet.process?.command ?? null,
+            processPid: packet.process?.pid ?? null,
+            processUser: packet.process?.user ?? null,
         }));
 
         this.db.insert(packets).values(rows).run();

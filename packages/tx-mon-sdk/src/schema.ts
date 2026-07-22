@@ -61,6 +61,10 @@ export const packets = sqliteTable(
         length: integer("length").notNull(),
         info: text("info").notNull(),
         receivedAt: integer("received_at").notNull(),
+        /** lsof-attributed process command (best-effort; nullable). */
+        processCommand: text("process_command"),
+        processPid: integer("process_pid"),
+        processUser: text("process_user"),
     },
     (table) => [
         index("packets_session_received_idx").on(
