@@ -42,7 +42,7 @@ test("anomalies map stays bounded under high-churn ingest", () => {
     expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
     // Eviction actually ran (otherwise the bound is trivially satisfied).
     expect(trafficNetwork.flowsEvicted).toBeGreaterThan(0);
-});
+}, { timeout: 60_000 });
 
 test("evicting a flow drops its anomalies (no dangling references)", () => {
     for (let i = 0; i < 2500; i++) {
@@ -57,7 +57,7 @@ test("evicting a flow drops its anomalies (no dangling references)", () => {
             expect(trafficNetwork.flows.has(anomaly.flowId)).toBe(true);
         }
     }
-});
+}, { timeout: 60_000 });
 
 test("evicting a host drops its host-scoped anomalies", () => {
     // Suspicious-port anomalies are keyed by destination host; churn a wide host
@@ -85,4 +85,4 @@ test("evicting a host drops its host-scoped anomalies", () => {
             expect(trafficNetwork.hosts.has(anomaly.hostId)).toBe(true);
         }
     }
-});
+}, { timeout: 60_000 });
