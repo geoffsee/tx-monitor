@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-bun run check:fix
-git update-index --again
-bun run typecheck
