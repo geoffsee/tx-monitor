@@ -31,58 +31,70 @@ function largeTransferPacket(index: number): ParsedPacket {
     };
 }
 
-test("anomalies map stays bounded under high-churn ingest", () => {
-    for (let i = 0; i < 2500; i++) {
-        trafficNetwork.ingestPacket(largeTransferPacket(i), true);
-    }
-
-    expect(trafficNetwork.anomalies.size).toBeLessThanOrEqual(
-        MAX_MEMORY_ANOMALIES,
-    );
-    expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
-    // Eviction actually ran (otherwise the bound is trivially satisfied).
-    expect(trafficNetwork.flowsEvicted).toBeGreaterThan(0);
-}, { timeout: 60_000 });
-
-test("evicting a flow drops its anomalies (no dangling references)", () => {
-    for (let i = 0; i < 2500; i++) {
-        trafficNetwork.ingestPacket(largeTransferPacket(i), true);
-    }
-
-    // Every surviving flow-scoped anomaly must reference a live flow; if
-    // forgetFlow did not run on eviction, evicted flows would leave orphaned
-    // anomalies behind here.
-    for (const anomaly of trafficNetwork.anomalies.values()) {
-        if (anomaly.flowId) {
-            expect(trafficNetwork.flows.has(anomaly.flowId)).toBe(true);
+test(
+    "anomalies map stays bounded under high-churn ingest",
+    () => {
+        for (let i = 0; i < 2500; i++) {
+            trafficNetwork.ingestPacket(largeTransferPacket(i), true);
         }
-    }
-}, { timeout: 60_000 });
 
-test("evicting a host drops its host-scoped anomalies", () => {
-    // Suspicious-port anomalies are keyed by destination host; churn a wide host
-    // space so hosts evict, then assert no anomaly references an evicted host.
-    for (let i = 0; i < 2000; i++) {
-        trafficNetwork.ingestPacket(
-            {
-                id: `sp-${i}`,
-                timestamp: "12:00:00.000000",
-                proto: "TCP",
-                srcHost: "192.168.1.100",
-                srcPort: 50000 + (i % 10000),
-                dstHost: `203.0.${Math.floor(i / 254) % 254}.${(i % 254) + 1}`,
-                dstPort: 445, // suspicious port -> host-scoped anomaly
-                length: 128,
-                info: "smb probe",
-            },
-            true,
+        expect(trafficNetwork.anomalies.size).toBeLessThanOrEqual(
+            MAX_MEMORY_ANOMALIES,
         );
-    }
+        expect(trafficNetwork.flows.size).toBeLessThanOrEqual(MAX_MEMORY_FLOWS);
+        // Eviction actually ran (otherwise the bound is trivially satisfied).
+        expect(trafficNetwork.flowsEvicted).toBeGreaterThan(0);
+    },
+    { timeout: 60_000 },
+);
 
-    expect(trafficNetwork.hostsEvicted).toBeGreaterThan(0);
-    for (const anomaly of trafficNetwork.anomalies.values()) {
-        if (anomaly.hostId) {
-            expect(trafficNetwork.hosts.has(anomaly.hostId)).toBe(true);
+test(
+    "evicting a flow drops its anomalies (no dangling references)",
+    () => {
+        for (let i = 0; i < 2500; i++) {
+            trafficNetwork.ingestPacket(largeTransferPacket(i), true);
         }
-    }
-}, { timeout: 60_000 });
+
+        // Every surviving flow-scoped anomaly must reference a live flow; if
+        // forgetFlow did not run on eviction, evicted flows would leave orphaned
+        // anomalies behind here.
+        for (const anomaly of trafficNetwork.anomalies.values()) {
+            if (anomaly.flowId) {
+                expect(trafficNetwork.flows.has(anomaly.flowId)).toBe(true);
+            }
+        }
+    },
+    { timeout: 60_000 },
+);
+
+test(
+    "evicting a host drops its host-scoped anomalies",
+    () => {
+        // Suspicious-port anomalies are keyed by destination host; churn a wide host
+        // space so hosts evict, then assert no anomaly references an evicted host.
+        for (let i = 0; i < 2000; i++) {
+            trafficNetwork.ingestPacket(
+                {
+                    id: `sp-${i}`,
+                    timestamp: "12:00:00.000000",
+                    proto: "TCP",
+                    srcHost: "192.168.1.100",
+                    srcPort: 50000 + (i % 10000),
+                    dstHost: `203.0.${Math.floor(i / 254) % 254}.${(i % 254) + 1}`,
+                    dstPort: 445, // suspicious port -> host-scoped anomaly
+                    length: 128,
+                    info: "smb probe",
+                },
+                true,
+            );
+        }
+
+        expect(trafficNetwork.hostsEvicted).toBeGreaterThan(0);
+        for (const anomaly of trafficNetwork.anomalies.values()) {
+            if (anomaly.hostId) {
+                expect(trafficNetwork.hosts.has(anomaly.hostId)).toBe(true);
+            }
+        }
+    },
+    { timeout: 60_000 },
+);
