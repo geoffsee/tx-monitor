@@ -28,8 +28,9 @@ Use this map before touching a subsystem. Prefer the smallest relevant surface r
 
 ## Persistence and APIs
 
-- `src/db/schema.ts`: Drizzle schema.
-- `src/db/client.ts`: SQLite client setup.
+- `packages/tx-mon-sdk`: read-only SQLite SDK (`openTxMon`, `contextAround`) and shared Drizzle schema.
+- `src/db/schema.ts`: re-exports schema from `tx-mon-sdk`.
+- `src/db/client.ts`: SQLite client setup (writer / migrations).
 - `src/db/store.ts`: session and packet store.
 - `drizzle/`: migrations and metadata.
 - `src/lib/api.ts`: browser API helpers.

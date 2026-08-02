@@ -12,6 +12,7 @@ This is a Bun + React app with a small, source-first layout.
 - `scripts/verify-publish.ts`: packaging sanity checks.
 - `drizzle/`: SQL migrations.
 - `build/`, `dist/`, `.test-tx-mon.db*`: generated artifacts (keep ignored/not committed).
+- `packages/tx-mon-sdk/`: read-only capture query SDK (workspace package).
 - `bin/tx-monitor.js`: executable entrypoint.
 - `package.json` + `biome.json` + `tsconfig.json` define the toolchain.
 - Tests live next to implementation files as `*.test.ts` / `*.test.tsx`.

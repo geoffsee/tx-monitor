@@ -7,6 +7,7 @@ export const MAX_MEMORY_HOSTS = 500;
 export const MAX_MEMORY_FLOWS = 2000;
 export const MAX_MEMORY_PACKETS = 80;
 export const MAX_MEMORY_PACKETS_SUMMARY = 8;
+export const MAX_MEMORY_ANOMALIES = 200;
 
 const EvictionReasonsModel = types.model("EvictionReasons", {
     host_cap: types.optional(types.number, 0),
@@ -160,11 +161,54 @@ const TrafficNetworkModel = types
         // Distinct DNS target hosts seen (capped naturally by host cardinality)
         const dnsTargets = new Set<string>();
 
+        const removeAnomaliesMatching = (
+            predicate: (anomaly: typeof AnomalyModel.Type) => boolean,
+        ) => {
+            const toDelete: string[] = [];
+            for (const anomaly of self.anomalies.values()) {
+                if (predicate(anomaly)) {
+                    toDelete.push(anomaly.id);
+                }
+            }
+            for (const id of toDelete) {
+                self.anomalies.delete(id);
+            }
+        };
+
+        // Drop side-structure state tied to an evicted flow/host so these
+        // maps track live cardinality, not all-time distinct keys (leak fix).
+        const forgetFlow = (flowId: string) => {
+            flowArrivals.delete(flowId);
+            removeAnomaliesMatching((anomaly) => anomaly.flowId === flowId);
+        };
+
+        const forgetHost = (hostId: string) => {
+            dnsTargets.delete(hostId);
+            removeAnomaliesMatching((anomaly) => anomaly.hostId === hostId);
+        };
+
+        const capAnomalies = () => {
+            if (self.anomalies.size <= MAX_MEMORY_ANOMALIES) {
+                return;
+            }
+            const excess = self.anomalies.size - MAX_MEMORY_ANOMALIES;
+            const sorted = Array.from(self.anomalies.values()).sort(
+                (a, b) => a.timestamp - b.timestamp,
+            );
+            for (let i = 0; i < excess; i++) {
+                const victim = sorted[i];
+                if (victim) {
+                    self.anomalies.delete(victim.id);
+                }
+            }
+        };
+
         const addAnomaly = (anomaly: SnapshotIn<typeof AnomalyModel>) => {
             if (self.anomalies.has(anomaly.id)) {
                 return;
             }
             self.anomalies.set(anomaly.id, AnomalyModel.create(anomaly));
+            capAnomalies();
             remember(`ALERT: ${anomaly.type} - ${anomaly.description}`);
         };
 
@@ -319,6 +363,7 @@ const TrafficNetworkModel = types
             }
             for (const id of toDelete) {
                 self.flows.delete(id);
+                forgetFlow(id);
             }
             recordEviction("flow_orphan", toDelete.length);
             remember(
@@ -340,7 +385,9 @@ const TrafficNetworkModel = types
             for (let i = 0; i < excess; i++) {
                 const victim = sorted[i];
                 if (victim) {
-                    self.hosts.delete(victim.id);
+                    const victimId = victim.id;
+                    self.hosts.delete(victimId);
+                    forgetHost(victimId);
                     evicted++;
                 }
             }
@@ -368,7 +415,9 @@ const TrafficNetworkModel = types
             for (let i = 0; i < excess; i++) {
                 const victim = sorted[i];
                 if (victim) {
-                    self.flows.delete(victim.id);
+                    const victimId = victim.id;
+                    self.flows.delete(victimId);
+                    forgetFlow(victimId);
                     evicted++;
                 }
             }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
+import type { Database } from "bun:sqlite";
 import { reverse } from "node:dns/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { hostname as getHostname, homedir } from "node:os";
 import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -147,12 +148,18 @@ const dbPath = values["no-db"]
               DEFAULT_DB,
           ),
       );
+const sqliteRef: { current: Database | null } = { current: null };
 const store = dbPath
-    ? new TrafficStore(
-          openDatabase(
-              dbPath.startsWith("/") ? dbPath : join(process.cwd(), dbPath),
-          ),
-      )
+    ? (() => {
+          const fullPath = dbPath.startsWith("/")
+              ? dbPath
+              : join(process.cwd(), dbPath);
+          const sqlite = openDatabase(fullPath);
+          sqliteRef.current = (
+              sqlite as unknown as { client: Database }
+          ).client;
+          return new TrafficStore(sqlite);
+      })()
     : null;
 const clients = new Set<WsClient>();
 let captureStarted = false;
@@ -1165,6 +1172,102 @@ async function handleApiRequest(
         return jsonResponse({ error: "Method not allowed" }, 405, {
             allow: "GET,POST",
         });
+    }
+
+    // Storage metrics and maintenance endpoints
+    if (url.pathname === "/api/storage/metrics") {
+        const sqlite = sqliteRef.current;
+        if (!sqlite) {
+            return jsonResponse({ error: "Persistence is disabled" }, 503);
+        }
+        try {
+            const dbPath = sqlite.filename;
+            let dbSizeBytes: number | null = null;
+            try {
+                const stats = statSync(dbPath);
+                dbSizeBytes = stats.size;
+            } catch {
+                dbSizeBytes = null;
+            }
+
+            // Get row counts
+            const packetCount = sqlite
+                .query("SELECT COUNT(*) as cnt FROM packets")
+                .get() as { cnt: number } | undefined;
+            const sessionCount = sqlite
+                .query("SELECT COUNT(*) as cnt FROM capture_sessions")
+                .get() as { cnt: number } | undefined;
+            const indexCount = sqlite
+                .query(
+                    "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'",
+                )
+                .get() as { cnt: number } | undefined;
+
+            // Check if our optimization indexes exist
+            const hasPacketsReceivedAtIdx = sqlite
+                .query(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' AND name='packets_received_at_idx'",
+                )
+                .get() as { 1: number } | undefined;
+            const hasSessionsTimeIdx = sqlite
+                .query(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' AND name='capture_sessions_time_idx'",
+                )
+                .get() as { 1: number } | undefined;
+
+            const isOptimized =
+                !!hasPacketsReceivedAtIdx && !!hasSessionsTimeIdx;
+
+            // Get last optimization time from DB modification time
+            let lastOptimizedAt: number | null = null;
+            try {
+                const stats = statSync(dbPath);
+                lastOptimizedAt = stats.mtime.getTime();
+            } catch {
+                lastOptimizedAt = null;
+            }
+
+            return jsonResponse({
+                dbPath,
+                dbSizeBytes,
+                packetCount: packetCount?.cnt ?? null,
+                sessionCount: sessionCount?.cnt ?? null,
+                indexCount: indexCount?.cnt ?? null,
+                isOptimized,
+                lastOptimizedAt,
+            });
+        } catch {
+            return jsonResponse(
+                { error: "Failed to get storage metrics" },
+                500,
+            );
+        }
+    }
+
+    if (url.pathname === "/api/storage/optimize") {
+        const sqlite = sqliteRef.current;
+        if (!sqlite) {
+            return jsonResponse({ error: "Persistence is disabled" }, 503);
+        }
+        if (request.method !== "POST") {
+            return jsonResponse({ error: "Method not allowed" }, 405, {
+                allow: "POST",
+            });
+        }
+        try {
+            // Create the missing indexes
+            sqlite.exec(`
+                CREATE INDEX IF NOT EXISTS packets_received_at_idx ON packets (received_at);
+                CREATE INDEX IF NOT EXISTS capture_sessions_time_idx ON capture_sessions (started_at, ended_at);
+            `);
+
+            return jsonResponse({ ok: true, message: "Indexes created" });
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : "Optimization failed";
+            console.error("Storage optimization failed:", message);
+            return jsonResponse({ error: message }, 500);
+        }
     }
 
     return jsonResponse({ error: "Not found" }, 404);
