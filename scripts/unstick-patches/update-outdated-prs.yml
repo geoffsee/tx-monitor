@@ -1,0 +1,51 @@
+name: Update outdated PR branches
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail early if RELEASE_TOKEN is missing
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN is not set. Dependabot ignores" \
+                 "@dependabot rebase comments from GITHUB_TOKEN."
+            exit 1
+          fi
+
+      - name: Update out-of-date PR branches
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+            --json number,author,isDraft,mergeStateStatus \
+            --jq '.[] | select(.isDraft|not) | select(.mergeStateStatus == "BEHIND") | "\(.number)\t\(.author.login)"' \
+          | while IFS=$'\t' read -r number author; do
+              echo "Updating PR #$number ($author)..."
+              case "$author" in
+                dependabot[bot]|app/dependabot)
+                  # Dependabot rebase retriggers checks; plain branch updates may not.
+                  # Comments must come from an account with push access (RELEASE_TOKEN).
+                  gh pr comment "$number" --repo "$GITHUB_REPOSITORY" --body "@dependabot rebase"
+                  ;;
+                *)
+                  gh pr update-branch "$number" --repo "$GITHUB_REPOSITORY" || {
+                    echo "Skipped PR #$number (update failed — likely conflicts)"
+                  }
+                  ;;
+              esac
+            done

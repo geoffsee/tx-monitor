@@ -1,6 +1,10 @@
 name: Dependabot auto-merge
 
-on: pull_request
+# pull_request_target runs in the base-branch context so repository secrets
+# (RELEASE_TOKEN) are available. Dependabot pull_request events cannot read
+# those secrets, and merges performed with GITHUB_TOKEN do not trigger
+# downstream push workflows (Auto Tag / Test on main).
+on: pull_request_target
 
 permissions:
   contents: write
@@ -11,6 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
+      - name: Fail early if RELEASE_TOKEN is missing
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN is not set. Auto-merge with GITHUB_TOKEN" \
+                 "does not trigger push workflows (Auto Tag / CI on main)."
+            exit 1
+          fi
+
       - name: Dependabot metadata
         id: metadata
         uses: dependabot/fetch-metadata@v3
@@ -25,4 +39,4 @@ jobs:
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
