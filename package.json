@@ -67,7 +67,7 @@
         "@openai/codex-sdk": "^0.146.0",
         "@xyflow/react": "^12.10.2",
         "drizzle-orm": "^0.45.2",
-        "mobx": "^6.15.0",
+        "mobx": "^7.0.0",
         "mobx-state-tree": "^7.2.0",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
