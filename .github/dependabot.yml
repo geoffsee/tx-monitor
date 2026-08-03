@@ -10,8 +10,6 @@ updates:
     open-pull-requests-limit: 10
     assignees:
       - "geoffsee"
-    labels:
-      - "dependencies"
     groups:
       bun-minor-and-patch:
         patterns:
@@ -38,12 +36,16 @@ updates:
     open-pull-requests-limit: 5
     assignees:
       - "geoffsee"
-    labels:
-      - "dependencies"
     groups:
       github-actions:
         patterns:
           - "*"
+    # Private / unreachable action repos cause Dependabot update jobs to fail
+    # red even when public action bumps succeed.
+    ignore:
+      - dependency-name: "geoffsee/caretta-action"
+      - dependency-name: "geoffsee/caretta-autopilot-action"
+      - dependency-name: "geoffsee/helios-action"
     commit-message:
       prefix: "ci"
       include: "scope"
