@@ -22,6 +22,11 @@ updates:
           - "*"
         update-types:
           - "major"
+    # mobx-state-tree still peers on mobx@^6; MobX 7 breaks map construction
+    # (ObservableMap requires `new`) until MST ships a compatible release.
+    ignore:
+      - dependency-name: "mobx"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"
       include: "scope"
