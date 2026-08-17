@@ -25,6 +25,11 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    # MST 7.2 still peers on mobx ^6.3.0. MobX 7 breaks types.map
+    # (ObservableMap must be constructed with new), so majors stay red.
+    ignore:
+      - dependency-name: "mobx"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
