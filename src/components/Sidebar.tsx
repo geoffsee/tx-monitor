@@ -96,6 +96,10 @@ export function Sidebar({
     const [flowsScrollTop, setFlowsScrollTop] = useState(0);
     const packetsContainerRef = useRef<HTMLUListElement>(null);
     const [packetsScrollTop, setPacketsScrollTop] = useState(0);
+    // Overlay list filter when a comparison session is loaded.
+    const [comparisonListFilter, setComparisonListFilter] = useState<
+        "all" | "shared" | "delta"
+    >("all");
 
     // Pending capture control drafts (synced from live graph.capture primitives only;
     // object identity of graph.capture changes every publishGraph and must not reset drafts)
@@ -144,8 +148,20 @@ export function Sidebar({
     const PACKET_ITEM_HEIGHT = 58;
     const OVERSCAN = 2;
 
+    const filterByComparison = <T extends { inComparison?: boolean }>(
+        items: T[],
+    ): T[] => {
+        if (!graph.comparison || comparisonListFilter === "all") {
+            return items;
+        }
+        if (comparisonListFilter === "shared") {
+            return items.filter((item) => item.inComparison === true);
+        }
+        return items.filter((item) => item.inComparison === false);
+    };
+
     const getWindowedFlows = () => {
-        const items = graph.flows;
+        const items = filterByComparison(graph.flows);
         const container = flowsContainerRef.current;
         const height = container ? container.clientHeight || 220 : 220;
         const scroll = flowsScrollTop;
@@ -158,7 +174,7 @@ export function Sidebar({
     };
 
     const getWindowedPackets = () => {
-        const items = graph.packets;
+        const items = filterByComparison(graph.packets);
         const container = packetsContainerRef.current;
         const height = container ? container.clientHeight || 300 : 300;
         const scroll = packetsScrollTop;
@@ -169,6 +185,98 @@ export function Sidebar({
         const end = Math.min(items.length, start + visibleCount);
         return { items: items.slice(start, end), start, total: items.length };
     };
+
+    const comparisonBadge = (inComparison: boolean | undefined) => {
+        if (inComparison === true) {
+            return (
+                <span
+                    style={{
+                        fontSize: 9,
+                        padding: "0 4px",
+                        borderRadius: 3,
+                        border: "1px solid #66aec4",
+                        color: "#66aec4",
+                        letterSpacing: "0.06em",
+                        flexShrink: 0,
+                    }}
+                >
+                    shared
+                </span>
+            );
+        }
+        if (inComparison === false) {
+            return (
+                <span
+                    style={{
+                        fontSize: 9,
+                        padding: "0 4px",
+                        borderRadius: 3,
+                        border: "1px solid #e6a07c",
+                        color: "#e6a07c",
+                        letterSpacing: "0.06em",
+                        flexShrink: 0,
+                    }}
+                >
+                    delta
+                </span>
+            );
+        }
+        return null;
+    };
+
+    const renderComparisonFilterControls = () =>
+        graph.comparison ? (
+            <div
+                style={{
+                    display: "flex",
+                    gap: 4,
+                    marginTop: 6,
+                    flexWrap: "wrap",
+                }}
+            >
+                {(
+                    [
+                        ["all", "All"],
+                        ["shared", "Shared"],
+                        ["delta", "Delta"],
+                    ] as const
+                ).map(([value, label]) => {
+                    const active = comparisonListFilter === value;
+                    return (
+                        <button
+                            key={value}
+                            type="button"
+                            onClick={() => setComparisonListFilter(value)}
+                            style={{
+                                ...denseSubtleStyle,
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                border: `1px solid ${
+                                    active
+                                        ? value === "delta"
+                                            ? "#e6a07c"
+                                            : value === "shared"
+                                              ? "#66aec4"
+                                              : "#33414a"
+                                        : "#33414a"
+                                }`,
+                                background: active ? "#132028" : "#101d26",
+                                color:
+                                    active && value === "delta"
+                                        ? "#e6a07c"
+                                        : active && value === "shared"
+                                          ? "#66aec4"
+                                          : "#d9e6ec",
+                                fontSize: 10,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {label}
+                        </button>
+                    );
+                })}
+            </div>
+        ) : null;
 
     // displayHostLabel uses full trafficNetwork (not graph.nodes) so hosts
     // outside MAX_GRAPH_HOSTS still resolve DNS / labels for flows, packets, ticker.
@@ -258,9 +366,15 @@ export function Sidebar({
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                             }}
-                            title={graph.comparison.label}
+                            title={`${graph.comparison.label} · ${graph.comparison.commonFlowCount} shared / ${graph.comparison.deltaFlowCount} delta flows (primary only)`}
                         >
-                            {graph.comparison.commonFlowCount} shared
+                            <span style={{ color: "#66aec4" }}>
+                                {graph.comparison.commonFlowCount}
+                            </span>
+                            <span style={{ color: "#7b9aaa" }}> / </span>
+                            <span style={{ color: "#e6a07c" }}>
+                                {graph.comparison.deltaFlowCount}
+                            </span>
                         </div>
                     </div>
                 ) : null}
@@ -422,6 +536,7 @@ export function Sidebar({
                     }
                 >
                     <div style={panelTitleStyle}>Active Flows</div>
+                    {renderComparisonFilterControls()}
                     {(() => {
                         const w = getWindowedFlows();
                         if (w.total === 0) {
@@ -434,7 +549,10 @@ export function Sidebar({
                                     }}
                                 >
                                     <div style={denseFeedRowStyle}>
-                                        No flows yet
+                                        {graph.comparison &&
+                                        comparisonListFilter !== "all"
+                                            ? `No ${comparisonListFilter} flows`
+                                            : "No flows yet"}
                                     </div>
                                 </div>
                             );
@@ -472,6 +590,16 @@ export function Sidebar({
                                             )
                                                 ? selectedRowStyle
                                                 : {}),
+                                            ...(flow.inComparison === true
+                                                ? {
+                                                      borderColor: "#66aec455",
+                                                  }
+                                                : flow.inComparison === false
+                                                  ? {
+                                                        borderColor:
+                                                            "#e6a07c55",
+                                                    }
+                                                  : {}),
                                         }}
                                     >
                                         <div style={{ minWidth: 0 }}>
@@ -494,21 +622,9 @@ export function Sidebar({
                                                 {displayHostLabel(flow.srcHost)}{" "}
                                                 -&gt;{" "}
                                                 {displayHostLabel(flow.dstHost)}
-                                                {flow.inComparison ? (
-                                                    <span
-                                                        style={{
-                                                            fontSize: 9,
-                                                            padding: "0 4px",
-                                                            borderRadius: 3,
-                                                            border: "1px solid #66aec4",
-                                                            color: "#66aec4",
-                                                            letterSpacing:
-                                                                "0.06em",
-                                                        }}
-                                                    >
-                                                        shared
-                                                    </span>
-                                                ) : null}
+                                                {comparisonBadge(
+                                                    flow.inComparison,
+                                                )}
                                             </div>
                                             <div
                                                 style={denseSubtleStyle}
@@ -549,6 +665,7 @@ export function Sidebar({
                     }}
                 >
                     <div style={panelTitleStyle}>Packet Feed</div>
+                    {renderComparisonFilterControls()}
                     <ul
                         ref={packetsContainerRef}
                         onScroll={(e) =>
@@ -606,15 +723,23 @@ export function Sidebar({
                                             >
                                                 <strong
                                                     style={{
-                                                        display: "block",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 6,
                                                         fontSize: 13,
                                                     }}
                                                     title={`${packet.proto}${packet.dstPort ? `:${packet.dstPort}` : ""}`}
                                                 >
-                                                    {packet.timestamp}{" "}
-                                                    {formatService(
-                                                        packet.dstPort ?? null,
-                                                        packet.proto,
+                                                    <span>
+                                                        {packet.timestamp}{" "}
+                                                        {formatService(
+                                                            packet.dstPort ??
+                                                                null,
+                                                            packet.proto,
+                                                        )}
+                                                    </span>
+                                                    {comparisonBadge(
+                                                        packet.inComparison,
                                                     )}
                                                 </strong>
                                                 <div

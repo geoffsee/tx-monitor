@@ -324,7 +324,7 @@ describe("createGraph", () => {
         expect(graph.nodes.length).toBe(MAX_GRAPH_HOSTS);
     });
 
-    test("annotates nodes, flows and edges with inComparison when comparison context is set", () => {
+    test("annotates nodes, flows, edges and packets with common/delta when comparison context is set", () => {
         trafficNetwork.reset();
         clearComparisonContext();
 
@@ -373,12 +373,34 @@ describe("createGraph", () => {
         expect(edgeCommon?.data?.inComparison).toBe(true);
         expect(edgeOnlyPrimary?.data?.inComparison).toBe(false);
 
-        // Comparison summary present
+        const pktShared = snap.packets.find((p) => p.id === "p1");
+        const pktDelta = snap.packets.find((p) => p.id === "p2");
+        expect(pktShared?.inComparison).toBe(true);
+        expect(pktDelta?.inComparison).toBe(false);
+
+        // Comparison summary: shared vs primary-only (delta); no data merge
         expect(snap.comparison?.sessionId).toBe("cmp-1");
         expect(snap.comparison?.commonHostCount).toBeGreaterThanOrEqual(1);
         expect(snap.comparison?.commonFlowCount).toBeGreaterThanOrEqual(1);
+        expect(snap.comparison?.deltaHostCount).toBeGreaterThanOrEqual(1);
+        expect(snap.comparison?.deltaFlowCount).toBeGreaterThanOrEqual(1);
+        // Overlay host 10.0.0.9 is not injected into primary graph
+        expect(snap.nodes.some((n) => n.id === "10.0.0.9")).toBe(false);
 
         clearComparisonContext();
+
+        // Without comparison, annotations clear
+        const cleared = createGraph();
+        expect(cleared.comparison).toBeUndefined();
+        expect(
+            cleared.nodes.every((n) => n.data.inComparison === undefined),
+        ).toBe(true);
+        expect(cleared.flows.every((f) => f.inComparison === undefined)).toBe(
+            true,
+        );
+        expect(cleared.packets.every((p) => p.inComparison === undefined)).toBe(
+            true,
+        );
     });
 
     test("summary-only mode drops fine-grained packets after threshold while retaining aggregates, recent window, and caps", () => {
