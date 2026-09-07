@@ -39,6 +39,10 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
         data.resolvedDns &&
         data.label !== data.resolvedDns;
     const isPinned = !!data.pinned;
+    // true = shared/common with comparison; false = primary-only delta;
+    // undefined = no comparison overlay loaded.
+    const isShared = data.inComparison === true;
+    const isDelta = data.inComparison === false;
 
     return (
         <div
@@ -118,10 +122,12 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
-                    outline: data.inComparison
+                    outline: isShared
                         ? "1px dashed #66aec4"
-                        : undefined,
-                    outlineOffset: data.inComparison ? "-2px" : undefined,
+                        : isDelta
+                          ? "1px solid #e6a07c"
+                          : undefined,
+                    outlineOffset: isShared || isDelta ? "-2px" : undefined,
                 }}
             >
                 <div
@@ -138,7 +144,7 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                 >
                     {categoryLabel(data.category)}
                     {isPinned ? " ★" : ""}
-                    {data.inComparison ? (
+                    {isShared ? (
                         <span
                             style={{
                                 fontSize: 8,
@@ -149,7 +155,20 @@ export function HostNode({ data, selected }: NodeProps<Node<HostNodeData>>) {
                                 color: "#66aec4",
                             }}
                         >
-                            vs
+                            shared
+                        </span>
+                    ) : isDelta ? (
+                        <span
+                            style={{
+                                fontSize: 8,
+                                letterSpacing: "0.08em",
+                                padding: "0 3px",
+                                borderRadius: 3,
+                                border: "1px solid #e6a07c",
+                                color: "#e6a07c",
+                            }}
+                        >
+                            delta
                         </span>
                     ) : null}
                 </div>

@@ -11,6 +11,11 @@ export type HostNodeData = {
     processes?: string[];
     processCount?: number;
     resolvedDns?: string;
+    /**
+     * When a comparison overlay is active: true = also in comparison
+     * (shared/common), false = primary-only (delta). Undefined when no
+     * comparison is loaded.
+     */
     inComparison?: boolean;
     pinned?: boolean;
 };
@@ -20,6 +25,10 @@ export type FlowEdgeData = {
     labelColor: string;
     stroke: string;
     active: boolean;
+    /**
+     * When a comparison overlay is active: true = shared/common,
+     * false = primary-only (delta). Undefined when no comparison.
+     */
     inComparison?: boolean;
     pinned?: boolean;
 };
@@ -48,10 +57,18 @@ export type TrafficViewMode = "live" | "history";
 export type ComparisonSummary = {
     sessionId: string;
     label: string;
+    /** Hosts retained from the comparison (overlay) session. */
     hostCount: number;
+    /** Flows retained from the comparison (overlay) session. */
     flowCount: number;
+    /** Hosts present in both primary and comparison. */
     commonHostCount: number;
+    /** Flows present in both primary and comparison. */
     commonFlowCount: number;
+    /** Hosts present only in the primary (delta). */
+    deltaHostCount: number;
+    /** Flows present only in the primary (delta). */
+    deltaFlowCount: number;
 };
 
 export type SessionLoadProgress = {
@@ -107,6 +124,12 @@ export type TrafficSnapshot = {
         length: number;
         info: string;
         process?: ProcessSummary;
+        /**
+         * When a comparison overlay is active: true = flow key also in
+         * comparison (shared), false = primary-only (delta). Undefined when
+         * no comparison is loaded.
+         */
+        inComparison?: boolean;
     }>;
     flows: Array<{
         id: string;
@@ -118,6 +141,10 @@ export type TrafficSnapshot = {
         bytesTotal: number;
         active: boolean;
         process?: ProcessSummary;
+        /**
+         * When a comparison overlay is active: true = shared with comparison
+         * session, false = primary-only (delta). Undefined when no comparison.
+         */
         inComparison?: boolean;
     }>;
     anomalies: Anomaly[];
