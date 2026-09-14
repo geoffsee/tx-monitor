@@ -1,0 +1,31 @@
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          # RELEASE_TOKEN so enabling auto-merge attributes the eventual merge
+          # to a PAT user. Merges performed via GITHUB_TOKEN / github-actions
+          # do not trigger push workflows (Auto Tag, Test on main, etc.).
+          github-token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Enable auto-merge for non-major updates
+        if: >
+          steps.metadata.outputs.dependency-group != 'bun-major' &&
+          steps.metadata.outputs.dependency-group != 'cargo-major' &&
+          steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
