@@ -46,7 +46,20 @@ export function FlowEdge({
                             ? 3.5
                             : 2,
                     opacity: selected ? 1 : data?.active ? 1 : 0.45,
-                    strokeDasharray: data?.inComparison ? "4 2" : undefined,
+                    // shared = dashed cyan overlay; delta (primary-only) =
+                    // short dash amber cue without merging comparison data.
+                    strokeDasharray:
+                        data?.inComparison === true
+                            ? "4 2"
+                            : data?.inComparison === false
+                              ? "2 3"
+                              : undefined,
+                    filter:
+                        data?.inComparison === false
+                            ? "drop-shadow(0 0 2px #e6a07c88)"
+                            : data?.inComparison === true
+                              ? "drop-shadow(0 0 2px #66aec488)"
+                              : undefined,
                     cursor: "pointer",
                 }}
             />

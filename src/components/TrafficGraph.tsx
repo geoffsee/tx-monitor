@@ -181,8 +181,83 @@ export function TrafficGraph({
                                 />
                                 Public host
                             </div>
+                            {graph.comparison ? (
+                                <>
+                                    <div style={legendRowStyle}>
+                                        <span
+                                            style={{
+                                                ...legendSwatchStyle,
+                                                background: "transparent",
+                                                border: "1px dashed #66aec4",
+                                            }}
+                                        />
+                                        Shared w/ overlay
+                                    </div>
+                                    <div style={legendRowStyle}>
+                                        <span
+                                            style={{
+                                                ...legendSwatchStyle,
+                                                background: "transparent",
+                                                border: "1px solid #e6a07c",
+                                            }}
+                                        />
+                                        Primary only (delta)
+                                    </div>
+                                </>
+                            ) : null}
                         </div>
                     </Panel>
+                    {graph.comparison ? (
+                        <Panel position="top-right">
+                            <div
+                                style={{
+                                    ...overlayPanelStyle,
+                                    padding: "8px 12px",
+                                    maxWidth: 280,
+                                    fontSize: 11,
+                                    lineHeight: 1.35,
+                                }}
+                                title={`Comparison overlay: ${graph.comparison.label}`}
+                            >
+                                <div
+                                    style={{
+                                        ...eyebrowStyle,
+                                        fontSize: 9,
+                                        marginBottom: 2,
+                                    }}
+                                >
+                                    Comparing overlay
+                                </div>
+                                <div
+                                    style={{
+                                        fontWeight: 700,
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                    }}
+                                >
+                                    {graph.comparison.label}
+                                </div>
+                                <div
+                                    style={{
+                                        marginTop: 4,
+                                        color: "#9bb2bd",
+                                        fontSize: 10,
+                                    }}
+                                >
+                                    <span style={{ color: "#66aec4" }}>
+                                        {graph.comparison.commonFlowCount}{" "}
+                                        shared
+                                    </span>
+                                    {" · "}
+                                    <span style={{ color: "#e6a07c" }}>
+                                        {graph.comparison.deltaFlowCount} delta
+                                    </span>
+                                    {" flows"}
+                                </div>
+                            </div>
+                        </Panel>
+                    ) : null}
                     <Panel position="bottom-center">
                         <div
                             style={{
