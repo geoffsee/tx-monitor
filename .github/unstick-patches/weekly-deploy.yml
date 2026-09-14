@@ -1,0 +1,90 @@
+name: Weekly Deploy
+
+# Ships a patch release weekly so dependency updates that landed without an
+# Auto Tag run still reach users. Mirrors auto-tag.yml (caretta-action is
+# unreachable and was failing every scheduled run).
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    name: Bump version and tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Fail early if RELEASE_TOKEN is missing
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN is not set. A tag pushed with the default" \
+                 "GITHUB_TOKEN will not trigger tag-based release workflows."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ -z "$CURRENT" ] || [ "$CURRENT" = "undefined" ]; then
+            echo "::error::could not read version from package.json"
+            exit 1
+          fi
+
+          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=${PATCH%%-*}
+          PATCH=$((PATCH + 1))
+          NEXT="$MAJOR.$MINOR.$PATCH"
+
+          if git rev-parse -q --verify "refs/tags/v$NEXT" >/dev/null; then
+            echo "::error::tag v$NEXT already exists"
+            exit 1
+          fi
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "next=$NEXT"       >> "$GITHUB_OUTPUT"
+          echo "Bumping $CURRENT -> $NEXT (patch)"
+
+      - name: Apply version to package.json
+        run: |
+          set -euo pipefail
+          NEXT="${{ steps.version.outputs.next }}"
+          npm version "$NEXT" --no-git-tag-version --allow-same-version
+
+      - name: Commit, tag, and push
+        run: |
+          set -euo pipefail
+          NEXT="${{ steps.version.outputs.next }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add package.json
+          git add -u bun.lock package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null || true
+          git commit -m "chore(release): v$NEXT"
+
+          git tag -a "v$NEXT" -m "Release v$NEXT"
+          git push origin HEAD:main
+          git push origin "v$NEXT"
+
+          echo "Tagged v$NEXT"
+          echo "### Released \`v$NEXT\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Weekly deploy bumped from \`${{ steps.version.outputs.current }}\`." >> "$GITHUB_STEP_SUMMARY"
