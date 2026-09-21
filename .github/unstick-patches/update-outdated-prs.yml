@@ -15,11 +15,18 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Fail early if RELEASE_TOKEN is missing
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN is not set. Dependabot ignores" \
+                 "@dependabot rebase comments from GITHUB_TOKEN."
+            exit 1
+          fi
+
       - name: Update out-of-date PR branches
         env:
-          # RELEASE_TOKEN can comment @dependabot rebase; GITHUB_TOKEN often cannot
-          # on fine-grained PATs / restricted repos, and Dependabot ignores some
-          # GITHUB_TOKEN branch updates for check re-triggering.
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
@@ -30,8 +37,9 @@ jobs:
           | while IFS=$'\t' read -r number author; do
               echo "Updating PR #$number ($author)..."
               case "$author" in
-                dependabot|dependabot\[bot\]|app/dependabot)
-                  # Dependabot rebase retriggers checks; plain branch updates do not.
+                dependabot[bot]|app/dependabot)
+                  # Dependabot rebase retriggers checks; plain branch updates may not.
+                  # Comments must come from an account with push access (RELEASE_TOKEN).
                   gh pr comment "$number" --repo "$GITHUB_REPOSITORY" --body "@dependabot rebase"
                   ;;
                 *)
