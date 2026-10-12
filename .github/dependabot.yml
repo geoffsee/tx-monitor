@@ -1,4 +1,6 @@
 version: 2
+# 2026-10-12: the Monday 09:00 UTC version-update jobs did not run.
+# Editing this file on the default branch retriggers those checks.
 updates:
   - package-ecosystem: "bun"
     directory: "/"
