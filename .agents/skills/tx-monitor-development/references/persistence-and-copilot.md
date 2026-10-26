@@ -3,7 +3,6 @@
 ## SQLite and sessions
 
 Persistence turns transient packet streams into inspectable sessions. Schema or store changes should preserve:
-
 - Session creation and retrieval.
 - Packet insertion order and pagination.
 - Optional persistence disablement via `--no-db`.
@@ -18,7 +17,6 @@ The shared Drizzle schema lives in `packages/tx-mon-sdk/src/schema.ts` (re-expor
 ## HTTP APIs
 
 The README-documented APIs are part of the user contract:
-
 - `GET /api/sessions`
 - `GET /api/sessions/:id`
 - `GET /api/sessions/:id/packets?offset=0&limit=5000`
@@ -36,7 +34,6 @@ Dashboard and agent tooling should prefer `tx-mon-sdk` (`openTxMon` / `contextAr
 Copilot analysis is optional and should operate on explicit client-provided snapshots. Treat packet metadata, process names, hostnames, and environment variables as sensitive.
 
 When changing copilot behavior, preserve:
-
 - `TXMON_CODEX_AUTH=local` and `TXMON_CODEX_AUTH=api-key` behavior.
 - `OPENAI_API_KEY` handling without logging secret values.
 - `TXMON_CODEX_MODEL` override behavior.

@@ -1,4 +1,5 @@
 ---
+
 name: coding-standards
 description: "Project coding standards for tx-monitor. Use when implementing, reviewing, or refactoring code so changes stay small, readable, testable, and aligned with clear boundaries."
 ---
@@ -12,7 +13,6 @@ Write code that is easy to understand, easy to change, and hard to misuse. Prefe
 ## Naming
 
 Names must reveal intent.
-
 - Use domain words from the project: packet, capture, session, host, flow, graph, edge, process, anomaly, copilot.
 - Prefer specific names over generic containers: `packetCount`, `captureSession`, `selectedHostId`.
 - Avoid abbreviations unless they are established protocol terms such as TCP, UDP, IP, HTTP, WS, DB, or CLI.
@@ -23,7 +23,6 @@ Names must reveal intent.
 ## Functions
 
 Functions should do one thing at one level of abstraction.
-
 - Keep functions short enough that the main path is visible without scrolling.
 - Extract parsing, validation, transformation, persistence, rendering, and side effects into separate functions.
 - Prefer early returns for invalid or edge cases.
@@ -35,7 +34,6 @@ Functions should do one thing at one level of abstraction.
 ## Modules and Boundaries
 
 Dependencies must point inward toward stable domain logic and outward only at the edges.
-
 - Keep packet parsing independent from WebSocket delivery, database writes, and UI rendering.
 - Keep graph derivation independent from React components.
 - Keep persistence code behind store/API boundaries.
@@ -47,7 +45,6 @@ Dependencies must point inward toward stable domain logic and outward only at th
 ## Data Flow
 
 Make data transformations explicit.
-
 - Parse raw tcpdump text into typed packet events.
 - Convert packet events into network state.
 - Convert network state into graph nodes and edges.
@@ -60,7 +57,6 @@ Avoid shortcuts that couple these stages directly.
 ## Error Handling
 
 Handle expected failures deliberately.
-
 - Treat malformed tcpdump lines as non-events or typed parse failures, not crashes.
 - Surface missing tcpdump, permission failures, missing files, database failures, and copilot failures with actionable messages.
 - Do not swallow errors silently.
@@ -70,7 +66,6 @@ Handle expected failures deliberately.
 ## Comments
 
 Comments should explain why, not restate what the code says.
-
 - Use comments for protocol quirks, platform-specific tcpdump behavior, security/privacy reasoning, and non-obvious tradeoffs.
 - Delete comments that merely repeat the implementation.
 - If a comment is needed to explain tangled code, prefer simplifying the code first.
@@ -78,7 +73,6 @@ Comments should explain why, not restate what the code says.
 ## Tests
 
 Tests should lock down behavior at subsystem boundaries.
-
 - Parser changes require tcpdump fixture coverage.
 - Graph changes require node/edge identity and aggregation coverage.
 - Layout changes require deterministic-position expectations where practical.
@@ -89,7 +83,6 @@ Tests should lock down behavior at subsystem boundaries.
 ## Refactoring
 
 Refactor in small, behavior-preserving steps.
-
 - Keep public contracts stable unless the change is intentional and documented.
 - Improve names before changing structure.
 - Extract pure logic before changing side effects.
@@ -99,7 +92,6 @@ Refactor in small, behavior-preserving steps.
 ## TypeScript Standards
 
 Use TypeScript to make invalid states difficult to represent.
-
 - Prefer precise types over `any`.
 - Use discriminated unions for variant states.
 - Use readonly data where mutation is not required.
@@ -110,7 +102,6 @@ Use TypeScript to make invalid states difficult to represent.
 ## React Standards
 
 Components should be presentation and interaction units, not business logic containers.
-
 - Keep packet, graph, and persistence rules outside components.
 - Use hooks for browser-side orchestration and state wiring.
 - Keep component props specific and typed.
@@ -120,7 +111,6 @@ Components should be presentation and interaction units, not business logic cont
 ## Bun Server Standards
 
 Server code should make lifecycle and side effects explicit.
-
 - Separate startup, route handling, capture ingestion, WebSocket delivery, and persistence.
 - Prefer deterministic file replay for development and tests.
 - Do not run live capture or privileged commands from tests.
@@ -130,7 +120,6 @@ Server code should make lifecycle and side effects explicit.
 ## Security and Privacy
 
 Network metadata is sensitive local data.
-
 - Do not log secrets or environment values.
 - Do not send ambient traffic to external services by default.
 - Keep copilot analysis opt-in and snapshot-based.
@@ -140,7 +129,6 @@ Network metadata is sensitive local data.
 ## Review Checklist
 
 Before considering a change complete, verify:
-
 - Names describe intent.
 - Each function has one clear responsibility.
 - Core logic is separated from framework, transport, and persistence details.

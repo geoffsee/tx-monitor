@@ -1,4 +1,5 @@
 ---
+
 name: tx-monitor-development
 description: "Maintainer-agent reference for implementing, reviewing, or testing tx-monitor functionality: tcpdump parsing, live/file replay, WebSocket streaming, React traffic graph state, SQLite persistence, copilot analysis, packaging, and validation. Use when modifying code, docs, tests, or release behavior in this repository."
 ---
@@ -8,7 +9,6 @@ description: "Maintainer-agent reference for implementing, reviewing, or testing
 ## Core Workflow
 
 Identify the subsystem first, then load only the needed reference:
-
 - Project map and source ownership: read `references/source-map.md`.
 - tcpdump capture, file replay, WebSocket streaming, parser behavior, and packet fixtures: read `references/packet-capture-and-server.md`.
 - React graph, node/edge state, layout, selection, and UI interaction: read `references/ui-state-and-graph.md`.
@@ -24,7 +24,6 @@ Keep packet ingestion, persistence, and UI state boundaries explicit. Parser cha
 Treat packet metadata as sensitive local data. Do not log secrets, API keys, raw environment values, or copilot payloads. Keep AI analysis opt-in and based on explicit client-provided snapshots.
 
 Use package scripts instead of ad-hoc commands:
-
 - Full autonomous gate: `bun run lint && bun run typecheck && bun test && bun run build`.
 - Formatting/fixes: `bun run format` and `bun run lint:fix`.
 - Safe manual replay path: `bun run monitor:file` with `bun run dev` in a second terminal.

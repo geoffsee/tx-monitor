@@ -8,6 +8,7 @@ A real-time network traffic visualizer.
 - `tcpdump` (required for live capture only)
 
 ## Quick Start
+
 Use your preferred Node package management solution to execute the cli.
 ```bash
 sudo bunx tx-monitor
@@ -59,15 +60,15 @@ Open [http://localhost:3001](http://localhost:3001). The compiled server embeds 
 
 ## Scripts
 
-| Script | Description |
-| --- | --- |
-| `bun run dev` | Vite dev server on port 4173 (proxies `/ws` to 3001) |
-| `bun run build` | Build browser bundle into `dist/` |
-| `bun run compile` | Build native executable into `build/tx-monitor` with embedded UI |
-| `bun run monitor` | Start server with live `tcpdump` capture |
-| `bun run monitor:file` | Start server replaying `tcpdump.log` |
-| `bun run start` | Start server (live capture; serves `dist/` if present) |
-| `bun run start:file` | Start server with `--file tcpdump.log` |
+| Script                 | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `bun run dev`          | Vite dev server on port 4173 (proxies `/ws` to 3001)             |
+| `bun run build`        | Build browser bundle into `dist/`                                |
+| `bun run compile`      | Build native executable into `build/tx-monitor` with embedded UI |
+| `bun run monitor`      | Start server with live `tcpdump` capture                         |
+| `bun run monitor:file` | Start server replaying `tcpdump.log`                             |
+| `bun run start`        | Start server (live capture; serves `dist/` if present)           |
+| `bun run start:file`   | Start server with `--file tcpdump.log`                           |
 
 ## Server Options
 
@@ -75,16 +76,16 @@ Open [http://localhost:3001](http://localhost:3001). The compiled server embeds 
 bun run src/server.ts [--file <path>] [--port <port>] [--serve] [--db <path>] [--no-db] [--iface <name>] [--direction <dir>] [--bpf <expr>]
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--file <path>` | Replay a `tcpdump` log instead of live capture |
-| `--port <port>` | WebSocket and HTTP port (default: `3001`) |
-| `--serve` | Serve the built frontend from `dist/` |
-| `--db <path>` | SQLite database path for packet persistence (default: `~/.tx-monitor`) |
-| `--no-db` | Disable SQLite persistence |
-| `--iface <name>` | Live capture interface (default: `any`) |
-| `--direction <dir>` | Live capture direction: `in`, `out`, or `inout` (default: `out`) |
-| `--bpf <expr>` | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53`. Tokens starting with `-` are rejected. Live BPF is a single argv after `--`. |
+| Flag                | Description                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--file <path>`     | Replay a `tcpdump` log instead of live capture                                                                                                                                 |
+| `--port <port>`     | WebSocket and HTTP port (default: `3001`)                                                                                                                                      |
+| `--serve`           | Serve the built frontend from `dist/`                                                                                                                                          |
+| `--db <path>`       | SQLite database path for packet persistence (default: `~/.tx-monitor`)                                                                                                         |
+| `--no-db`           | Disable SQLite persistence                                                                                                                                                     |
+| `--iface <name>`    | Live capture interface (default: `any`)                                                                                                                                        |
+| `--direction <dir>` | Live capture direction: `in`, `out`, or `inout` (default: `out`)                                                                                                               |
+| `--bpf <expr>`      | BPF filter for live (and basic post-filter for file replay), e.g. `host 192.168.1.10 or port 53`. Tokens starting with `-` are rejected. Live BPF is a single argv after `--`. |
 
 Capture params (iface, direction, effective command, BPF) are surfaced in UI "Capture Source", status updates, and server logs. Controls in the sidebar let you change them at runtime for live capture (restarts subprocess cleanly) and apply basic BPF to file replays without full server restart. Session continuity preserved on live param changes.
 
@@ -123,21 +124,21 @@ A brief effective settings line is logged at startup (port, db, replay, mode). N
 
 ## Environment Variables
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `3001` | Server listen port |
-| `TXMON_DB` | `~/.tx-monitor` | SQLite database path when persistence is enabled |
-| `TXMON_CODEX_AUTH` | `local` | Codex SDK auth mode for copilot requests. Use `local` for your logged-in Codex/OpenAI subscription credentials, or `api-key` to pass `OPENAI_API_KEY`. |
-| `OPENAI_API_KEY` | unset | Optional key used only when `TXMON_CODEX_AUTH=api-key`. Can also be set in `.env.copilot`. |
-| `TXMON_CODEX_MODEL` | `gpt-5.5` | Optional model override for Codex SDK copilot requests |
-| `TXMON_CODEX_TIMEOUT_MS` | `120000` | Timeout for backend Codex SDK copilot requests |
-| `FILE_REPLAY_SPEED` | `0` | Real-time replay multiplier for file mode (`0` = send as fast as possible) |
-| `FILE_REPLAY_SLEEP_CAP_MS` | `120` | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set |
-| `TXMON_IFACE` | `any` | Default live capture interface (overridden by --iface) |
-| `TXMON_DIRECTION` | `out` | Default live capture direction |
-| `TXMON_BPF` | (none) | Default BPF filter expression |
-| `TXMON_TCPDUMP_ARGS` | unset | Optional full live-capture argv (initial only; env only; not accepted in config files) |
-| `TXMON_ALLOW_REMOTE_CAPTURE` | unset | When `1`/`true`, allow `set-capture` from non-loopback WebSocket clients (default: localhost only) |
+| Variable                     | Default         | Description                                                                                                                                            |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PORT`                       | `3001`          | Server listen port                                                                                                                                     |
+| `TXMON_DB`                   | `~/.tx-monitor` | SQLite database path when persistence is enabled                                                                                                       |
+| `TXMON_CODEX_AUTH`           | `local`         | Codex SDK auth mode for copilot requests. Use `local` for your logged-in Codex/OpenAI subscription credentials, or `api-key` to pass `OPENAI_API_KEY`. |
+| `OPENAI_API_KEY`             | unset           | Optional key used only when `TXMON_CODEX_AUTH=api-key`. Can also be set in `.env.copilot`.                                                             |
+| `TXMON_CODEX_MODEL`          | `gpt-5.5`       | Optional model override for Codex SDK copilot requests                                                                                                 |
+| `TXMON_CODEX_TIMEOUT_MS`     | `120000`        | Timeout for backend Codex SDK copilot requests                                                                                                         |
+| `FILE_REPLAY_SPEED`          | `0`             | Real-time replay multiplier for file mode (`0` = send as fast as possible)                                                                             |
+| `FILE_REPLAY_SLEEP_CAP_MS`   | `120`           | Max delay between replayed packets when `FILE_REPLAY_SPEED` is set                                                                                     |
+| `TXMON_IFACE`                | `any`           | Default live capture interface (overridden by --iface)                                                                                                 |
+| `TXMON_DIRECTION`            | `out`           | Default live capture direction                                                                                                                         |
+| `TXMON_BPF`                  | (none)          | Default BPF filter expression                                                                                                                          |
+| `TXMON_TCPDUMP_ARGS`         | unset           | Optional full live-capture argv (initial only; env only; not accepted in config files)                                                                 |
+| `TXMON_ALLOW_REMOTE_CAPTURE` | unset           | When `1`/`true`, allow `set-capture` from non-loopback WebSocket clients (default: localhost only)                                                     |
 
 ## Persistence
 
@@ -159,13 +160,13 @@ See [`packages/tx-mon-sdk/README.md`](packages/tx-mon-sdk/README.md) for the ful
 
 ### Read over HTTP
 
-| Endpoint | Description |
-| --- | --- |
-| `GET /api/sessions` | List recent capture sessions |
-| `GET /api/sessions/:id` | Fetch one capture session |
-| `GET /api/sessions/:id/packets?offset=0&limit=5000` | Paginated packets for a session |
-| `GET /api/packets?limit=80&session=<id>` | List recent packets, optionally scoped to one session |
-| `POST /api/copilot` | Analyze the client-provided capture snapshot (strict snapshot model) using the backend Codex SDK |
+| Endpoint                                            | Description                                                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET /api/sessions`                                 | List recent capture sessions                                                                     |
+| `GET /api/sessions/:id`                             | Fetch one capture session                                                                        |
+| `GET /api/sessions/:id/packets?offset=0&limit=5000` | Paginated packets for a session                                                                  |
+| `GET /api/packets?limit=80&session=<id>`            | List recent packets, optionally scoped to one session                                            |
+| `POST /api/copilot`                                 | Analyze the client-provided capture snapshot (strict snapshot model) using the backend Codex SDK |
 
 Schema migrations live in `drizzle/` and are applied automatically on server startup.
 

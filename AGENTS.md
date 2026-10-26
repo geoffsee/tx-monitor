@@ -1,8 +1,8 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This is a Bun + React app with a small, source-first layout.
 
+This is a Bun + React app with a small, source-first layout.
 - `src/` contains runtime code:
   - `server.ts` and `ws.ts`: Bun server + WebSocket orchestration.
   - `lib/`: parser, graph state, copilot integration, and persistence helpers.
@@ -18,6 +18,7 @@ This is a Bun + React app with a small, source-first layout.
 - Tests live next to implementation files as `*.test.ts` / `*.test.tsx`.
 
 ## Build, Test, and Development Commands
+
 - `bun run dev` — start Vite UI on `4173` (proxies `/ws` to server).
 - `bun run monitor:file` — start server replaying `tcpdump.log`.
 - `bun run monitor` (or `bun run start:file`) — live capture or file replay mode server.
@@ -27,11 +28,13 @@ This is a Bun + React app with a small, source-first layout.
 - `bun run db:generate` / `bun run db:push` — refresh and apply Drizzle migrations.
 
 ## Coding Style & Naming Conventions
+
 - Use the project formatter/linter: `bun run lint` and `bun run check:fix`.
 - `biome.json` enforces 4-space indentation and double quotes; follow existing TypeScript style.
 - Prefer explicit typing, `PascalCase` for React components/types, `camelCase` for functions/variables, and `kebab-case` file names.
 
 ## Testing Guidelines
+
 - Framework: Bun test runner (`bun:test`), with tests colocated in `src/**/*.test.ts`.
 - Primary command: `bun test`.
 - CI also requires `bun run typecheck` and `bun run lint` before merging.
@@ -42,6 +45,7 @@ This is a Bun + React app with a small, source-first layout.
   - `bun run build`
 
 ## Commit & Pull Request Guidelines
+
 - Recent history uses short, imperative-style subjects (e.g., `fix linter config`, `add code guidelines...`).
 - Pre-commit/pre-push hooks run formatting, typecheck, and tests automatically.
 - PRs should include:
@@ -50,5 +54,6 @@ This is a Bun + React app with a small, source-first layout.
   - Notes for any DB/migration or UI behavior changes.
 
 ## Security & Configuration Notes
+
 - `txdump`/live capture needs elevated privileges on many systems.
 - Keep credentials out of version control; use `.env.copilot` for local Codex/OpenAI keys.

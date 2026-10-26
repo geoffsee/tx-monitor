@@ -5,7 +5,6 @@
 The graph exists to make host relationships legible during live traffic. Preserve stable identity for nodes and edges so the UI does not jump unnecessarily under stream churn.
 
 When changing graph behavior, test or reason explicitly about:
-
 - Host identity normalization.
 - Edge aggregation across packets.
 - Directionality and protocol/port metadata.
@@ -18,7 +17,6 @@ When changing graph behavior, test or reason explicitly about:
 React components should keep packet evidence available. If a visualization summarizes traffic, the detail panel or session view should still make the underlying host, port, protocol, process, timestamp, or packet count inspectable.
 
 Prefer small, subsystem-local changes:
-
 - `TrafficGraph.tsx` for rendering and graph interaction.
 - `HostNode.tsx` and `FlowEdge.tsx` for visual primitives.
 - `useTrafficFeed.ts` for stream ingestion.
