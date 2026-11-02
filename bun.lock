@@ -8,8 +8,8 @@
         "@openai/codex-sdk": "^0.166.0",
         "@xyflow/react": "^12.10.2",
         "drizzle-orm": "^0.45.2",
-        "mobx": "^6.15.0",
-        "mobx-state-tree": "^8.0.0",
+        "mobx": "^7.1.4",
+        "mobx-state-tree": "^9.0.0",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
         "tx-mon-sdk": "workspace:*",
@@ -297,9 +297,9 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA=="],
 
-    "mobx": ["mobx@6.16.1", "", {}, "sha512-syNcDdX3KT+Jq3je6eGjBhuc24Z68td2VG0zNFqRswaE433D9SNH5VRy/xrGbJsUixfppLLccXhAW9JSf6n+SQ=="],
+    "mobx": ["mobx@7.1.4", "", {}, "sha512-2G9WcLqXGKe4e5usnMabjz06mqO5hQmad3qagY7/n5MmKS7t281+XtmYxnPYqVmSnCEGAKJkrdRfDhOjn3UNJg=="],
 
-    "mobx-state-tree": ["mobx-state-tree@8.0.0", "", { "dependencies": { "ts-essentials": "^9.4.1" }, "peerDependencies": { "mobx": "^7.0.0" } }, "sha512-3ekhwG9KkPtrzzsp9vJu8JEpctoXeCADk1O1G4s+36JDqLug/AVsdW2JXT+rrAfWtPXopaoCER/sJs6qPK5oTg=="],
+    "mobx-state-tree": ["mobx-state-tree@9.0.0", "", { "dependencies": { "ts-essentials": "^9.4.1" }, "peerDependencies": { "mobx": "^7.0.0" } }, "sha512-jhO/vYk4syfqQKNLLPTbY0C+/N4HA14cLcizDPMS4qndWo+HKGJN+JMJ5c2BEi5LmbtVLZkWRNeOgvMSQ8H5tg=="],
 
     "nanoid": ["nanoid@3.3.20", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ=="],
 
