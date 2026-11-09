@@ -10,6 +10,7 @@ A real-time network traffic visualizer.
 ## Quick Start
 
 Use your preferred Node package management solution to execute the cli.
+
 ```bash
 sudo bunx tx-monitor
 ```
@@ -96,9 +97,11 @@ Capture params (iface, direction, effective command, BPF) are surfaced in UI "Ca
 A local config file supplies safe defaults. Precedence is: config file < environment variables < CLI flags.
 
 Primary location:
+
 - `~/.tx-monitor/config`
 
 Additional locations (later entries override earlier for the same key):
+
 - `~/.tx-monitor/config.toml`
 - `.tx-monitor/config` (relative to current working directory)
 - `.tx-monitor.toml` (relative to current working directory)

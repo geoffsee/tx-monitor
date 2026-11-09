@@ -3,6 +3,7 @@
 ## Project Structure & Module Organization
 
 This is a Bun + React app with a small, source-first layout.
+
 - `src/` contains runtime code:
   - `server.ts` and `ws.ts`: Bun server + WebSocket orchestration.
   - `lib/`: parser, graph state, copilot integration, and persistence helpers.

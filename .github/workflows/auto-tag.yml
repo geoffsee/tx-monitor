@@ -103,6 +103,9 @@ jobs:
           set -euo pipefail
           NEXT="${{ steps.version.outputs.next }}"
           npm version "$NEXT" --no-git-tag-version --allow-same-version
+          # npm version rewrites package.json with its own indentation; Biome
+          # lint on the Release workflow fails unless we reformat.
+          npx --yes @biomejs/biome format --write package.json
 
       - name: Commit, tag, and push
         run: |

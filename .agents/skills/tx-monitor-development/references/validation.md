@@ -13,6 +13,7 @@ Use this when the user asks for validation or before release work.
 ## Focused checks
 
 Prefer focused tests while developing a subsystem:
+
 - Parser: `bun test src/lib/tcpdumpParser.test.ts`.
 - Graph: `bun test src/lib/graph.test.ts src/layout.test.ts`.
 - Persistence: `bun test src/db/store.test.ts`.
@@ -40,6 +41,7 @@ Live capture requires tcpdump and may require sudo. Do not run it automatically.
 ## Release checks
 
 Before packaging or deploy work, confirm:
+
 - `package.json` files list remains intentional.
 - Build output exists when expected.
 - CLI entrypoint still points to `bin/tx-monitor.js`.
