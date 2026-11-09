@@ -1,8 +1,7 @@
 # Dependabot shipping unstick patches
 
-Canonical copies of the Dependabot shipping workflow fixes. Live workflows under
-`.github/workflows/` were updated from these on 2026-11-09. Keep the copies in
-sync when changing auto-merge, outdated-PR rebase, Auto Tag, or Weekly Deploy.
+These files are not live yet. Copy them over `.github/workflows/` with a token
+that has **Workflows** write permission:
 
 ```bash
 cp .github/unstick-patches/dependabot-auto-merge.yml .github/workflows/
@@ -11,9 +10,11 @@ cp .github/unstick-patches/auto-tag.yml .github/workflows/
 cp .github/unstick-patches/weekly-deploy.yml .github/workflows/
 ```
 
-On 2026-10-12 and 2026-10-26 the Supervisor PAT was rejected for workflow paths
-(`GH013`, missing Workflows scope). Prefer a token with Contents, Pull requests,
-and **Workflows** write when updating these files.
+On 2026-10-12, 2026-10-26, and 2026-11-09 the Supervisor PAT was rejected for
+workflow paths:
+
+`refusing to allow a Personal Access Token to create or update workflow
+without workflow scope` (GH013).
 
 ## Why
 
@@ -22,5 +23,7 @@ and **Workflows** write when updating these files.
 - Weekly Deploy called unreachable `geoffsee/caretta-action` (404 every Monday, including 2026-11-09 run 42592348670); patch ships a lockfile-based safety-net release instead.
 - Update-outdated-PRs must comment as `RELEASE_TOKEN` (Dependabot ignores `GITHUB_TOKEN` rebase comments).
 - Auto Tag should reformat `package.json` after `npm version` so Release lint stays green.
+
+`RELEASE_TOKEN` also needs Contents, Pull requests, and **Workflows** write.
 
 Related: https://github.com/geoffsee/tx-monitor/issues/81

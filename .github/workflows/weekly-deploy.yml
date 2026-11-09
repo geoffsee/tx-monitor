@@ -1,10 +1,5 @@
 name: Weekly Deploy
 
-# Safety-net release path. The previous caretta-action reference could not be
-# resolved (action missing/private), which failed every Monday schedule.
-# Dependency shipping is owned by Auto Tag on lockfile pushes; this job only
-# covers the case where a lockfile landed on main without a newer tag.
-
 on:
   schedule:
     - cron: "0 2 * * 1"
@@ -12,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
   deploy:
@@ -20,59 +17,23 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}
 
-      - name: Fail early if RELEASE_TOKEN is missing
+      - name: Restore Grok OAuth credentials
         env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          if [ -z "$RELEASE_TOKEN" ]; then
-            echo "::error::RELEASE_TOKEN is not set. Weekly Deploy cannot push tags."
-            exit 1
-          fi
+          GROK_CREDENTIALS: ${{ secrets.GROK_CREDENTIALS }}
+        run: bash scripts/restore-grok-credentials.sh
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Run caretta deploy workflow
+        uses: geoffsee/caretta-action@v0.0.6
         with:
-          node-version: "20"
-
-      - name: Ship pending lockfile bumps
-        run: |
-          set -euo pipefail
-
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
-          if [ -z "$LAST_TAG" ]; then
-            echo "No tags found; nothing to compare."
-            exit 0
-          fi
-
-          if ! git diff --name-only "$LAST_TAG"..HEAD | grep -qE '^(bun\.lock|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$'; then
-            echo "No lockfile changes since $LAST_TAG; nothing to ship."
-            exit 0
-          fi
-
-          echo "Lockfile changed since $LAST_TAG; cutting a patch release."
-
-          CURRENT=$(node -p "require('./package.json').version")
-          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=${PATCH%%-*}
-          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
-
-          if git rev-parse -q --verify "refs/tags/v$NEXT" >/dev/null; then
-            echo "::error::tag v$NEXT already exists"
-            exit 1
-          fi
-
-          npm version "$NEXT" --no-git-tag-version --allow-same-version
-          npx --yes @biomejs/biome format --write package.json
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add package.json
-          git commit -m "chore(release): v$NEXT"
-          git tag -a "v$NEXT" -m "Release v$NEXT"
-          git push origin HEAD:main
-          git push origin "v$NEXT"
-
-          echo "Tagged v$NEXT"
+          task: run
+          args: deploy
+          preset: deploy
+          agent: xai
+          github-token: ${{ secrets.GH_TOKEN }}
+        env:
+          DEV_BOT_APP_ID: ${{ secrets.DEV_BOT_APP_ID }}
+          DEV_BOT_INSTALLATION_ID: ${{ secrets.DEV_BOT_INSTALLATION_ID }}
+          DEV_BOT_PRIVATE_KEY_B64: ${{ secrets.DEV_BOT_PRIVATE_KEY_B64 }}
+          RUST_LOG: info

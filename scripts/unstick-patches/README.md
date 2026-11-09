@@ -1,8 +1,8 @@
-# CI unstick patches
+# CI unstick patches (apply when RELEASE_TOKEN has `workflows` write)
 
-Prefer `.github/unstick-patches/` (includes Weekly Deploy). These copies cover
-auto-merge, outdated-PR rebase, and Auto Tag. Applied to live workflows on
-2026-11-09.
+Fine-grained PATs without the Workflows permission cannot push
+`.github/workflows/*`. Prefer `.github/unstick-patches/` (includes Weekly
+Deploy). Copy onto main once the token has that scope:
 
 ```bash
 cp scripts/unstick-patches/dependabot-auto-merge.yml .github/workflows/
