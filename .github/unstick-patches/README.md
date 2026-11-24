@@ -21,10 +21,11 @@ comment on #81 (403). Shipping was unblocked by manually cutting `v1.1.17`
 for Dependabot #97/#98 lockfile bumps that never triggered Auto Tag.
 
 On 2026-11-24 Weekly Deploy failed again on missing `caretta-action`
-(run 45155783377), Auto Tag still skipped for Dependabot #99, and major
-`@xyflow/react` #100 was stuck on merge conflicts plus a `colorMode` →
-`forceColorMode` typecheck break. The app migration is shipped separately;
-live workflow copies still need Workflows write on `RELEASE_TOKEN`.
+(run 45155783377), Auto Tag still skipped for Dependabot #99's GITHUB_TOKEN
+merge, and major `@xyflow/react` #100 was stuck on merge conflicts plus a
+`colorMode` → `forceColorMode` typecheck break. The app migration landed on
+main as `42fac98` and Auto Tag cut `v1.1.18`; live workflow copies still
+need Workflows write on `RELEASE_TOKEN` (GH013 again this week).
 
 ## Why
 

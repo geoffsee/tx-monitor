@@ -19,5 +19,6 @@ What they fix:
 - Weekly Deploy safety-net release instead of missing `caretta-action`
 - format package.json after `npm version` so Release lint stays green
 
-Last GH013 rejection: 2026-11-24. Manual ship that week: pending for #99
-(and `@xyflow/react` 13 once merged) while live workflow patches remain blocked.
+Last GH013 rejection: 2026-11-24. That week Auto Tag did cut `v1.1.18`
+after a non-GITHUB_TOKEN push of the `@xyflow/react` 13 fix (also covering
+#99 lockfile); live workflow patches remain blocked without Workflows write.
