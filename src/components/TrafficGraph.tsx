@@ -103,7 +103,7 @@ export function TrafficGraph({
                     panOnScroll
                     minZoom={0.45}
                     maxZoom={1.25}
-                    colorMode="dark"
+                    forceColorMode="dark"
                     proOptions={{ hideAttribution: true }}
                 >
                     <Background

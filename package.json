@@ -65,7 +65,7 @@
     },
     "dependencies": {
         "@openai/codex-sdk": "^0.171.0",
-        "@xyflow/react": "^12.10.2",
+        "@xyflow/react": "^13.0.2",
         "drizzle-orm": "^0.45.2",
         "mobx": "^7.1.4",
         "mobx-state-tree": "^9.0.0",

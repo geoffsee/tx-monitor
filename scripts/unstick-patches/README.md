@@ -19,4 +19,5 @@ What they fix:
 - Weekly Deploy safety-net release instead of missing `caretta-action`
 - format package.json after `npm version` so Release lint stays green
 
-Last GH013 rejection: 2026-11-16. Manual ship that week: `v1.1.17` for #97/#98.
+Last GH013 rejection: 2026-11-24. Manual ship that week: pending for #99
+(and `@xyflow/react` 13 once merged) while live workflow patches remain blocked.
